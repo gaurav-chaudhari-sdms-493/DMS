@@ -104,3 +104,4 @@ To run services locally outside of Docker:
 - **Celery Workers**: Shift background document processing and embedding to Celery workers for scalability.
 - **Compliance Dashboard**: Add UI components to monitor audit logs and ensure SOC2/GDPR compliance.
 - **RBAC UI**: Build interfaces to intuitively manage roles and granular resource permissions.
+
