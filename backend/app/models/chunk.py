@@ -1,8 +1,7 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import ForeignKey
+from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy import ForeignKey, TEXT, INTEGER, Index
 from pgvector.sqlalchemy import Vector
-from pgvector.sqlalchemy import TSVector
 from datetime import datetime
 import uuid
 from typing import TYPE_CHECKING, Optional, Any
@@ -15,13 +14,18 @@ if TYPE_CHECKING:
 class Chunk(Base):
     __tablename__ = "chunks"
 
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
-    content: Mapped[str] = mapped_column()
-    page_number: Mapped[Optional[int]] = mapped_column()
-    chunk_index: Mapped[int] = mapped_column()
+    tenant_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), index=True)
+    content: Mapped[str] = mapped_column(TEXT)
     embedding: Mapped[Any] = mapped_column(Vector(1536))
-    content_tsv: Mapped[Any] = mapped_column(TSVector())
+    chunk_metadata: Mapped[dict] = mapped_column(JSONB)
+    page_number: Mapped[Optional[int]] = mapped_column(INTEGER)
+    s3_path: Mapped[str] = mapped_column(TEXT)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     document: Mapped["Document"] = relationship("Document", back_populates="chunks")
+
+    __table_args__ = (
+        Index('ix_chunks_tenant_id', 'tenant_id'),
+    )

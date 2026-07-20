@@ -1,0 +1,9 @@
+# Ignore node_modules, but not in the frontend directory
+**/node_modules
+
+# Ignore .git and .idea directories
+.git
+.idea
+
+# Allow the frontend lib directory
+!frontend/lib

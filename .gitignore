@@ -16,7 +16,6 @@ dist/
 downloads/
 eggs/
 .eggs/
-lib/
 lib64/
 parts/
 sdist/
@@ -34,7 +33,6 @@ ENV/
 node_modules/
 .next/
 out/
-build/
 .DS_Store
 *.pem
 
