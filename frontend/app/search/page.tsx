@@ -1,17 +1,26 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { FolderSearch, AlertCircle } from "lucide-react";
 import { SearchBar } from "@/components/search/SearchBar";
 import { AISummary } from "@/components/search/AISummary";
 import { ResultCard } from "@/components/search/ResultCard";
 import { api } from "@/lib/api";
 import type { SearchResponse } from "@/types";
+import { isAuthenticated } from "@/lib/auth";
 
 export default function SearchPage() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [response, setResponse] = useState<SearchResponse | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.replace("/login");
+    }
+  }, [router]);
 
   const handleSearch = async (query: string) => {
     setLoading(true);

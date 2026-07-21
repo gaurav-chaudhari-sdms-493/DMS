@@ -1,11 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { UploadProgress } from "@/components/upload/UploadProgress";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { isAuthenticated } from "@/lib/auth";
 
 interface UploadTask {
   id: string;
@@ -15,7 +17,14 @@ interface UploadTask {
 }
 
 export default function UploadPage() {
+  const router = useRouter();
   const [uploads, setUploads] = useState<UploadTask[]>([]);
+
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.replace("/login");
+    }
+  }, [router]);
 
   const handleFileSelected = async (file: File) => {
     const id = Math.random().toString(36).substring(7);

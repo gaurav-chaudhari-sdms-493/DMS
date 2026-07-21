@@ -54,91 +54,95 @@ Text snippet:
 
 async def _ingest_document_task_async(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
     """Celery task for the full ingestion pipeline: OCR → chunk → embed → store."""
-    document_id = UUID(document_id_str)
-    version_id = UUID(version_id_str)
-    tenant_id = UUID(tenant_id_str)
+    from app.database import engine
+    try:
+        document_id = UUID(document_id_str)
+        version_id = UUID(version_id_str)
+        tenant_id = UUID(tenant_id_str)
 
-    async with AsyncSessionLocal() as db:
-        try:
-            # 1. Download file
-            file_bytes = await download_file(s3_path)
-            filename = os.path.basename(s3_path)
+        async with AsyncSessionLocal() as db:
+            try:
+                # 1. Download file
+                file_bytes = await download_file(s3_path)
+                filename = os.path.basename(s3_path)
 
-            # 2. OCR
-            ocr = get_ocr_provider()
-            pages = await ocr.extract_pages(file_bytes, filename)
+                # 2. OCR
+                ocr = get_ocr_provider()
+                pages = await ocr.extract_pages(file_bytes, filename)
 
-            # 3. Chunk
-            chunker = TextChunker()
-            chunks = chunker.chunk_pages(pages)
+                # 3. Chunk
+                chunker = TextChunker()
+                chunks = chunker.chunk_pages(pages)
 
-            if not chunks:
-                raise ValueError("No text found in document.")
+                if not chunks:
+                    raise ValueError("No text found in document.")
 
-            # 4. Embed chunks
-            embed_provider = get_embed_provider()
-            embeddings = await embed_provider.embed([c.content for c in chunks])
+                # 4. Embed chunks
+                embed_provider = get_embed_provider()
+                embeddings = await embed_provider.embed([c.content for c in chunks])
 
-            # 5. Insert chunks
-            for idx, chunk in enumerate(chunks):
-                db_chunk = DBChunk(
-                    document_id=document_id,
-                    version_id=version_id,
-                    tenant_id=tenant_id,
-                    content=chunk.content,
-                    page_number=chunk.page_number,
-                    chunk_index=chunk.chunk_index,
-                    embedding=embeddings[idx],
-                    chunk_metadata={"token_count": chunk.token_count, "bbox": chunk.bbox},
-                    s3_path=s3_path
-                )
-                db.add(db_chunk)
-
-            # 6. Extract metadata
-            full_text = " ".join([p.get("text", "") for p in pages])
-            meta_dict = await extract_metadata(full_text)
-
-            # 7. Insert metadata
-            if meta_dict:
-                for key, value in meta_dict.items():
-                    db_meta = MetadataItem(
+                # 5. Insert chunks
+                for idx, chunk in enumerate(chunks):
+                    db_chunk = DBChunk(
                         document_id=document_id,
-                        key=key,
-                        value=value if isinstance(value, (dict, list)) else {"v": value},
-                        source="llm",
-                        confidence_score=0.9,
+                        version_id=version_id,
+                        tenant_id=tenant_id,
+                        content=chunk.content,
+                        page_number=chunk.page_number,
+                        chunk_index=chunk.chunk_index,
+                        embedding=embeddings[idx],
+                        chunk_metadata={"token_count": chunk.token_count, "bbox": chunk.bbox},
+                        s3_path=s3_path
                     )
-                    db.add(db_meta)
+                    db.add(db_chunk)
 
-                if meta_dict.get("title"):
-                    stmt = select(Document).where(Document.id == document_id)
-                    res = await db.execute(stmt)
-                    doc = res.scalar_one_or_none()
-                    if doc and doc.title == "Unknown":
-                        doc.title = meta_dict["title"]
-                        doc.doc_type = meta_dict.get("document_type")
+                # 6. Extract metadata
+                full_text = " ".join([p.get("text", "") for p in pages])
+                meta_dict = await extract_metadata(full_text)
 
-            # 8. Update status
-            stmt = select(Document).where(Document.id == document_id)
-            res = await db.execute(stmt)
-            doc = res.scalar_one_or_none()
-            if doc:
-                doc.status = "indexed"
+                # 7. Insert metadata
+                if meta_dict:
+                    for key, value in meta_dict.items():
+                        db_meta = MetadataItem(
+                            document_id=document_id,
+                            key=key,
+                            value=value if isinstance(value, (dict, list)) else {"v": value},
+                            source="llm",
+                            confidence_score=0.9,
+                        )
+                        db.add(db_meta)
 
-            await db.commit()
+                    if meta_dict.get("title"):
+                        stmt = select(Document).where(Document.id == document_id)
+                        res = await db.execute(stmt)
+                        doc = res.scalar_one_or_none()
+                        if doc and doc.title == "Unknown":
+                            doc.title = meta_dict["title"]
+                            doc.doc_type = meta_dict.get("document_type")
 
-        except Exception as e:
-            logger.error(f"Ingestion failed for {document_id}: {e}")
-            async with AsyncSessionLocal() as db_fail:
-                try:
-                    stmt = select(Document).where(Document.id == document_id)
-                    res = await db_fail.execute(stmt)
-                    doc = res.scalar_one_or_none()
-                    if doc:
-                        doc.status = "failed"
-                    await db_fail.commit()
-                except Exception as inner_e:
-                    logger.error(f"Failed to update document status to 'failed': {inner_e}")
+                # 8. Update status
+                stmt = select(Document).where(Document.id == document_id)
+                res = await db.execute(stmt)
+                doc = res.scalar_one_or_none()
+                if doc:
+                    doc.status = "indexed"
+
+                await db.commit()
+
+            except Exception as e:
+                logger.error(f"Ingestion failed for {document_id}: {e}")
+                async with AsyncSessionLocal() as db_fail:
+                    try:
+                        stmt = select(Document).where(Document.id == document_id)
+                        res = await db_fail.execute(stmt)
+                        doc = res.scalar_one_or_none()
+                        if doc:
+                            doc.status = "failed"
+                        await db_fail.commit()
+                    except Exception as inner_e:
+                        logger.error(f"Failed to update document status to 'failed': {inner_e}")
+    finally:
+        await engine.dispose()
 
 @celery_app.task(name="app.tasks.ingest_document_task")
 def ingest_document_task(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
