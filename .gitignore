@@ -48,3 +48,4 @@ yarn-error.log*
 .vscode/
 *.swp
 *.swo
+/frontend/package-lock.json
