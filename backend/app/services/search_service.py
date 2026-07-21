@@ -22,6 +22,21 @@ async def search(
     
     start_time = time.time()
     
+    # Enforce AI Input Guardrails
+    from app.services.guardrail_service import validate_input_query, validate_output_summary
+    is_safe, error_msg, scrubbed_query = validate_input_query(query)
+    if not is_safe:
+        took_ms = int((time.time() - start_time) * 1000)
+        return SearchResponse(
+            query=query,
+            ai_summary=f"Safety Block: {error_msg}",
+            results=[],
+            cached=False,
+            took_ms=took_ms
+        )
+    
+    query = scrubbed_query
+    
     cache_key = generate_cache_key(str(tenant_id), query, filters)
     cached = await get_cached_search(cache_key)
     if cached:
@@ -186,6 +201,9 @@ async def search(
         Message(role="system", content=sys_msg),
         Message(role="user", content=user_msg)
     ])
+    
+    # Enforce AI Output Guardrails
+    summary = validate_output_summary(summary)
     
     took_ms = int((time.time() - start_time) * 1000)
     
