@@ -6,16 +6,16 @@ from uuid import UUID
 from celery import Celery
 from sqlalchemy import select
 
-from app.ai.base import Message
-from app.ai.factory import get_embed_provider, get_llm_provider
-from app.database import AsyncSessionLocal
-from app.models.chunk import Chunk as DBChunk
-from app.models.document import Document
-from app.models.metadata_item import MetadataItem
-from app.ocr.factory import get_ocr_provider
-from app.pipeline.chunker import TextChunker
-from app.services.storage_service import download_file
-from app.config import settings
+from ..ai.base import Message
+from ..ai.factory import get_embed_provider, get_llm_provider
+from ..database import AsyncSessionLocal
+from ..models.chunk import Chunk as DBChunk
+from ..models.document import Document
+from ..models.metadata_item import MetadataItem
+from ..ocr.factory import get_ocr_provider
+from ..pipeline.chunker import TextChunker
+from ..services.storage_service import download_file
+from ..config import settings
 
 celery_app = Celery(
     "worker",
@@ -52,8 +52,7 @@ Text snippet:
         return {}
 
 
-@celery_app.task(name="app.tasks.ingest_document_task")
-async def ingest_document_task(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
+async def _ingest_document_task_async(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
     """Celery task for the full ingestion pipeline: OCR → chunk → embed → store."""
     document_id = UUID(document_id_str)
     version_id = UUID(version_id_str)
@@ -85,10 +84,13 @@ async def ingest_document_task(document_id_str: str, version_id_str: str, s3_pat
                 db_chunk = DBChunk(
                     document_id=document_id,
                     version_id=version_id,
+                    tenant_id=tenant_id,
                     content=chunk.content,
                     page_number=chunk.page_number,
                     chunk_index=chunk.chunk_index,
-                    embedding=embeddings[idx]
+                    embedding=embeddings[idx],
+                    chunk_metadata={"token_count": chunk.token_count, "bbox": chunk.bbox},
+                    s3_path=s3_path
                 )
                 db.add(db_chunk)
 
@@ -137,3 +139,8 @@ async def ingest_document_task(document_id_str: str, version_id_str: str, s3_pat
                     await db_fail.commit()
                 except Exception as inner_e:
                     logger.error(f"Failed to update document status to 'failed': {inner_e}")
+
+@celery_app.task(name="app.tasks.ingest_document_task")
+def ingest_document_task(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
+    import asyncio
+    asyncio.run(_ingest_document_task_async(document_id_str, version_id_str, s3_path, tenant_id_str))

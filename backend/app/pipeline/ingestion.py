@@ -1,5 +1,5 @@
 from uuid import UUID
-from app.tasks.worker import ingest_document_task
+from ..tasks.worker import ingest_document_task
 
 
 async def ingest_document(

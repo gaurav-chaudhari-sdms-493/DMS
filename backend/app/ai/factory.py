@@ -1,9 +1,29 @@
 from app.config import settings
 from app.ai.base import LLMProvider, EmbeddingProvider, RerankerProvider
+from typing import List
+import logging
+
+logger = logging.getLogger(__name__)
 
 _llm_provider: LLMProvider | None = None
 _embed_provider: EmbeddingProvider | None = None
 _rerank_provider: RerankerProvider | None = None
+
+class FallbackEmbeddingProvider(EmbeddingProvider):
+    def __init__(self, primary: EmbeddingProvider, fallback: EmbeddingProvider):
+        self.primary = primary
+        self.fallback = fallback
+
+    async def embed(self, texts: List[str]) -> List[List[float]]:
+        try:
+            return await self.primary.embed(texts)
+        except Exception as e:
+            logger.warning(f"Primary embedding provider ({self.primary.__class__.__name__}) failed: {e}. Falling back to secondary ({self.fallback.__class__.__name__}).")
+            return await self.fallback.embed(texts)
+
+    @property
+    def dimensions(self) -> int:
+        return self.primary.dimensions
 
 def get_llm_provider() -> LLMProvider:
     global _llm_provider
@@ -14,6 +34,9 @@ def get_llm_provider() -> LLMProvider:
         elif settings.ai_llm_provider == 'anthropic':
             from app.ai.providers.anthropic_provider import AnthropicLLMProvider
             _llm_provider = AnthropicLLMProvider(api_key=settings.anthropic_api_key, model=settings.anthropic_llm_model)
+        elif settings.ai_llm_provider == 'groq':
+            from app.ai.providers.groq_provider import GroqLLMProvider
+            _llm_provider = GroqLLMProvider(api_key=settings.groq_api_key, model=settings.groq_llm_model)
         else:
             raise ValueError(f'Unknown LLM provider: {settings.ai_llm_provider}')
     return _llm_provider
@@ -21,15 +44,46 @@ def get_llm_provider() -> LLMProvider:
 def get_embed_provider() -> EmbeddingProvider:
     global _embed_provider
     if _embed_provider is None:
+        # Resolve primary embedding provider
+        primary_provider = None
         if settings.ai_embed_provider == 'openai':
             from app.ai.providers.openai_provider import OpenAIEmbeddingProvider
-            _embed_provider = OpenAIEmbeddingProvider(
+            primary_provider = OpenAIEmbeddingProvider(
                 api_key=settings.openai_api_key, 
                 model=settings.openai_embed_model, 
                 dimensions=settings.openai_embed_dimensions
             )
+        elif settings.ai_embed_provider == 'bgem3':
+            from app.ai.providers.bgem3_provider import BGEM3EmbeddingProvider
+            primary_provider = BGEM3EmbeddingProvider()
+        elif settings.ai_embed_provider == 'gemini':
+            from app.ai.providers.gemini_provider import GeminiEmbeddingProvider
+            primary_provider = GeminiEmbeddingProvider(api_key=settings.google_api_key, model=settings.gemini_embed_model)
+        elif settings.ai_embed_provider == 'cohere':
+            from app.ai.providers.cohere_provider import CohereEmbeddingProvider
+            primary_provider = CohereEmbeddingProvider(api_key=settings.cohere_api_key, model="embed-english-v3.0")
         else:
             raise ValueError(f'Unknown Embedding provider: {settings.ai_embed_provider}')
+
+        # Resolve fallback embedding provider if configured
+        fallback_provider = None
+        if settings.ai_embed_fallback_provider == 'cohere':
+            from app.ai.providers.cohere_provider import CohereEmbeddingProvider
+            fallback_provider = CohereEmbeddingProvider(api_key=settings.cohere_api_key, model="embed-english-v3.0")
+        elif settings.ai_embed_fallback_provider == 'openai':
+            from app.ai.providers.openai_provider import OpenAIEmbeddingProvider
+            fallback_provider = OpenAIEmbeddingProvider(
+                api_key=settings.openai_api_key,
+                model=settings.openai_embed_model,
+                dimensions=settings.openai_embed_dimensions
+            )
+
+        # Wrap in FallbackEmbeddingProvider if a fallback exists
+        if fallback_provider:
+            _embed_provider = FallbackEmbeddingProvider(primary_provider, fallback_provider)
+        else:
+            _embed_provider = primary_provider
+
     return _embed_provider
 
 def get_rerank_provider() -> RerankerProvider:

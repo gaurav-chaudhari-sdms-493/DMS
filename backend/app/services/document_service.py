@@ -7,11 +7,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 
-from app.models.document import Document
-from app.models.document_version import DocumentVersion
-from app.schemas.document import DocumentUploadResponse, DocumentDetailResponse
-from app.services.storage_service import upload_file
-from app.pipeline.ingestion import ingest_document
+from ..models.document import Document
+from ..models.document_version import DocumentVersion
+from ..schemas.document import DocumentUploadResponse, DocumentDetailResponse
+from ..services.storage_service import upload_file
+from ..pipeline.ingestion import ingest_document
 
 logger = logging.getLogger(__name__)
 

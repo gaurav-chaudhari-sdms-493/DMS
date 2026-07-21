@@ -1,9 +1,12 @@
 from logging.config import fileConfig
 import os
+import sys
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import pool
 from alembic import context
 import asyncio
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
@@ -16,9 +19,18 @@ config = context.config
 
 # add your model's MetaData object here
 # for 'autogenerate' support
-# from myapp import mymodel
-# target_metadata = mymodel.Base.metadata
-target_metadata = None
+from app.database import Base
+# Import all models to ensure they are registered on the metadata object
+from app.models.tenant import Tenant
+from app.models.user import User, UserRole
+from app.models.document import Document
+from app.models.document_version import DocumentVersion
+from app.models.chunk import Chunk
+from app.models.metadata_item import MetadataItem
+from app.models.permission import Permission
+from app.models.audit_log import AuditLog
+
+target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
@@ -63,7 +75,7 @@ async def run_migrations_online() -> None:
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
 
-async def do_run_migrations(connection):
+def do_run_migrations(connection):
     context.configure(connection=connection, target_metadata=target_metadata)
     with context.begin_transaction():
         context.run_migrations()
