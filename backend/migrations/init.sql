@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS chunks (
   version_id UUID REFERENCES document_versions(id) ON DELETE CASCADE,
   content TEXT NOT NULL,
   content_tsv TSVECTOR GENERATED ALWAYS AS (to_tsvector('english', content)) STORED,
-  embedding VECTOR(1536),
+  embedding VECTOR(1024),
   page_number INTEGER,
   chunk_index INTEGER,
   bbox JSONB,

@@ -48,15 +48,21 @@ async def ingest_document(
     tenant_id: UUID,
     db: AsyncSession,
 ) -> None:
-    """Full ingestion pipeline: OCR → chunk → embed → store."""
+    """Full ingestion pipeline: OCR (with GCV fallback) → chunk → embed → store."""
     try:
         # 1. Download file
         file_bytes = await download_file(s3_path)
         filename = os.path.basename(s3_path)
         
-        # 2. OCR
+        # 2. OCR with GCV Fallback
         ocr = get_ocr_provider()
-        pages = await ocr.extract_pages(file_bytes, filename)
+        try:
+            pages = await ocr.extract_pages(file_bytes, filename)
+        except OCRFallbackRequired as e:
+            logger.warning(f"pdfplumber raised OCRFallbackRequired ({e}). Retrying with Google Cloud Vision (GCV) provider...")
+            from app.ocr.providers.gcv_provider import GCVProvider
+            gcv_ocr = GCVProvider()
+            pages = await gcv_ocr.extract_pages(file_bytes, filename)
         
         # 3. Chunk
         chunker = TextChunker()
@@ -115,17 +121,6 @@ async def ingest_document(
             
         await db.commit()
         
-    except OCRFallbackRequired as e:
-        logger.error(f"Ingestion failed for {document_id}: {e}")
-        try:
-            stmt = select(Document).where(Document.id == document_id)
-            res = await db.execute(stmt)
-            doc = res.scalar_one_or_none()
-            if doc:
-                doc.status = "failed"
-            await db.commit()
-        except Exception:
-            pass
     except Exception as e:
         logger.error(f"Ingestion failed for {document_id}: {e}")
         try:
@@ -137,4 +132,3 @@ async def ingest_document(
             await db.commit()
         except Exception:
             pass
-

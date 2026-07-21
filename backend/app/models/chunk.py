@@ -19,7 +19,7 @@ class Chunk(Base):
     version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("document_versions.id"), index=True, nullable=True)
     content: Mapped[str] = mapped_column(TEXT)
     content_tsv: Mapped[Optional[Any]] = mapped_column(TSVECTOR, Computed("to_tsvector('english', content)"), nullable=True)
-    embedding: Mapped[Any] = mapped_column(Vector(1536))
+    embedding: Mapped[Any] = mapped_column(Vector(1024))
     page_number: Mapped[Optional[int]] = mapped_column(INTEGER, nullable=True)
     chunk_index: Mapped[Optional[int]] = mapped_column(INTEGER, nullable=True)
     bbox: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
