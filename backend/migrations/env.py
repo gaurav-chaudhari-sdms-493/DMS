@@ -37,7 +37,8 @@ target_metadata = Base.metadata
 # my_important_option = config.get_main_option("my_important_option")
 
 def get_url():
-    return os.getenv("POSTGRES_URL")
+    from app.config import settings
+    return settings.postgres_url
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.

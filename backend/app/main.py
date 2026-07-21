@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from .config import settings
 from .api.v1.router import api_router
 from .services.cache_service import init_redis
+from .services.storage_service import ensure_bucket_exists
 from .tasks.worker import celery_app
 
 limiter = Limiter(key_func=get_remote_address)
@@ -14,6 +15,10 @@ limiter = Limiter(key_func=get_remote_address)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_redis()
+    try:
+        await ensure_bucket_exists()
+    except Exception as e:
+        pass
     yield
 
 def create_app() -> FastAPI:

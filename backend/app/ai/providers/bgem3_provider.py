@@ -12,8 +12,16 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
     def _load_model(self):
         if self._model is None:
             try:
+                import os
+                import torch
+                os.environ["TOKENIZERS_PARALLELISM"] = "false"
+                torch.set_num_threads(1)
                 from sentence_transformers import SentenceTransformer
-                self._model = SentenceTransformer(self.model_name)
+                try:
+                    self._model = SentenceTransformer(self.model_name, local_files_only=True)
+                except Exception as e:
+                    logger.info(f"Failed local load of '{self.model_name}', trying online download: {e}")
+                    self._model = SentenceTransformer(self.model_name)
             except ImportError as e:
                 logger.error("sentence-transformers is not installed. Please install it using `pip install sentence-transformers`.")
                 raise e
@@ -28,11 +36,7 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
         self._load_model()
         
         import asyncio
-        from functools import partial
-        
-        loop = asyncio.get_running_loop()
-        func = partial(self._model.encode, texts, convert_to_numpy=True)
-        embeddings_np = await loop.run_in_executor(None, func)
+        embeddings_np = await asyncio.to_thread(self._model.encode, texts, convert_to_numpy=True)
         embeddings = embeddings_np.tolist()
         
         # Pad to 1536 dimensions to match pgvector db column definition

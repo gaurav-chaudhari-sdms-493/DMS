@@ -37,7 +37,7 @@ export default function SearchPage() {
     }
   };
 
-  const filteredResults = response?.results.filter((r) => Math.round(r.score * 100) > 0) || [];
+  const filteredResults = response?.results || [];
 
   return (
     <div className="max-w-4xl mx-auto py-8">

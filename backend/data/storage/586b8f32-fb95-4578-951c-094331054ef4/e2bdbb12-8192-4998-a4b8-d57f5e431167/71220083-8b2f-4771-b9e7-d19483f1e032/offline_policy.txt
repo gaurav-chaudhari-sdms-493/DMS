@@ -1,0 +1,3 @@
+Offline Document Search Engine Policy
+
+This system allows searching indexed documents 100 percent offline in aeroplane mode. All embeddings, reranking, and search operations take place on the local machine.

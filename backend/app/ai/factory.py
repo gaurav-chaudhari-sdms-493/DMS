@@ -37,8 +37,15 @@ def get_llm_provider() -> LLMProvider:
         elif settings.ai_llm_provider == 'groq':
             from app.ai.providers.groq_provider import GroqLLMProvider
             _llm_provider = GroqLLMProvider(api_key=settings.groq_api_key, model=settings.groq_llm_model)
+        elif settings.ai_llm_provider == 'ollama':
+            from app.ai.providers.ollama_provider import OllamaLLMProvider
+            _llm_provider = OllamaLLMProvider(base_url=settings.ollama_base_url, model=settings.ollama_llm_model)
+        elif settings.ai_llm_provider in ('local', 'dummy', 'none'):
+            from app.ai.providers.local_provider import LocalLLMProvider
+            _llm_provider = LocalLLMProvider()
         else:
-            raise ValueError(f'Unknown LLM provider: {settings.ai_llm_provider}')
+            from app.ai.providers.local_provider import LocalLLMProvider
+            _llm_provider = LocalLLMProvider()
     return _llm_provider
 
 def get_embed_provider() -> EmbeddingProvider:
@@ -62,6 +69,9 @@ def get_embed_provider() -> EmbeddingProvider:
         elif settings.ai_embed_provider == 'cohere':
             from app.ai.providers.cohere_provider import CohereEmbeddingProvider
             primary_provider = CohereEmbeddingProvider(api_key=settings.cohere_api_key, model="embed-english-v3.0")
+        elif settings.ai_embed_provider == 'ollama':
+            from app.ai.providers.ollama_provider import OllamaEmbeddingProvider
+            primary_provider = OllamaEmbeddingProvider(base_url=settings.ollama_base_url, model=settings.ollama_embed_model)
         else:
             raise ValueError(f'Unknown Embedding provider: {settings.ai_embed_provider}')
 
@@ -92,6 +102,9 @@ def get_rerank_provider() -> RerankerProvider:
         if settings.ai_rerank_provider == 'cohere':
             from app.ai.providers.cohere_provider import CohereRerankerProvider
             _rerank_provider = CohereRerankerProvider(api_key=settings.cohere_api_key, model=settings.cohere_rerank_model)
+        elif settings.ai_rerank_provider == 'bge':
+            from app.ai.providers.bge_reranker_provider import BGERerankerProvider
+            _rerank_provider = BGERerankerProvider(model_name=settings.local_rerank_model)
         else:
             class DummyReranker(RerankerProvider):
                 async def rerank(self, query: str, documents: list[str], top_n: int = 5):

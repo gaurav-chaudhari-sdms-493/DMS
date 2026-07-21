@@ -25,3 +25,7 @@ numpy==1.26.4
 email-validator==2.2.0
 celery==5.4.0
 flower==2.0.1
+sentence-transformers>=3.0.0
+pytesseract>=0.3.10
+pdf2image>=1.17.0
+Pillow>=10.0.0

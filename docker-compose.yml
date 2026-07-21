@@ -56,8 +56,14 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env
+    environment:
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      POSTGRES_URL: "postgresql+asyncpg://docsearch:reset123@postgres:5432/docsearch"
+      REDIS_URL: "redis://:reset123@redis:6379/0"
     volumes:
       - ./backend:/app
+      - ~/.cache/huggingface:/root/.cache/huggingface
     working_dir: /app
     command: >
       sh -c "alembic upgrade head && echo 'Backend API Docs: http://localhost:8000/api/docs' && uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -68,7 +74,7 @@ services:
         max-file: "3"
     networks:
       - default
-      
+
   worker:
     build: ./backend
     depends_on:
@@ -78,8 +84,14 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env
+    environment:
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      POSTGRES_URL: "postgresql+asyncpg://docsearch:reset123@postgres:5432/docsearch"
+      REDIS_URL: "redis://:reset123@redis:6379/0"
     volumes:
       - ./backend:/app
+      - ~/.cache/huggingface:/root/.cache/huggingface
     working_dir: /app
     command: >
       sh -c "celery -A app.tasks.worker.celery_app worker --loglevel=info"

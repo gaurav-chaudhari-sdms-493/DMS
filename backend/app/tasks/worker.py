@@ -54,13 +54,15 @@ Text snippet:
 
 async def _ingest_document_task_async(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
     """Celery task for the full ingestion pipeline: OCR → chunk → embed → store."""
-    from app.database import engine
+    from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+    task_engine = create_async_engine(settings.postgres_url)
+    TaskSession = async_sessionmaker(task_engine, class_=AsyncSession, expire_on_commit=False)
     try:
         document_id = UUID(document_id_str)
         version_id = UUID(version_id_str)
         tenant_id = UUID(tenant_id_str)
 
-        async with AsyncSessionLocal() as db:
+        async with TaskSession() as db:
             try:
                 # 1. Download file
                 file_bytes = await download_file(s3_path)
@@ -131,7 +133,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
 
             except Exception as e:
                 logger.error(f"Ingestion failed for {document_id}: {e}")
-                async with AsyncSessionLocal() as db_fail:
+                async with TaskSession() as db_fail:
                     try:
                         stmt = select(Document).where(Document.id == document_id)
                         res = await db_fail.execute(stmt)
@@ -141,8 +143,10 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                         await db_fail.commit()
                     except Exception as inner_e:
                         logger.error(f"Failed to update document status to 'failed': {inner_e}")
+    except Exception as outer_e:
+        logger.error(f"Ingestion task outer failure: {outer_e}")
     finally:
-        await engine.dispose()
+        await task_engine.dispose()
 
 @celery_app.task(name="app.tasks.ingest_document_task")
 def ingest_document_task(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:

@@ -1,6 +1,12 @@
 # Ignore node_modules, but not in the frontend directory
 **/node_modules
 
+# Ignore python virtualenv and caches
+.venv
+__pycache__
+*.pyc
+*.pyo
+
 # Ignore .git and .idea directories
 .git
 .idea

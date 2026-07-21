@@ -13,6 +13,22 @@ class Settings(BaseSettings):
     
     # Redis
     redis_url: str
+
+    @field_validator("postgres_url", mode="after")
+    @classmethod
+    def adjust_postgres_url(cls, v: str) -> str:
+        import os
+        if os.path.exists("/.dockerenv") and "@localhost" in v:
+            return v.replace("@localhost", "@postgres")
+        return v
+
+    @field_validator("redis_url", mode="after")
+    @classmethod
+    def adjust_redis_url(cls, v: str) -> str:
+        import os
+        if os.path.exists("/.dockerenv") and "@localhost" in v:
+            return v.replace("@localhost", "@redis")
+        return v
     
     # JWT
     jwt_secret_key: str = 'secret'
@@ -20,19 +36,20 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_days: int = 7
     
-    # AWS S3
+    # AWS S3 / MinIO Storage
     aws_access_key_id: str = 'key'
     aws_secret_access_key: str = 'secret'
     aws_region: str = 'us-east-1'
     s3_bucket_name: str = 'bucket'
     s3_presigned_url_expiry_seconds: int = 900
+    s3_endpoint_url: str | None = None
     
     # AI Providers
-    ai_llm_provider: Literal['openai', 'anthropic', 'groq'] = 'openai'
-    ai_embed_provider: Literal['openai', 'bgem3', 'gemini'] = 'openai'
+    ai_llm_provider: Literal['openai', 'anthropic', 'groq', 'ollama', 'local'] = 'local'
+    ai_embed_provider: Literal['openai', 'bgem3', 'gemini', 'cohere', 'ollama'] = 'bgem3'
     ai_embed_fallback_provider: Literal['cohere', 'openai', 'none'] = 'none'
-    ai_rerank_provider: Literal['cohere', 'none'] = 'cohere'
-    ai_ocr_provider: Literal['pdfplumber', 'llamaparse'] = 'pdfplumber'
+    ai_rerank_provider: Literal['cohere', 'bge', 'none'] = 'bge'
+    ai_ocr_provider: Literal['pdfplumber', 'llamaparse', 'pytesseract'] = 'pdfplumber'
     
     openai_api_key: str = ''
     openai_llm_model: str = 'gpt-4o-mini'
@@ -52,6 +69,13 @@ class Settings(BaseSettings):
     cohere_rerank_model: str = 'rerank-english-v3.0'
     
     llamaparse_api_key: str = ''
+    
+    # Local Providers Config (Ollama, BGE Reranker, Tesseract)
+    ollama_base_url: str = 'http://localhost:11434'
+    ollama_llm_model: str = 'llama3.3'
+    ollama_embed_model: str = 'bge-m3'
+    local_rerank_model: str = 'BAAI/bge-reranker-v2-m3'
+    tesseract_cmd: str = 'tesseract'
     
     # Rate limiting
     rate_limit_per_user: str = '60/minute'

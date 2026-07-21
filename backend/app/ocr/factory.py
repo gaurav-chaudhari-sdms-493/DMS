@@ -12,6 +12,9 @@ def get_ocr_provider() -> OCRProvider:
         elif settings.ai_ocr_provider == 'llamaparse':
             from app.ocr.providers.llamaparse_provider import LlamaParseProvider
             _ocr_provider = LlamaParseProvider(api_key=settings.llamaparse_api_key)
+        elif settings.ai_ocr_provider == 'pytesseract':
+            from app.ocr.providers.tesseract_provider import TesseractOCRProvider
+            _ocr_provider = TesseractOCRProvider(tesseract_cmd=settings.tesseract_cmd)
         else:
             raise ValueError(f"Unknown OCR provider: {settings.ai_ocr_provider}")
     return _ocr_provider
