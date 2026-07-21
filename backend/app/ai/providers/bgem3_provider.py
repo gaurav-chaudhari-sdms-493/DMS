@@ -15,7 +15,8 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
                 import os
                 import torch
                 os.environ["TOKENIZERS_PARALLELISM"] = "false"
-                torch.set_num_threads(1)
+                num_threads = min(4, os.cpu_count() or 1)
+                torch.set_num_threads(num_threads)
                 from sentence_transformers import SentenceTransformer
                 try:
                     self._model = SentenceTransformer(self.model_name, local_files_only=True)
