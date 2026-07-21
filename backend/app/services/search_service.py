@@ -79,7 +79,18 @@ async def search(
         
     merged = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:20]
     
-    # 6. Rerank
+    if not merged:
+        took_ms = int((time.time() - start_time) * 1000)
+        resp = SearchResponse(
+            query=query,
+            ai_summary="The answer was not found in the available documents.",
+            results=[],
+            cached=False,
+            took_ms=took_ms
+        )
+        await log_action(db, user_id, tenant_id, "search.query", details={"query": query, "result_count": 0, "took_ms": took_ms}, ip_address=ip_address)
+        return resp
+
     reranker = get_rerank_provider()
     doc_texts = [docs_map[cid].content for cid, _ in merged]
     reranked = await reranker.rerank(query, doc_texts, top_n=limit)
