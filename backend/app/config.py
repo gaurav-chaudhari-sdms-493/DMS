@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     ai_llm_provider: Literal['openai', 'anthropic'] = 'openai'
     ai_embed_provider: Literal['openai'] = 'openai'
     ai_rerank_provider: Literal['cohere', 'none'] = 'cohere'
-    ai_ocr_provider: Literal['pdfplumber', 'llamaparse'] = 'pdfplumber'
+    ai_ocr_provider: Literal['pdfplumber', 'llamaparse', 'gcv'] = 'pdfplumber'
     
     openai_api_key: str = ''
     openai_llm_model: str = 'gpt-4o-mini'
@@ -45,6 +45,10 @@ class Settings(BaseSettings):
     cohere_rerank_model: str = 'rerank-english-v3.0'
     
     llamaparse_api_key: str = ''
+    
+    google_application_credentials_json: str = ''
+    google_application_credentials_path: str = ''
+
     
     # Rate limiting
     rate_limit_per_user: str = '60/minute'

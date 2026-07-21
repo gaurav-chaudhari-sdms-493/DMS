@@ -1,5 +1,6 @@
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import text
 from app.config import settings
 
 engine = create_async_engine(
@@ -21,6 +22,13 @@ AsyncSessionLocal = async_sessionmaker(
 class Base(DeclarativeBase):
     pass
 
+async def set_tenant_context(session: AsyncSession, tenant_id: str) -> None:
+    """Sets transaction-scoped session variable for Postgres RLS enforcement."""
+    await session.execute(
+        text("SET LOCAL app.current_tenant_id = :tenant_id"),
+        {"tenant_id": str(tenant_id)}
+    )
+
 async def get_db():
     async with AsyncSessionLocal() as session:
         try:
@@ -31,3 +39,5 @@ async def get_db():
             raise
         finally:
             await session.close()
+
+

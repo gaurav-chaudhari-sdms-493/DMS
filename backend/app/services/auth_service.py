@@ -1,5 +1,5 @@
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
@@ -15,23 +15,23 @@ def verify_password(plain: str, hashed: str) -> bool:
     return pwd_context.verify(plain, hashed)
 
 def create_access_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_token_expire_minutes)
     to_encode = {
         "sub": str(user_id),
         "tenant_id": str(tenant_id),
         "role": role,
-        "exp": int(expire.timestamp()),
+        "exp": expire,
         "jti": str(uuid.uuid4())
     }
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 def create_refresh_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(days=settings.jwt_refresh_token_expire_days)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
     to_encode = {
         "sub": str(user_id),
         "tenant_id": str(tenant_id),
         "role": role,
-        "exp": int(expire.timestamp()),
+        "exp": expire,
         "jti": str(uuid.uuid4())
     }
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)

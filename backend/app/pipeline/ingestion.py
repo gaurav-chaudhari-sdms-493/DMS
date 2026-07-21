@@ -13,6 +13,8 @@ from app.ai.base import Message
 from app.pipeline.chunker import TextChunker
 import os
 
+from app.ocr.exceptions import OCRFallbackRequired
+
 logger = logging.getLogger(__name__)
 
 async def extract_metadata(text: str) -> dict:
@@ -113,6 +115,17 @@ async def ingest_document(
             
         await db.commit()
         
+    except OCRFallbackRequired as e:
+        logger.error(f"Ingestion failed for {document_id}: {e}")
+        try:
+            stmt = select(Document).where(Document.id == document_id)
+            res = await db.execute(stmt)
+            doc = res.scalar_one_or_none()
+            if doc:
+                doc.status = "failed"
+            await db.commit()
+        except Exception:
+            pass
     except Exception as e:
         logger.error(f"Ingestion failed for {document_id}: {e}")
         try:
@@ -124,3 +137,4 @@ async def ingest_document(
             await db.commit()
         except Exception:
             pass
+

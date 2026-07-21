@@ -139,6 +139,14 @@ ALTER TABLE metadata ENABLE ROW LEVEL SECURITY;
 ALTER TABLE audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE permissions ENABLE ROW LEVEL SECURITY;
 
+-- Force RLS (ensures table owners and app roles also respect RLS policies)
+ALTER TABLE documents FORCE ROW LEVEL SECURITY;
+ALTER TABLE document_versions FORCE ROW LEVEL SECURITY;
+ALTER TABLE chunks FORCE ROW LEVEL SECURITY;
+ALTER TABLE metadata FORCE ROW LEVEL SECURITY;
+ALTER TABLE audit_logs FORCE ROW LEVEL SECURITY;
+ALTER TABLE permissions FORCE ROW LEVEL SECURITY;
+
 -- Create app role (used by the backend connection)
 DO $$ BEGIN
   IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = 'docsearch_app') THEN
