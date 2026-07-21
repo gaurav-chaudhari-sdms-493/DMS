@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, Download, ExternalLink } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 import { Card } from "../ui/Card";
 import type { SearchResult } from "@/types";
 import { Badge } from "../ui/Badge";
@@ -9,7 +9,7 @@ interface ResultCardProps {
 }
 
 export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
-  // Mock logic to highlight bold tags from backend if snippet has HTML
+  // Safely render backend-highlighted HTML (bold match terms)
   const createMarkup = (html: string) => {
     return { __html: html };
   };
@@ -38,25 +38,31 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         )}
       </div>
 
-      <div 
-        className="text-sm text-textMuted line-clamp-3 leading-relaxed bg-surface/30 p-3 rounded-lg border border-borderDark/50 italic"
+      {/* Snippet preview — dark navy background, light gray text, indigo bold highlights */}
+      <div
+        className="text-sm leading-relaxed p-3 rounded-lg border border-indigo-900/40 not-italic"
+        style={{
+          backgroundColor: "#0f1420",
+          color: "#e2e8f0",
+          fontStyle: "normal",
+        }}
         dangerouslySetInnerHTML={createMarkup(result.snippet)}
       />
 
       <div className="flex items-center justify-between mt-auto pt-2 border-t border-borderDark">
         <div className="flex items-center gap-2">
           <div className="w-16 h-1.5 bg-surface rounded-full overflow-hidden" title={`Relevance: ${Math.round(result.score * 100)}%`}>
-            <div 
-              className={`h-full rounded-full ${getScoreColor(result.score)}`} 
-              style={{ width: `${Math.max(10, result.score * 100)}%` }} 
+            <div
+              className={`h-full rounded-full ${getScoreColor(result.score)}`}
+              style={{ width: `${Math.max(10, result.score * 100)}%` }}
             />
           </div>
           <span className="text-xs text-textMuted font-medium">{Math.round(result.score * 100)}% Match</span>
         </div>
 
-        <a 
-          href={result.download_url} 
-          target="_blank" 
+        <a
+          href={result.download_url}
+          target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-indigo-400 transition-colors"
         >
