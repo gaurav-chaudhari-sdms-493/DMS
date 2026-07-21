@@ -12,7 +12,6 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
     headers["Authorization"] = `Bearer ${token}`;
   }
 
-  // Set JSON content-type if body is JSON string and header not set
   if (options.body && typeof options.body === "string" && !headers["Content-Type"]) {
     headers["Content-Type"] = "application/json";
   }
@@ -23,7 +22,6 @@ async function apiFetch<T>(path: string, options: RequestInit = {}): Promise<T> 
   });
 
   if (res.status === 401 && typeof window !== "undefined") {
-    // Redirect to login on token invalid/expired
     if (!window.location.pathname.startsWith("/login")) {
       window.location.href = "/login";
     }
@@ -58,11 +56,11 @@ export const api = {
     },
   },
   documents: {
-    upload: async (file: File): Promise<{ document_id: string; version_id: string; title: str; status: str }> => {
+    upload: async (file: File): Promise<{ document_id: string; version_id: string; title: string; status: string }> => {
       const formData = new FormData();
       formData.append("file", file);
 
-      return apiFetch("/api/v1/documents", {
+      return apiFetch("/api/v1/documents/", {
         method: "POST",
         body: formData,
       });
@@ -73,7 +71,7 @@ export const api = {
   },
   search: {
     query: async (query: string, limit: number = 5, filters?: object): Promise<any> => {
-      return apiFetch("/api/v1/search", {
+      return apiFetch("/api/v1/search/", {
         method: "POST",
         body: JSON.stringify({ query, limit, filters }),
       });

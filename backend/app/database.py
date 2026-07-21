@@ -23,9 +23,9 @@ class Base(DeclarativeBase):
     pass
 
 async def set_tenant_context(session: AsyncSession, tenant_id: str) -> None:
-    """Sets transaction-scoped session variable for Postgres RLS enforcement."""
+    """Sets transaction-scoped session variable for Postgres RLS enforcement using set_config."""
     await session.execute(
-        text("SET LOCAL app.current_tenant_id = :tenant_id"),
+        text("SELECT set_config('app.current_tenant_id', :tenant_id, true)"),
         {"tenant_id": str(tenant_id)}
     )
 
@@ -39,5 +39,3 @@ async def get_db():
             raise
         finally:
             await session.close()
-
-

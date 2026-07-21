@@ -1,12 +1,34 @@
-// This is a placeholder file for authentication logic.
-
 export const storeTokens = (accessToken: string, refreshToken: string) => {
-  console.log("Storing tokens:", accessToken, refreshToken);
-  // In a real app, you would store these in localStorage or a cookie
+  if (typeof window !== "undefined") {
+    localStorage.setItem("access_token", accessToken);
+    localStorage.setItem("refresh_token", refreshToken);
+  }
+};
+
+export const getAccessToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("access_token");
+  }
+  return null;
+};
+
+export const getRefreshToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("refresh_token");
+  }
+  return null;
+};
+
+export const clearTokens = () => {
+  if (typeof window !== "undefined") {
+    localStorage.removeItem("access_token");
+    localStorage.removeItem("refresh_token");
+  }
 };
 
 export const isAuthenticated = (): boolean => {
-  console.log("Checking authentication status");
-  // In a real app, you would check for the presence of a valid token
+  if (typeof window !== "undefined") {
+    return !!localStorage.getItem("access_token");
+  }
   return false;
 };

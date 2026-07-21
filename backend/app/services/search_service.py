@@ -30,20 +30,21 @@ async def search(
     embed_provider = get_embed_provider()
     embeddings = await embed_provider.embed([query])
     q_emb = embeddings[0]
+    q_emb_str = f"[{','.join(str(x) for x in q_emb)}]"
     
     # 3. Vector search
     vec_sql = text("""
         SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
-               1 - (c.embedding <=> :query_embedding::vector) as vector_score
+               1 - (c.embedding <=> CAST(:query_embedding AS vector)) as vector_score
         FROM chunks c 
         JOIN documents d ON c.document_id = d.id
         LEFT JOIN document_versions v ON v.document_id = d.id
         WHERE d.tenant_id = :tenant_id AND d.status = 'indexed'
-        ORDER BY c.embedding <=> :query_embedding::vector
+        ORDER BY c.embedding <=> CAST(:query_embedding AS vector)
         LIMIT 20
     """)
     
-    vec_res = await db.execute(vec_sql, {"query_embedding": q_emb, "tenant_id": tenant_id})
+    vec_res = await db.execute(vec_sql, {"query_embedding": q_emb_str, "tenant_id": str(tenant_id)})
     vec_rows = vec_res.fetchall()
     
     # 4. Keyword search
@@ -59,7 +60,7 @@ async def search(
         LIMIT 20
     """)
     
-    kw_res = await db.execute(kw_sql, {"query": query, "tenant_id": tenant_id})
+    kw_res = await db.execute(kw_sql, {"query": query, "tenant_id": str(tenant_id)})
     kw_rows = kw_res.fetchall()
     
     # 5. RRF Merge
