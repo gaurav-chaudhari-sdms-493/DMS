@@ -12,10 +12,11 @@ A production-ready platform for multi-tenant document ingestion, processing, and
              │
              ▼
     [ FastAPI Backend ]  (Port 8000)
-       ┌─────┴─────┐
-       ▼           ▼
-  [ Redis ]   [ PostgreSQL + pgvector ]
- (Port 6379)         (Port 5432)
+       ┌─────┴──────────┬──────────┐
+       │                │          │
+       ▼                ▼          ▼
+[ Celery Worker ]  [ Redis ]   [ PostgreSQL + pgvector ]
+ (Async Tasks)     (Port 6379)         (Port 5432)
 ```
 
 ## Quick Start
@@ -35,6 +36,8 @@ A production-ready platform for multi-tenant document ingestion, processing, and
    ```bash
    docker compose up --build
    ```
+   The system will be available after a few moments. Check the container logs to monitor progress.
+
 For more detailed instructions on the Docker setup, see the [Docker README](./docker/README.md).
 
 ## Services Reference
@@ -45,6 +48,7 @@ For more detailed instructions on the Docker setup, see the [Docker README](./do
 | Backend   | FastAPI Python server      | 8000 |
 | Postgres  | pgvector database          | 5432 |
 | Redis     | Caching & task queue store | 6379 |
+| Worker    | Celery background worker   | N/A  |
 
 ## Environment Variables Reference
 
@@ -91,7 +95,13 @@ To run services locally outside of Docker:
   ```bash
   cd backend
   pip install -r requirements.txt
+  alembic upgrade head
   uvicorn main:app --reload --port 8000
+  ```
+- **Celery Worker**:
+  ```bash
+  cd backend
+  celery -A app.tasks.worker.celery_app worker --loglevel=info
   ```
 - **Frontend**:
   ```bash
@@ -102,6 +112,6 @@ To run services locally outside of Docker:
 
 ## Phase 2 Roadmap
 
-- **Celery Workers**: Shift background document processing and embedding to Celery workers for scalability.
+- **Celery Workers**: Shift background document processing and embedding to Celery workers for scalability. **(Done)**
 - **Compliance Dashboard**: Add UI components to monitor audit logs and ensure SOC2/GDPR compliance.
 - **RBAC UI**: Build interfaces to intuitively manage roles and granular resource permissions.

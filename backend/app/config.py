@@ -9,10 +9,10 @@ class Settings(BaseSettings):
     cors_origins: List[str] = ['http://localhost:3000']
     
     # Database
-    postgres_url: str = 'postgresql+asyncpg://user:pass@localhost:5432/db'
+    postgres_url: str
     
     # Redis
-    redis_url: str = 'redis://localhost:6379/0'
+    redis_url: str
     
     # JWT
     jwt_secret_key: str = 'secret'

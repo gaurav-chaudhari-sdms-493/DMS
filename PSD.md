@@ -12,16 +12,20 @@ The proposed Document Management System (DMS) is a highly scalable, domain-agnos
 - **Database**: PostgreSQL
 - **Database Extensions**: pgvector for embeddings, JSONB for flexible metadata
 - **Caching Layer**: Redis
+- **Task Queue**: Celery
 - **Re-ranking Layer**: Cohere Rerank
 - **Main Generative LLM**: GPT-4o or Claude 3.5 Sonnet
 - **Storage**: AWS S3
 
 ## 3. Architecture & Data Flow
 ### 3.1. Phase 1: Ingestion Pipeline (Upload & Indexing)
-1.  **File Upload**: The client uploads a document via the UI. The file is saved directly to a tenant-isolated AWS S3 bucket.
-2.  **Multilingual & Handwriting Parsing**: The raw file is routed to LlamaParse or Google Cloud Vision to extract text, tables, and layout metadata (e.g., page numbers, bounding boxes) with high fidelity.
-3.  **Dynamic Metadata Extraction**: A fast LLM reads the extracted text in a zero-shot capacity and outputs a JSON object containing dynamically identified metadata (e.g., Document Type, Key Names, Dates, Urgency).
-4.  **Vectorization & Storage**: LlamaIndex chunks the text while retaining spatial mapping (page numbers). Chunks are embedded into vectors and stored in PostgreSQL (pgvector). The dynamic JSON object is stored alongside it in a JSONB column.
+1.  **File Upload**: The client uploads a document via the UI. The API returns an immediate "Processing" status.
+2.  **Task Queuing**: A background job is enqueued in Celery. The file is saved to a tenant-isolated AWS S3 bucket.
+3.  **Async Processing (Celery Worker)**:
+    - **Multilingual & Handwriting Parsing**: The raw file is routed to LlamaParse or Google Cloud Vision to extract text, tables, and layout metadata.
+    - **Dynamic Metadata Extraction**: A fast LLM reads the extracted text and outputs a JSON object with dynamically identified metadata.
+    - **Vectorization & Storage**: LlamaIndex chunks the text, embeds it into vectors, and stores them in PostgreSQL (pgvector). The dynamic JSON is stored in a JSONB column.
+4.  **Status Update**: The document's status is updated to "Indexed" upon successful completion.
 
 ### 3.2. Phase 2: Retrieval Pipeline (Search & Output)
 1.  **Semantic Caching (Layer 0)**: The system checks Redis for identical recent queries. If found, it instantly returns cached results and bypasses the database.

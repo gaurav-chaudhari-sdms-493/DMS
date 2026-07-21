@@ -7,6 +7,7 @@ from contextlib import asynccontextmanager
 from app.config import settings
 from app.api.v1.router import api_router
 from app.services.cache_service import init_redis
+from app.tasks.worker import celery_app
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -37,6 +38,9 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
     
     app.include_router(api_router)
+    
+    # Attach Celery app to the FastAPI app instance
+    app.celery_app = celery_app
     
     return app
 
