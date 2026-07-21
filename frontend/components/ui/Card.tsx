@@ -10,7 +10,7 @@ export const Card = React.forwardRef<HTMLDivElement, CardProps>(
     return (
       <div
         ref={ref}
-        className={`glass rounded-xl p-6 transition-all duration-300 ${glow ? "hover:shadow-[0_0_20px_rgba(99,102,241,0.2)] hover:-translate-y-1" : ""} ${gradient ? "relative overflow-hidden before:absolute before:inset-0 before:p-[1px] before:bg-gradient-to-br before:from-primary before:to-secondary before:-z-10 before:rounded-xl" : ""} ${className}`}
+        className={`rounded-xl p-6 transition-all duration-300 ${gradient ? "border border-transparent bg-[linear-gradient(var(--bg),var(--bg))_padding-box,linear-gradient(to_bottom_right,var(--primary),var(--secondary))_border-box]" : "glass"} ${glow ? "hover:shadow-[0_0_30px_rgba(99,102,241,0.25)] hover:-translate-y-1 hover:border-primary/50" : ""} ${className}`}
         {...props}
       >
         {children}
