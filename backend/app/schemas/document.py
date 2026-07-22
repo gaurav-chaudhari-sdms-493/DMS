@@ -10,6 +10,12 @@ class DocumentUploadResponse(BaseModel):
     status: str
     created_at: datetime
 
+class BatchDocumentUploadResponse(BaseModel):
+    documents: List[DocumentUploadResponse]
+    total: int
+    succeeded: int
+    failed: int
+
 class DocumentDetailResponse(BaseModel):
     document_id: UUID
     title: str
@@ -19,3 +25,5 @@ class DocumentDetailResponse(BaseModel):
     current_version: Optional[Dict[str, Any]]
     metadata: List[Dict[str, Any]]
     versions: List[Dict[str, Any]]
+
+

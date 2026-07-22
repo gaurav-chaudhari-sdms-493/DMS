@@ -7,9 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 
+from typing import List
 from ..models.document import Document
 from ..models.document_version import DocumentVersion
-from ..schemas.document import DocumentUploadResponse, DocumentDetailResponse
+from ..schemas.document import DocumentUploadResponse, DocumentDetailResponse, BatchDocumentUploadResponse
 from ..services.storage_service import upload_file
 from ..pipeline.ingestion import ingest_document
 
@@ -80,6 +81,32 @@ async def upload_document(
         title=doc.title,
         status=doc.status,
         created_at=doc.created_at,
+    )
+
+
+async def upload_documents_bulk(
+    files: List[UploadFile],
+    tenant_id: UUID,
+    user_id: UUID,
+    db: AsyncSession,
+) -> BatchDocumentUploadResponse:
+    """Upload multiple documents, create DB records, and schedule async ingestion for each."""
+    uploaded_docs: List[DocumentUploadResponse] = []
+    failed_count = 0
+
+    for file in files:
+        try:
+            doc_resp = await upload_document(file, tenant_id, user_id, db)
+            uploaded_docs.append(doc_resp)
+        except Exception as err:
+            logger.error(f"Failed to upload document {file.filename}: {err}")
+            failed_count += 1
+
+    return BatchDocumentUploadResponse(
+        documents=uploaded_docs,
+        total=len(files),
+        succeeded=len(uploaded_docs),
+        failed=failed_count,
     )
 
 

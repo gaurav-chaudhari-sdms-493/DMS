@@ -68,5 +68,16 @@ export const api = {
         body: formData,
       });
     },
+    uploadBulk: async (files: File[]): Promise<any> => {
+      const formData = new FormData();
+      files.forEach((file) => {
+        formData.append("files", file);
+      });
+      return await request("/api/v1/documents/bulk", {
+        method: "POST",
+        body: formData,
+      });
+    },
+
   },
 };
