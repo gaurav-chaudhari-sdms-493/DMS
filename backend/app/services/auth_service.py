@@ -3,16 +3,54 @@ from datetime import datetime, timedelta
 from jose import jwt, JWTError
 from passlib.context import CryptContext
 from fastapi import HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.config import settings
-from app.schemas.auth import TokenPayload
+from app.schemas.auth import TokenPayload, SignUpRequest, SignUpResponse
+from app.models.user import User, UserRole
+from app.models.tenant import Tenant
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+import bcrypt
 
 def hash_password(password: str) -> str:
-    return pwd_context.hash(password)
+    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
 
 def verify_password(plain: str, hashed: str) -> bool:
-    return pwd_context.verify(plain, hashed)
+    try:
+        return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+    except Exception:
+        return False
+
+async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
+    """Creates a new tenant and an admin user."""
+    stmt = select(User).where(User.email == body.email)
+    res = await db.execute(stmt)
+    if res.scalar_one_or_none():
+        raise HTTPException(status_code=409, detail="Email already registered")
+
+    # Create tenant
+    tenant = Tenant(name=f"{body.full_name}'s Organization")
+    db.add(tenant)
+    await db.flush()
+
+    # Create user
+    user = User(
+        email=body.email,
+        full_name=body.full_name,
+        hashed_password=hash_password(body.password),
+        tenant_id=tenant.id,
+        role=UserRole.admin,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+
+    return SignUpResponse(
+        user_id=user.id,
+        tenant_id=tenant.id,
+        full_name=user.full_name,
+        email=user.email,
+    )
 
 def create_access_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
     expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_expire_minutes)

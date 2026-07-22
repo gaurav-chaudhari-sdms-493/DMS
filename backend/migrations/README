@@ -1,0 +1,3 @@
+Generic upgrade and downgrade functions.
+
+This directory contains a versioning script that can be used to upgrade and downgrade a database.

@@ -1,11 +1,13 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { UploadZone } from "@/components/upload/UploadZone";
 import { UploadProgress } from "@/components/upload/UploadProgress";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
+import { isAuthenticated } from "@/lib/auth";
 
 interface UploadTask {
   id: string;
@@ -15,18 +17,33 @@ interface UploadTask {
 }
 
 export default function UploadPage() {
+  const router = useRouter();
   const [uploads, setUploads] = useState<UploadTask[]>([]);
 
-  const handleFileSelected = async (file: File) => {
-    const id = Math.random().toString(36).substring(7);
-    const newUpload: UploadTask = { id, file, progress: 0, status: "uploading" };
-    setUploads((prev) => [newUpload, ...prev]);
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      router.replace("/login");
+    }
+  }, [router]);
 
-    // Simulate progress
+  const handleFilesSelected = async (files: File[]) => {
+    if (files.length === 0) return;
+
+    const newTasks: UploadTask[] = files.map((file) => ({
+      id: Math.random().toString(36).substring(7),
+      file,
+      progress: 0,
+      status: "uploading",
+    }));
+
+    const taskIds = new Set(newTasks.map((t) => t.id));
+
+    setUploads((prev) => [...newTasks, ...prev]);
+
     const interval = setInterval(() => {
       setUploads((prev) =>
         prev.map((u) => {
-          if (u.id === id && u.status === "uploading") {
+          if (taskIds.has(u.id) && u.status === "uploading") {
             const next = u.progress + 10;
             if (next >= 100) return { ...u, progress: 99 };
             return { ...u, progress: next };
@@ -37,15 +54,19 @@ export default function UploadPage() {
     }, 200);
 
     try {
-      await api.documents.upload(file);
+      if (files.length === 1) {
+        await api.documents.upload(files[0]);
+      } else {
+        await api.documents.uploadBulk(files);
+      }
       clearInterval(interval);
       setUploads((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, progress: 100, status: "indexed" } : u))
+        prev.map((u) => (taskIds.has(u.id) ? { ...u, progress: 100, status: "indexed" } : u))
       );
     } catch (error) {
       clearInterval(interval);
       setUploads((prev) =>
-        prev.map((u) => (u.id === id ? { ...u, status: "failed" } : u))
+        prev.map((u) => (taskIds.has(u.id) ? { ...u, status: "failed" } : u))
       );
     }
   };
@@ -57,7 +78,7 @@ export default function UploadPage() {
         <p className="text-textMuted">Add PDFs, Word docs, or text files to your knowledge base.</p>
       </div>
 
-      <UploadZone onFileSelected={handleFileSelected} />
+      <UploadZone onFilesSelected={handleFilesSelected} />
 
       {uploads.length > 0 && (
         <div className="mt-12">

@@ -9,10 +9,10 @@ class Settings(BaseSettings):
     cors_origins: List[str] = ['http://localhost:3000']
     
     # Database
-    postgres_url: str = 'postgresql+asyncpg://user:pass@localhost:5432/db'
+    postgres_url: str
     
     # Redis
-    redis_url: str = 'redis://localhost:6379/0'
+    redis_url: str
     
     # JWT
     jwt_secret_key: str = 'secret'
@@ -28,8 +28,9 @@ class Settings(BaseSettings):
     s3_presigned_url_expiry_seconds: int = 900
     
     # AI Providers
-    ai_llm_provider: Literal['openai', 'anthropic'] = 'openai'
-    ai_embed_provider: Literal['openai'] = 'openai'
+    ai_llm_provider: Literal['openai', 'anthropic', 'groq'] = 'openai'
+    ai_embed_provider: Literal['openai', 'bgem3', 'gemini'] = 'openai'
+    ai_embed_fallback_provider: Literal['cohere', 'openai', 'none'] = 'none'
     ai_rerank_provider: Literal['cohere', 'none'] = 'cohere'
     ai_ocr_provider: Literal['pdfplumber', 'llamaparse'] = 'pdfplumber'
     
@@ -40,6 +41,12 @@ class Settings(BaseSettings):
     
     anthropic_api_key: str = ''
     anthropic_llm_model: str = 'claude-3-5-haiku-20241022'
+    
+    groq_api_key: str = ''
+    groq_llm_model: str = 'llama-3.3-70b-versatile'
+    
+    google_api_key: str = ''
+    gemini_embed_model: str = 'text-embedding-004'
     
     cohere_api_key: str = ''
     cohere_rerank_model: str = 'rerank-english-v3.0'

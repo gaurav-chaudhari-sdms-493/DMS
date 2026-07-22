@@ -23,6 +23,6 @@ async def log_action(
         details=details
     )
     db.add(log)
-    await db.commit()
+    await db.flush()
     await db.refresh(log)
     return log

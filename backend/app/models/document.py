@@ -18,12 +18,18 @@ class Document(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("document_versions.id", use_alter=True, name="fk_document_current_version_id"), nullable=True)
     title: Mapped[str] = mapped_column()
     doc_type: Mapped[Optional[str]] = mapped_column()
     status: Mapped[str] = mapped_column(default="pending")
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="documents")
-    versions: Mapped[List["DocumentVersion"]] = relationship("DocumentVersion", back_populates="document")
+    versions: Mapped[List["DocumentVersion"]] = relationship(
+        "DocumentVersion",
+        back_populates="document",
+        foreign_keys="[DocumentVersion.document_id]"
+    )
     metadata_items: Mapped[List["MetadataItem"]] = relationship("MetadataItem", back_populates="document")
     chunks: Mapped[List["Chunk"]] = relationship("Chunk", back_populates="document")

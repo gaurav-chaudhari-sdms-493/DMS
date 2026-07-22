@@ -1,18 +1,24 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.database import get_db
-from app.services.auth_service import verify_token
-from app.schemas.auth import TokenPayload
+from .database import get_db
+from .services.auth_service import verify_token
+from .schemas.auth import TokenPayload
 import uuid
 
 bearer_scheme = HTTPBearer()
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> TokenPayload:
+    if not credentials:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
     return verify_token(credentials.credentials)
 
 async def require_tenant_access(current_user: TokenPayload = Depends(get_current_user)) -> TokenPayload:
-    if not current_user.tenant_id:
+    if not current_user or not current_user.tenant_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tenant context")
     return current_user
 

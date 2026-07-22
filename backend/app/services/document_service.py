@@ -1,18 +1,18 @@
 import hashlib
 import uuid
 import logging
-from fastapi import UploadFile, BackgroundTasks, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
+from fastapi import UploadFile, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 
-from app.models.document import Document
-from app.models.document_version import DocumentVersion
-from app.schemas.document import DocumentUploadResponse, DocumentDetailResponse
-from app.services.storage_service import upload_file
-from app.pipeline.ingestion import ingest_document
-from app.database import AsyncSessionLocal
+from typing import List
+from ..models.document import Document
+from ..models.document_version import DocumentVersion
+from ..schemas.document import DocumentUploadResponse, DocumentDetailResponse, BatchDocumentUploadResponse
+from ..services.storage_service import upload_file
+from ..pipeline.ingestion import ingest_document
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +22,8 @@ async def upload_document(
     tenant_id: UUID,
     user_id: UUID,
     db: AsyncSession,
-    background_tasks: BackgroundTasks,
 ) -> DocumentUploadResponse:
-    """Upload a document to S3, create DB records, and schedule async ingestion.
-
-    The ingestion pipeline runs in a BackgroundTask using its own DB session
-    so it is not affected by the request session being closed after the response.
-    """
+    """Upload a document to S3, create DB records, and schedule async ingestion."""
     file_bytes = await file.read()
 
     # Compute file hash for deduplication
@@ -72,13 +67,12 @@ async def upload_document(
     await db.commit()
     await db.refresh(doc)
 
-    # Background ingestion uses its OWN session — never reuse the request session
-    background_tasks.add_task(
-        _run_ingestion_with_own_session,
-        doc_id,
-        version_id,
-        s3_key,
-        tenant_id,
+    # Enqueue the ingestion task
+    await ingest_document(
+        document_id=doc_id,
+        version_id=version_id,
+        s3_path=s3_key,
+        tenant_id=tenant_id,
     )
 
     return DocumentUploadResponse(
@@ -90,15 +84,30 @@ async def upload_document(
     )
 
 
-async def _run_ingestion_with_own_session(
-    document_id: UUID,
-    version_id: UUID,
-    s3_path: str,
+async def upload_documents_bulk(
+    files: List[UploadFile],
     tenant_id: UUID,
-) -> None:
-    """Wrapper that creates a fresh DB session for the background ingestion task."""
-    async with AsyncSessionLocal() as session:
-        await ingest_document(document_id, version_id, s3_path, tenant_id, session)
+    user_id: UUID,
+    db: AsyncSession,
+) -> BatchDocumentUploadResponse:
+    """Upload multiple documents, create DB records, and schedule async ingestion for each."""
+    uploaded_docs: List[DocumentUploadResponse] = []
+    failed_count = 0
+
+    for file in files:
+        try:
+            doc_resp = await upload_document(file, tenant_id, user_id, db)
+            uploaded_docs.append(doc_resp)
+        except Exception as err:
+            logger.error(f"Failed to upload document {file.filename}: {err}")
+            failed_count += 1
+
+    return BatchDocumentUploadResponse(
+        documents=uploaded_docs,
+        total=len(files),
+        succeeded=len(uploaded_docs),
+        failed=failed_count,
+    )
 
 
 async def get_document(
