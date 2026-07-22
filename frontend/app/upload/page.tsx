@@ -84,9 +84,9 @@ export default function UploadPage() {
         <div className="mt-12">
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-xl font-semibold text-textMain">Recent Uploads</h2>
-            <Link href="/search">
+            <Link href="/drive">
               <Button variant="ghost" size="sm" className="gap-2">
-                Go to Search
+                Go to Drive
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>

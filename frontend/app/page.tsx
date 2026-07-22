@@ -11,7 +11,7 @@ export default function Home() {
 
   useEffect(() => {
     if (isAuthenticated()) {
-      router.replace("/search");
+      router.replace("/drive");
     }
   }, [router]);
 

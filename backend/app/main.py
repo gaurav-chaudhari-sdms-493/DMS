@@ -9,11 +9,14 @@ from .api.v1.router import api_router
 from .services.cache_service import init_redis
 from .tasks.worker import celery_app
 
+from .services.storage_service import ensure_bucket_exists
+
 limiter = Limiter(key_func=get_remote_address)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_redis()
+    await ensure_bucket_exists()
     yield
 
 def create_app() -> FastAPI:
@@ -28,7 +31,7 @@ def create_app() -> FastAPI:
     
     app.add_middleware(
         CORSMiddleware, 
-        allow_origins=settings.cors_origins,
+        allow_origins=["*"],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

@@ -9,14 +9,28 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        background: "#0a0f1e",
-        surface: "rgba(255,255,255,0.05)",
-        primary: "#6366f1",
-        secondary: "#06b6d4",
-        success: "#10b981",
-        textMain: "#f1f5f9",
-        textMuted: "#94a3b8",
-        borderDark: "rgba(255,255,255,0.1)",
+        gdriveBg: "#f8f9fa",
+        gdriveSurface: "#ffffff",
+        gdriveSearchBg: "#edf2fc",
+        gdrivePillActive: "#c2e7ff",
+        gdrivePillText: "#001d35",
+        gdriveBlue: "#0b57d0",
+        gdriveBorder: "#e1e3e1",
+        gdriveCardBg: "#f0f4f9",
+        gdriveTextMain: "#1f1f1f",
+        gdriveTextMuted: "#444746",
+        background: "#f8f9fa",
+        surface: "#ffffff",
+        primary: "#0b57d0",
+        secondary: "#00639b",
+        success: "#146c2e",
+        textMain: "#1f1f1f",
+        textMuted: "#444746",
+        borderDark: "#e1e3e1",
+      },
+      borderRadius: {
+        "3xl": "24px",
+        "4xl": "28px",
       },
       keyframes: {
         fadeIn: {
@@ -24,18 +38,13 @@ const config: Config = {
           "100%": { opacity: "1" },
         },
         slideUp: {
-          "0%": { opacity: "0", transform: "translateY(20px)" },
+          "0%": { opacity: "0", transform: "translateY(10px)" },
           "100%": { opacity: "1", transform: "translateY(0)" },
-        },
-        pulseGlow: {
-          "0%, 100%": { boxShadow: "0 0 10px rgba(99,102,241,0.2)" },
-          "50%": { boxShadow: "0 0 30px rgba(99,102,241,0.5)" },
         },
       },
       animation: {
-        fadeIn: "fadeIn 0.5s ease-in-out",
-        slideUp: "slideUp 0.5s ease-out",
-        "pulse-glow": "pulseGlow 2s infinite ease-in-out",
+        fadeIn: "fadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
+        slideUp: "slideUp 0.25s cubic-bezier(0.4, 0, 0.2, 1)",
       },
     },
   },

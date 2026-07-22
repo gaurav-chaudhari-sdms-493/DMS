@@ -6,7 +6,7 @@ import json
 class Settings(BaseSettings):
     # App
     app_env: Literal['development', 'production', 'test'] = 'development'
-    cors_origins: List[str] = ['http://localhost:3000']
+    cors_origins: List[str] = ['*']
     
     # Database
     postgres_url: str
@@ -20,11 +20,13 @@ class Settings(BaseSettings):
     jwt_access_token_expire_minutes: int = 15
     jwt_refresh_token_expire_days: int = 7
     
-    # AWS S3
-    aws_access_key_id: str = 'key'
-    aws_secret_access_key: str = 'secret'
+    # AWS S3 / MinIO
+    aws_access_key_id: str = 'minioadmin'
+    aws_secret_access_key: str = 'minioadmin'
     aws_region: str = 'us-east-1'
-    s3_bucket_name: str = 'bucket'
+    s3_bucket_name: str = 'docsearch-documents'
+    s3_endpoint_url: str = 'http://localhost:9000'
+    s3_public_endpoint_url: str = 'http://localhost:9000'
     s3_presigned_url_expiry_seconds: int = 900
     
     # AI Providers

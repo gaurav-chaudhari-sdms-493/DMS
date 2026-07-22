@@ -22,7 +22,7 @@ async def search(
     
     start_time = time.time()
     
-    # Enforce AI Input Guardrails
+    # 1. Enforce AI Input Guardrails
     from app.services.guardrail_service import validate_input_query, validate_output_summary
     is_safe, error_msg, scrubbed_query = validate_input_query(query)
     if not is_safe:
@@ -59,6 +59,9 @@ async def search(
         for idx, (k, v) in enumerate(filters.items()):
             if k == "doc_type":
                 filter_clauses.append(f"AND d.doc_type = :filter_{idx}")
+                params[f"filter_{idx}"] = v
+            elif k == "document_id":
+                filter_clauses.append(f"AND d.id = :filter_{idx}")
                 params[f"filter_{idx}"] = v
             else:
                 # Treat as custom metadata item filter
@@ -133,7 +136,7 @@ async def search(
         took_ms = int((time.time() - start_time) * 1000)
         resp = SearchResponse(
             query=query,
-            ai_summary="No matching documents were found in the database.",
+            ai_summary=f"No matching documents were found in your drive for '{query}'.",
             results=[],
             cached=False,
             took_ms=took_ms
@@ -141,22 +144,48 @@ async def search(
         await log_action(db, user_id, tenant_id, "search.query", details={"query": query, "result_count": 0, "took_ms": took_ms}, ip_address=ip_address)
         return resp
         
-    # 6. Rerank
+    # 6. Rerank & Apply Relevance Threshold (Score >= 0.15)
     reranker = get_rerank_provider()
     doc_texts = [docs_map[cid].content for cid, _ in merged]
-    reranked = await reranker.rerank(query, doc_texts, top_n=limit)
+    reranked = await reranker.rerank(query, doc_texts, top_n=limit * 2)
     
+    RELEVANCE_THRESHOLD = 0.15
+    relevant_ranks = [r for r in reranked if r.score >= RELEVANCE_THRESHOLD]
+    
+    if not relevant_ranks:
+        took_ms = int((time.time() - start_time) * 1000)
+        resp = SearchResponse(
+            query=query,
+            ai_summary=f"No matching documents were found in your drive for '{query}'.",
+            results=[],
+            cached=False,
+            took_ms=took_ms
+        )
+        await log_action(db, user_id, tenant_id, "search.query", details={"query": query, "result_count": 0, "took_ms": took_ms}, ip_address=ip_address)
+        return resp
+        
     final_results = []
     snippets_for_llm = []
     doc_ids_for_metadata = []
+    seen_dedup = set()
     
-    for rank_res in reranked:
+    for rank_res in relevant_ranks:
         idx = rank_res.index
         cid, _ = merged[idx]
         row = docs_map[cid]
+        
+        # Deduplicate identical document page matches
+        dedup_key = (row.doc_id, row.page_number)
+        if dedup_key in seen_dedup:
+            continue
+        seen_dedup.add(dedup_key)
+        
         doc_ids_for_metadata.append(row.doc_id)
         
-    # Query metadata for all returned documents
+        if len(final_results) >= limit:
+            break
+            
+    # Query metadata for returned documents
     meta_map = {}
     if doc_ids_for_metadata:
         stmt = select(MetadataItem).where(MetadataItem.document_id.in_(doc_ids_for_metadata))
@@ -170,10 +199,16 @@ async def search(
                 val = val["v"]
             meta_map[doc_id][m.key] = val
             
-    for rank_res in reranked:
+    seen_dedup.clear()
+    for rank_res in relevant_ranks:
         idx = rank_res.index
         cid, _ = merged[idx]
         row = docs_map[cid]
+        
+        dedup_key = (row.doc_id, row.page_number)
+        if dedup_key in seen_dedup:
+            continue
+        seen_dedup.add(dedup_key)
         
         s3_path = row.s3_path
         url = await generate_presigned_url(s3_path) if s3_path else ""
@@ -187,16 +222,21 @@ async def search(
             score=rank_res.score,
             metadata=meta_map.get(row.doc_id, {})
         ))
-        snippets_for_llm.append(f"Document: {row.title}\nExcerpt: {row.content}")
+        snippets_for_llm.append(f"Document: {row.title} (Page {row.page_number or 1})\nExcerpt: {row.content}")
         
-    # 7. Summary
+        if len(final_results) >= limit:
+            break
+            
+    # 7. Generate Natural, Professional AI Summary using LLM
     llm = get_llm_provider()
     sys_msg = (
-        "You are a helpful document assistant. Answer the user's question clearly and concisely using only the provided document excerpts. "
-        "Note that 'marks' or 'grades' can refer to any scores, grades, numbers, ratios, or percentages mentioned in the context. "
-        "If the excerpts do not contain any relevant information to answer the question, state that the information was not found."
+        "You are an enterprise document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
+        "- Highlight key numbers, policies, dates, and names in bold formatting.\n"
+        "- Organize information with clean bullet points or numbered lists where appropriate.\n"
+        "- If multiple documents describe policies for different companies, clearly distinguish each company's policy.\n"
+        "- Do NOT invent details outside the excerpts."
     )
-    user_msg = f"Question: {query}\n\nExcerpts:\n" + "\n---\n".join(snippets_for_llm)
+    user_msg = f"Question: {query}\n\nRelevant Document Excerpts:\n" + "\n---\n".join(snippets_for_llm)
     summary = await llm.complete([
         Message(role="system", content=sys_msg),
         Message(role="user", content=user_msg)

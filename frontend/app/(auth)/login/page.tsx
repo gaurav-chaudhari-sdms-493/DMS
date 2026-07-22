@@ -22,7 +22,7 @@ export default function LoginPage() {
     try {
       const res = await api.auth.login(email, password);
       storeTokens(res.access_token, res.refresh_token);
-      router.push("/search");
+      router.push("/drive");
     } catch (err: any) {
       setError(err.message || "Invalid credentials");
     } finally {
