@@ -17,14 +17,10 @@ class DocumentVersion(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
     s3_path: Mapped[str] = mapped_column()
     version_number: Mapped[int] = mapped_column(default=1)
-    file_hash: Mapped[str] = mapped_column()
-    file_size_bytes: Mapped[int] = mapped_column()
-    original_filename: Mapped[str] = mapped_column()
-    uploaded_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    file_hash: Mapped[Optional[str]] = mapped_column(nullable=True)
+    file_size_bytes: Mapped[Optional[int]] = mapped_column(nullable=True)
+    original_filename: Mapped[Optional[str]] = mapped_column(nullable=True)
+    uploaded_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
-    document: Mapped["Document"] = relationship(
-        "Document",
-        back_populates="versions",
-        foreign_keys="[DocumentVersion.document_id]"
-    )
+    document: Mapped["Document"] = relationship("Document", back_populates="versions", foreign_keys=[document_id])

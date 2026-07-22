@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime, timedelta
+import bcrypt
+from datetime import datetime, timedelta, timezone
 from jose import jwt, JWTError
-from passlib.context import CryptContext
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -10,66 +10,37 @@ from app.schemas.auth import TokenPayload, SignUpRequest, SignUpResponse
 from app.models.user import User, UserRole
 from app.models.tenant import Tenant
 
-import bcrypt
-
 def hash_password(password: str) -> str:
-    return bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
+    pwd_bytes = password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(pwd_bytes, salt).decode('utf-8')
 
 def verify_password(plain: str, hashed: str) -> bool:
     try:
-        return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
+        pwd_bytes = plain.encode('utf-8')[:72]
+        hash_bytes = hashed.encode('utf-8')
+        return bcrypt.checkpw(pwd_bytes, hash_bytes)
     except Exception:
         return False
 
-async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
-    """Creates a new tenant and an admin user."""
-    stmt = select(User).where(User.email == body.email)
-    res = await db.execute(stmt)
-    if res.scalar_one_or_none():
-        raise HTTPException(status_code=409, detail="Email already registered")
-
-    # Create tenant
-    tenant = Tenant(name=f"{body.full_name}'s Organization")
-    db.add(tenant)
-    await db.flush()
-
-    # Create user
-    user = User(
-        email=body.email,
-        full_name=body.full_name,
-        hashed_password=hash_password(body.password),
-        tenant_id=tenant.id,
-        role=UserRole.admin,
-    )
-    db.add(user)
-    await db.commit()
-    await db.refresh(user)
-
-    return SignUpResponse(
-        user_id=user.id,
-        tenant_id=tenant.id,
-        full_name=user.full_name,
-        email=user.email,
-    )
-
 def create_access_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.jwt_access_token_expire_minutes)
     to_encode = {
         "sub": str(user_id),
         "tenant_id": str(tenant_id),
         "role": role,
-        "exp": int(expire.timestamp()),
+        "exp": expire,
         "jti": str(uuid.uuid4())
     }
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 def create_refresh_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(days=settings.jwt_refresh_token_expire_days)
+    expire = datetime.now(timezone.utc) + timedelta(days=settings.jwt_refresh_token_expire_days)
     to_encode = {
         "sub": str(user_id),
         "tenant_id": str(tenant_id),
         "role": role,
-        "exp": int(expire.timestamp()),
+        "exp": expire,
         "jti": str(uuid.uuid4())
     }
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)

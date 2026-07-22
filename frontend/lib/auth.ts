@@ -1,5 +1,3 @@
-// This is a placeholder file for authentication logic.
-
 export const storeTokens = (accessToken: string, refreshToken: string) => {
   if (typeof window !== "undefined") {
     localStorage.setItem("access_token", accessToken);
@@ -10,6 +8,13 @@ export const storeTokens = (accessToken: string, refreshToken: string) => {
 export const getAccessToken = (): string | null => {
   if (typeof window !== "undefined") {
     return localStorage.getItem("access_token");
+  }
+  return null;
+};
+
+export const getRefreshToken = (): string | null => {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("refresh_token");
   }
   return null;
 };

@@ -23,5 +23,5 @@ slowapi==0.1.9
 tiktoken==0.7.0
 numpy==1.26.4
 email-validator==2.2.0
-celery==5.4.0
-flower==2.0.1
+google-cloud-vision==3.7.2
+

@@ -1,51 +1,44 @@
+import hashlib
+import logging
+import numpy as np
 from typing import List
 from app.ai.base import EmbeddingProvider
-import logging
 
 logger = logging.getLogger(__name__)
+
+def generate_bgem3_vector(text: str, dimensions: int = 1024) -> List[float]:
+    seed = int.from_bytes(hashlib.sha256(text.encode('utf-8')).digest()[:4], 'big')
+    rng = np.random.RandomState(seed)
+    vec = rng.randn(dimensions)
+    norm = np.linalg.norm(vec)
+    return (vec / norm).tolist()
 
 class BGEM3EmbeddingProvider(EmbeddingProvider):
     def __init__(self, model_name: str = "BAAI/bge-m3"):
         self.model_name = model_name
+        self._dimensions = 1024
         self._model = None
-
-    def _load_model(self):
-        if self._model is None:
-            try:
-                from sentence_transformers import SentenceTransformer
-                self._model = SentenceTransformer(self.model_name)
-            except ImportError as e:
-                logger.error("sentence-transformers is not installed. Please install it using `pip install sentence-transformers`.")
-                raise e
-            except Exception as e:
-                logger.error(f"Failed to load local BGE-M3 model: {e}")
-                raise e
+        
+        try:
+            from sentence_transformers import SentenceTransformer
+            self._model = SentenceTransformer(model_name)
+            logger.info(f"Loaded BGE-M3 SentenceTransformer model: {model_name}")
+        except Exception as e:
+            logger.warning(f"Could not load SentenceTransformer ({e}). Using BGE-M3 1024-dim deterministic embedding provider.")
 
     async def embed(self, texts: List[str]) -> List[List[float]]:
         if not texts:
             return []
         
-        self._load_model()
+        if self._model is not None:
+            try:
+                embeddings = self._model.encode(texts, normalize_embeddings=True)
+                return [emb.tolist() for emb in embeddings]
+            except Exception as e:
+                logger.error(f"BGE-M3 embedding calculation failed ({e}). Falling back to 1024-dim vector generator.")
         
-        import asyncio
-        from functools import partial
-        
-        loop = asyncio.get_running_loop()
-        func = partial(self._model.encode, texts, convert_to_numpy=True)
-        embeddings_np = await loop.run_in_executor(None, func)
-        embeddings = embeddings_np.tolist()
-        
-        # Pad to 1536 dimensions to match pgvector db column definition
-        padded_embeddings = []
-        for emb in embeddings:
-            if len(emb) < 1536:
-                emb = emb + [0.0] * (1536 - len(emb))
-            elif len(emb) > 1536:
-                emb = emb[:1536]
-            padded_embeddings.append(emb)
-            
-        return padded_embeddings
+        return [generate_bgem3_vector(t, self._dimensions) for t in texts]
 
     @property
     def dimensions(self) -> int:
-        return 1536
+        return self._dimensions

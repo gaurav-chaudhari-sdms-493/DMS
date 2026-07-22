@@ -28,31 +28,41 @@ class Settings(BaseSettings):
     s3_presigned_url_expiry_seconds: int = 900
     
     # AI Providers
-    ai_llm_provider: Literal['openai', 'anthropic', 'groq'] = 'openai'
-    ai_embed_provider: Literal['openai', 'bgem3', 'gemini'] = 'openai'
-    ai_embed_fallback_provider: Literal['cohere', 'openai', 'none'] = 'none'
+    ai_llm_provider: Literal['openai', 'anthropic', 'groq'] = 'groq'
+    ai_embed_provider: Literal['openai', 'bgem3', 'gemini'] = 'bgem3'
+    ai_embed_fallback_provider: Literal['cohere', 'none'] = 'cohere'
     ai_rerank_provider: Literal['cohere', 'none'] = 'cohere'
-    ai_ocr_provider: Literal['pdfplumber', 'llamaparse'] = 'pdfplumber'
+    ai_ocr_provider: Literal['pdfplumber', 'llamaparse', 'gcv'] = 'pdfplumber'
     
+    # Groq
+    groq_api_key: str = ''
+    groq_llm_model: str = 'llama-3.3-70b-versatile'
+
+    # Gemini
+    google_api_key: str = ''
+    gemini_embed_model: str = 'text-embedding-004'
+
+    # OpenAI
     openai_api_key: str = ''
     openai_llm_model: str = 'gpt-4o-mini'
     openai_embed_model: str = 'text-embedding-3-small'
     openai_embed_dimensions: int = 1536
     
+    # Anthropic (alternative LLM)
     anthropic_api_key: str = ''
     anthropic_llm_model: str = 'claude-3-5-haiku-20241022'
     
-    groq_api_key: str = ''
-    groq_llm_model: str = 'llama-3.3-70b-versatile'
-    
-    google_api_key: str = ''
-    gemini_embed_model: str = 'text-embedding-004'
-    
+    # Cohere (reranker + fallback embed)
     cohere_api_key: str = ''
     cohere_rerank_model: str = 'rerank-english-v3.0'
     
+    # LlamaParse
     llamaparse_api_key: str = ''
     
+    # Google Cloud Vision Credentials
+    google_application_credentials_json: str = ''
+    google_application_credentials_path: str = ''
+
     # Rate limiting
     rate_limit_per_user: str = '60/minute'
     rate_limit_per_tenant: str = '1000/minute'

@@ -1,5 +1,5 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import UUID, JSONB, INET
 from sqlalchemy import ForeignKey
 from datetime import datetime
 import uuid
@@ -16,7 +16,7 @@ class AuditLog(Base):
     action: Mapped[str] = mapped_column()
     resource_type: Mapped[Optional[str]] = mapped_column(nullable=True)
     resource_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True)
-    ip_address: Mapped[Optional[str]] = mapped_column(nullable=True)
+    ip_address: Mapped[Optional[str]] = mapped_column(INET, nullable=True)
     user_agent: Mapped[Optional[str]] = mapped_column(nullable=True)
     details: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

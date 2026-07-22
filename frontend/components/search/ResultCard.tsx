@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, Download, User, Calendar, Tag } from "lucide-react";
+import { FileText, Download } from "lucide-react";
 import { Card } from "../ui/Card";
 import type { SearchResult } from "@/types";
 import { Badge } from "../ui/Badge";
@@ -9,6 +9,7 @@ interface ResultCardProps {
 }
 
 export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
+  // Safely render backend-highlighted HTML (bold match terms)
   const createMarkup = (html: string) => {
     return { __html: html };
   };
@@ -97,31 +98,23 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         )}
       </div>
 
-      {/* Snippet Content */}
-      <div 
-        className="text-sm text-textMuted leading-relaxed bg-surface/20 p-4 rounded-xl border border-borderDark/30 italic group-hover:bg-surface/30 group-hover:border-primary/10 transition-all duration-300"
+      {/* Snippet preview — dark navy background, light gray text, indigo bold highlights */}
+      <div
+        className="text-sm leading-relaxed p-3 rounded-lg border border-indigo-900/40 not-italic"
+        style={{
+          backgroundColor: "#0f1420",
+          color: "#e2e8f0",
+          fontStyle: "normal",
+        }}
         dangerouslySetInnerHTML={createMarkup(result.snippet)}
       />
 
-      {/* Key Topics Tags if present */}
-      {topicsList && topicsList.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap pt-1">
-          <Tag className="w-3.5 h-3.5 text-textMuted" />
-          {topicsList.map((topic: string, i: number) => (
-            <span key={i} className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/5 text-primary border border-primary/20 hover:bg-primary/10 transition-colors">
-              {topic}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Score Progress Bar and Download */}
-      <div className="flex items-center justify-between mt-auto pt-3 border-t border-borderDark/40">
-        <div className="flex items-center gap-3">
-          <div className="w-24 h-2 bg-surface rounded-full overflow-hidden" title={`Relevance: ${matchPct}%`}>
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(result.score)}`} 
-              style={{ width: `${Math.max(5, matchPct)}%` }} 
+      <div className="flex items-center justify-between mt-auto pt-2 border-t border-borderDark">
+        <div className="flex items-center gap-2">
+          <div className="w-16 h-1.5 bg-surface rounded-full overflow-hidden" title={`Relevance: ${Math.round(result.score * 100)}%`}>
+            <div
+              className={`h-full rounded-full ${getScoreColor(result.score)}`}
+              style={{ width: `${Math.max(10, result.score * 100)}%` }}
             />
           </div>
           <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border transition-all duration-300 ${getMatchGlow(result.score)}`}>
@@ -129,17 +122,15 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
           </span>
         </div>
 
-        {result.download_url && (
-          <a 
-            href={result.download_url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-indigo-400 bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg border border-primary/20 transition-all"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Download
-          </a>
-        )}
+        <a
+          href={result.download_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1.5 text-xs font-medium text-primary hover:text-indigo-400 transition-colors"
+        >
+          <Download className="w-3.5 h-3.5" />
+          Download
+        </a>
       </div>
     </Card>
   );
