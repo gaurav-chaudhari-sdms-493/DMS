@@ -55,7 +55,7 @@ export function DriveHeader({
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={aiMode ? "Ask AI anything about your drive documents..." : "Search in Drive..."}
+            placeholder={aiMode ? "Ask AI anything about your DMS documents..." : "Search in DMS..."}
             className={`w-full pl-12 pr-28 py-3 rounded-full bg-surface/90 text-textMain placeholder:text-textMuted text-sm border focus:outline-none transition-all shadow-inner ${
               aiMode
                 ? "border-secondary/50 focus:border-secondary focus:ring-2 focus:ring-secondary/20"

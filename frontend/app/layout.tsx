@@ -2,8 +2,8 @@ import "./globals.css";
 import React from "react";
 
 export const metadata = {
-  title: "Google Drive - DocSearch AI",
-  description: "AI Powered Google Drive Clone",
+  title: "DMS - DocSearch AI",
+  description: "AI Powered Document Management System (DMS)",
   viewport: "width=device-width, initial-scale=1",
 };
 

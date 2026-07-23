@@ -130,8 +130,9 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
     command: >
-      sh -c "echo 'Frontend Application: http://localhost:3000' && npm start"
+      sh -c "echo 'Frontend Application: http://localhost:3000' && npm run build && npm start"
     logging:
       driver: "json-file"
       options:

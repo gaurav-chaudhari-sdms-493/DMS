@@ -17,9 +17,12 @@ export default function Home() {
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center py-20 animate-fadeIn relative">
-      {/* Background decoration */}
-      <div className="absolute inset-0 z-[-1] overflow-hidden pointer-events-none flex justify-center items-center">
-         <div className="w-[800px] h-[800px] bg-gradient-to-tr from-primary/10 via-transparent to-secondary/10 rounded-full blur-3xl opacity-50 animate-[pulseGlow_8s_infinite]"></div>
+      {/* Stark Logo Header */}
+      <div className="mb-6 flex items-center justify-center gap-3">
+        <div className="bg-[#1e1e24] px-4 py-2 rounded-xl border border-primary/30 shadow-lg">
+          <img src="/stark-logo-white.avif" alt="Stark Logo" className="h-8 w-auto object-contain" />
+        </div>
+        <span className="text-2xl font-bold text-textMain tracking-tight">DMS</span>
       </div>
 
       <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">

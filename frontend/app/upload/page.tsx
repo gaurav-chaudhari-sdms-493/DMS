@@ -86,7 +86,7 @@ export default function UploadPage() {
             <h2 className="text-xl font-semibold text-textMain">Recent Uploads</h2>
             <Link href="/drive">
               <Button variant="ghost" size="sm" className="gap-2">
-                Go to Drive
+                Go to DMS
                 <ArrowRight className="w-4 h-4" />
               </Button>
             </Link>
