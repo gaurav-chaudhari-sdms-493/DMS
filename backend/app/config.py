@@ -45,7 +45,24 @@ class Settings(BaseSettings):
     anthropic_llm_model: str = 'claude-3-5-haiku-20241022'
     
     groq_api_key: str = ''
+    groq_api_key1: str = ''
+    groq_api_key2: str = ''
+    groq_api_key3: str = ''
+    groq_api_keys: str = ''
     groq_llm_model: str = 'llama-3.3-70b-versatile'
+    
+    def get_groq_api_keys(self) -> List[str]:
+        keys = []
+        for k in [self.groq_api_key, self.groq_api_key1, self.groq_api_key2, self.groq_api_key3]:
+            if k and k.strip() and k.strip() not in keys:
+                keys.append(k.strip())
+        if self.groq_api_keys:
+            for k in self.groq_api_keys.split(','):
+                k_clean = k.strip()
+                if k_clean and k_clean not in keys:
+                    keys.append(k_clean)
+        return keys
+
     
     google_api_key: str = ''
     gemini_embed_model: str = 'text-embedding-004'

@@ -75,7 +75,8 @@ export default function UploadPage() {
     <div className="max-w-3xl mx-auto py-8 animate-fadeIn">
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-textMain mb-2">Upload Documents</h1>
-        <p className="text-textMuted">Add PDFs, Word docs, or text files to your knowledge base.</p>
+        <p className="text-textMuted">Add PDFs, Word docs, Excel sheets, PowerPoint, Markdown, CSV, RTF, JSON, or text files to your knowledge base.</p>
+
       </div>
 
       <UploadZone onFilesSelected={handleFilesSelected} />

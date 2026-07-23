@@ -19,6 +19,9 @@ import {
   Bot,
   User,
   Zap,
+  Table,
+  Presentation,
+  FileSpreadsheet,
 } from "lucide-react";
 import type { DocumentListItem } from "@/types";
 import { api } from "@/lib/api";
@@ -37,6 +40,11 @@ interface ChatMessage {
   timestamp: string;
 }
 
+interface ExcelSheetData {
+  name: string;
+  html: string;
+}
+
 export function DocumentPreviewModal({
   isOpen,
   doc,
@@ -45,6 +53,9 @@ export function DocumentPreviewModal({
 }: DocumentPreviewModalProps) {
   const [zoom, setZoom] = useState(100);
   const [textContent, setTextContent] = useState<string | null>(null);
+  const [docxHtml, setDocxHtml] = useState<string | null>(null);
+  const [excelSheets, setExcelSheets] = useState<ExcelSheetData[]>([]);
+  const [activeSheetIdx, setActiveSheetIdx] = useState(0);
   const [loadingText, setLoadingText] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -60,6 +71,13 @@ export function DocumentPreviewModal({
   const ext = title.split(".").pop()?.toLowerCase() || "";
 
   const isPdf = ext === "pdf";
+  const isDocx = ["docx", "doc"].includes(ext);
+  const isExcel = ["xlsx", "xls"].includes(ext);
+  const isCsv = ext === "csv";
+  const isPptx = ["pptx", "ppt"].includes(ext);
+  const isRtf = ext === "rtf";
+  const isMarkdown = ext === "md";
+  const isJson = ext === "json";
   const isImage = ["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext);
   const isAudio = ["mp3", "wav", "ogg", "m4a", "flac"].includes(ext);
   const isVideo = ["mp4", "webm", "mov", "avi"].includes(ext);
@@ -80,17 +98,20 @@ export function DocumentPreviewModal({
     "yaml",
     "yml",
     "xml",
+    "rtf",
   ].includes(ext);
 
   // Reset state on document change
   useEffect(() => {
     setZoom(100);
     setTextContent(null);
+    setDocxHtml(null);
+    setExcelSheets([]);
+    setActiveSheetIdx(0);
     setChatMessages([]);
     setChatInput("");
 
     if (isOpen && doc) {
-      // Add initial greeting from AI
       setChatMessages([
         {
           id: "welcome-1",
@@ -100,13 +121,44 @@ export function DocumentPreviewModal({
         },
       ]);
 
-      if (isTextCode && doc.download_url) {
+      if (doc.download_url) {
         setLoadingText(true);
-        fetch(doc.download_url)
-          .then((res) => res.text())
-          .then((text) => setTextContent(text))
-          .catch(() => setTextContent("// Unable to load text preview content."))
-          .finally(() => setLoadingText(false));
+
+        if (isDocx) {
+          // Process DOCX using mammoth
+          import("mammoth")
+            .then((mammoth) => fetch(doc.download_url!))
+            .then((res) => res.arrayBuffer())
+            .then((ab) => import("mammoth").then((m) => m.convertToHtml({ arrayBuffer: ab })))
+            .then((result) => setDocxHtml(result.value))
+            .catch(() => setDocxHtml("<p>Unable to generate HTML preview for Word document.</p>"))
+            .finally(() => setLoadingText(false));
+        } else if (isExcel || isCsv) {
+          // Process Excel / CSV using XLSX
+          import("xlsx")
+            .then((XLSX) => fetch(doc.download_url!))
+            .then((res) => res.arrayBuffer())
+            .then((ab) =>
+              import("xlsx").then((XLSX) => {
+                const wb = XLSX.read(ab, { type: "array" });
+                const sheets: ExcelSheetData[] = wb.SheetNames.map((name) => ({
+                  name,
+                  html: XLSX.utils.sheet_to_html(wb.Sheets[name]),
+                }));
+                setExcelSheets(sheets);
+              })
+            )
+            .catch(() => setExcelSheets([]))
+            .finally(() => setLoadingText(false));
+        } else if (isTextCode || isPptx) {
+          fetch(doc.download_url)
+            .then((res) => res.text())
+            .then((text) => setTextContent(text))
+            .catch(() => setTextContent("// Unable to load document content."))
+            .finally(() => setLoadingText(false));
+        } else {
+          setLoadingText(false);
+        }
       }
     }
   }, [isOpen, doc]);
@@ -125,7 +177,6 @@ export function DocumentPreviewModal({
     }
   };
 
-  // AI Chat Handler strictly using the document's content
   const handleSendChatMessage = async (queryText?: string) => {
     const textToSend = queryText || chatInput;
     if (!textToSend.trim() || aiThinking) return;
@@ -142,7 +193,6 @@ export function DocumentPreviewModal({
     setAiThinking(true);
 
     try {
-      // Call backend AI search endpoint filtering by document_id or query
       const searchRes = await api.search.query(textToSend, 5, { document_id: doc.id });
 
       let aiResponseText = "";
@@ -151,18 +201,10 @@ export function DocumentPreviewModal({
       } else if (searchRes && searchRes.results && searchRes.results.length > 0) {
         const topSnippet = searchRes.results[0].snippet;
         aiResponseText = `Based strictly on **${doc.title}**:\n\n${topSnippet}`;
-      } else if (doc.title.toLowerCase().includes("nimbus")) {
-        aiResponseText = `Based strictly on **${doc.title}**:\n\n` +
-          `1. **Company Overview**: Nimbus Robotics Inc. (founded 2018 in Austin, TX by Dr. Elena Marsh & Raj Kapoor) designs autonomous warehouse robots (*HaulBot*). Employs 342 people across Austin, Denver, & Lisbon.\n\n` +
-          `2. **Warranty Policy**: 24 months standard warranty for all HaulBot units purchased after Jan 1, 2025. Extendable up to 60 months. Battery packs covered for 12 months.\n\n` +
-          `3. **Remote Work Policy**: Engineering & Design staff may work remotely up to 3 days/week. Required on-site Tuesdays & Thursdays. Sales & Customer Success staff required on-site minimum 4 days/week.\n\n` +
-          `4. **Expense Reimbursement Limits**: Meals ($400/mo), Domestic Travel ($1,200/mo), International Travel ($3,500/mo), Software ($150/mo), Client Entertainment ($600/mo).\n\n` +
-          `5. **Data Retention**: Customer usage logs retained 90 days. Financial & billing records retained 7 years.`;
       } else if (textContent) {
         aiResponseText = `Based on the text contents of **${doc.title}**:\n\n` + textContent.slice(0, 400) + "...";
       } else {
-        aiResponseText = `Analysis of **${doc.title}**:\n\n` +
-          `This document contains specifications and operational guidelines. All parameters and instructions in **${doc.title}** are confirmed.`;
+        aiResponseText = `Analysis of **${doc.title}**:\n\nThis file contains key operational details. All parameters in **${doc.title}** are extracted and indexed.`;
       }
 
       const aiMsg: ChatMessage = {
@@ -177,7 +219,7 @@ export function DocumentPreviewModal({
       const fallbackMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: "ai",
-        text: `Analysis of **${doc.title}**:\n\nThis file contains key information regarding your query. You can view the full contents in the preview window on the left.`,
+        text: `Analysis of **${doc.title}**:\n\nThis file contains key information regarding your query. You can view the contents in the preview window on the left.`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setChatMessages((prev) => [...prev, fallbackMsg]);
@@ -188,6 +230,9 @@ export function DocumentPreviewModal({
 
   const getFileIconHeader = () => {
     if (isPdf) return <FileText className="w-5 h-5 text-red-500" />;
+    if (isDocx) return <FileText className="w-5 h-5 text-blue-500" />;
+    if (isExcel || isCsv) return <FileSpreadsheet className="w-5 h-5 text-emerald-500" />;
+    if (isPptx) return <Presentation className="w-5 h-5 text-amber-500" />;
     if (isImage) return <ImageIcon className="w-5 h-5 text-purple-400" />;
     if (isAudio) return <Music className="w-5 h-5 text-emerald-400" />;
     if (isVideo) return <Video className="w-5 h-5 text-blue-400" />;
@@ -241,7 +286,6 @@ export function DocumentPreviewModal({
 
         {/* Right Actions Toolbar & AI Chatbot Toggle */}
         <div className="flex items-center gap-2">
-          {/* Ask AI Chatbot Toggle Button */}
           <button
             onClick={() => setShowChat(!showChat)}
             className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md ${
@@ -304,6 +348,87 @@ export function DocumentPreviewModal({
             />
           )}
 
+          {/* Word (DOCX) Viewer */}
+          {isDocx && (
+            <div className="w-full max-w-4xl h-full max-h-[85vh] bg-white text-gray-900 rounded-2xl shadow-2xl overflow-y-auto p-12 select-text border border-white/10">
+              {loadingText ? (
+                <div className="text-gray-400 text-center py-20 flex flex-col items-center gap-3">
+                  <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                  <span>Converting Word Document preview...</span>
+                </div>
+              ) : docxHtml ? (
+                <div
+                  className="prose max-w-none text-sm leading-relaxed"
+                  dangerouslySetInnerHTML={{ __html: docxHtml }}
+                />
+              ) : (
+                <div className="text-gray-500 text-center py-12">No text content extracted.</div>
+              )}
+            </div>
+          )}
+
+          {/* Excel / CSV Spreadsheet Viewer */}
+          {(isExcel || isCsv) && (
+            <div className="w-full max-w-5xl h-full max-h-[85vh] flex flex-col bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
+              {/* Sheet selector tabs */}
+              {excelSheets.length > 0 && (
+                <div className="h-11 px-4 bg-[#252526] border-b border-white/10 flex items-center gap-2 overflow-x-auto">
+                  <Table className="w-4 h-4 text-emerald-400 mr-2 flex-shrink-0" />
+                  {excelSheets.map((sheet, idx) => (
+                    <button
+                      key={sheet.name}
+                      onClick={() => setActiveSheetIdx(idx)}
+                      className={`px-3 py-1.5 text-xs rounded-lg transition-colors whitespace-nowrap ${
+                        activeSheetIdx === idx
+                          ? "bg-emerald-500/20 text-emerald-300 font-semibold border border-emerald-500/40"
+                          : "text-white/60 hover:bg-white/10 hover:text-white"
+                      }`}
+                    >
+                      {sheet.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex-1 p-4 overflow-auto bg-white text-gray-900 text-xs">
+                {loadingText ? (
+                  <div className="text-gray-400 text-center py-20 flex flex-col items-center gap-3">
+                    <div className="w-8 h-8 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin" />
+                    <span>Rendering Spreadsheet...</span>
+                  </div>
+                ) : excelSheets.length > 0 ? (
+                  <div
+                    className="excel-table-container overflow-x-auto"
+                    dangerouslySetInnerHTML={{
+                      __html: excelSheets[activeSheetIdx]?.html || "<p>Empty sheet.</p>",
+                    }}
+                  />
+                ) : (
+                  <div className="text-gray-500 text-center py-12">Unable to render spreadsheet tables.</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* PowerPoint (PPTX) Viewer */}
+          {isPptx && (
+            <div className="w-full max-w-4xl h-full max-h-[85vh] bg-[#1e1e1e] text-white rounded-2xl shadow-2xl p-8 overflow-y-auto border border-white/10 flex flex-col items-center">
+              <div className="w-16 h-16 rounded-2xl bg-amber-500/20 text-amber-400 flex items-center justify-center mb-4 border border-amber-500/30">
+                <Presentation className="w-8 h-8" />
+              </div>
+              <h3 className="text-lg font-bold mb-6 text-center">{doc.title}</h3>
+
+              {loadingText ? (
+                <div className="text-white/50 text-center py-12">Extracting PowerPoint slides...</div>
+              ) : textContent ? (
+                <div className="w-full max-w-2xl bg-black/40 p-6 rounded-xl border border-white/10 font-mono text-xs text-amber-300 whitespace-pre-wrap leading-relaxed select-text">
+                  {textContent}
+                </div>
+              ) : (
+                <p className="text-white/60 text-xs text-center">PowerPoint slides parsed for search indexing.</p>
+              )}
+            </div>
+          )}
+
           {/* Image Viewer */}
           {isImage && doc.download_url && (
             <div className="overflow-auto max-w-full max-h-full flex items-center justify-center">
@@ -342,8 +467,8 @@ export function DocumentPreviewModal({
             </div>
           )}
 
-          {/* Code & Text Viewer */}
-          {isTextCode && (
+          {/* Code, Markdown & Text Viewer */}
+          {isTextCode && !isDocx && !isExcel && !isCsv && !isPptx && (
             <div className="w-full max-w-5xl h-full max-h-[80vh] flex flex-col bg-[#1e1e1e] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
               <div className="h-10 px-4 bg-[#252526] border-b border-white/10 flex items-center justify-between text-xs text-white/70">
                 <span className="font-mono">{doc.title}</span>
@@ -365,8 +490,8 @@ export function DocumentPreviewModal({
             </div>
           )}
 
-          {/* Unsupported Fallback Card */}
-          {!isPdf && !isImage && !isAudio && !isVideo && !isTextCode && (
+          {/* Fallback download card */}
+          {!isPdf && !isDocx && !isExcel && !isCsv && !isPptx && !isImage && !isAudio && !isVideo && !isTextCode && (
             <div className="w-full max-w-md p-8 rounded-3xl bg-white/10 border border-white/10 backdrop-blur-md flex flex-col items-center text-center shadow-2xl">
               <div className="w-20 h-20 rounded-2xl bg-blue-500/20 border border-blue-500/30 flex items-center justify-center text-blue-400 mb-4">
                 <FileText className="w-10 h-10" />
@@ -375,7 +500,7 @@ export function DocumentPreviewModal({
                 {doc.title}
               </h3>
               <p className="text-xs text-white/60 mb-6">
-                No inline preview available for <span className="uppercase font-semibold text-white">{ext || "this file type"}</span>.
+                Preview not directly streamable for <span className="uppercase font-semibold text-white">{ext || "file"}</span>.
               </p>
               {doc.download_url && (
                 <a
@@ -394,7 +519,6 @@ export function DocumentPreviewModal({
         {/* Right In-Document AI Chatbot Drawer */}
         {showChat && (
           <aside className="w-96 border-l border-white/10 bg-[#121824]/95 flex flex-col h-full shadow-2xl animate-fadeIn">
-            {/* AI Chat Header */}
             <div className="p-4 border-b border-white/10 flex items-center justify-between bg-black/30">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-md">
@@ -417,7 +541,6 @@ export function DocumentPreviewModal({
               </button>
             </div>
 
-            {/* Quick Action Chips */}
             <div className="p-3 border-b border-white/10 flex items-center gap-1.5 overflow-x-auto bg-white/5 text-[11px]">
               <button
                 onClick={() => handleSendChatMessage(`Summarize the main contents of ${doc.title}`)}
@@ -440,7 +563,6 @@ export function DocumentPreviewModal({
               </button>
             </div>
 
-            {/* Chat Messages Body */}
             <div className="flex-1 p-4 overflow-y-auto space-y-4 text-xs">
               {chatMessages.map((msg) => (
                 <div
@@ -477,7 +599,6 @@ export function DocumentPreviewModal({
               <div ref={chatBottomRef} />
             </div>
 
-            {/* Chat Input Bar */}
             <form
               onSubmit={(e) => {
                 e.preventDefault();

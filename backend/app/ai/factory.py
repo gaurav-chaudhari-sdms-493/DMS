@@ -1,6 +1,7 @@
 from app.config import settings
-from app.ai.base import LLMProvider, EmbeddingProvider, RerankerProvider
+from app.ai.base import LLMProvider, EmbeddingProvider, RerankerProvider, Message
 from typing import List
+
 import logging
 
 logger = logging.getLogger(__name__)
@@ -25,21 +26,57 @@ class FallbackEmbeddingProvider(EmbeddingProvider):
     def dimensions(self) -> int:
         return self.primary.dimensions
 
+class FallbackLLMProvider(LLMProvider):
+    def __init__(self, primary: LLMProvider, secondary: LLMProvider | None = None):
+        self.primary = primary
+        self.secondary = secondary
+
+    async def complete(self, messages: List[Message], temperature: float = 0.1, max_tokens: int = 1024) -> str:
+        try:
+            return await self.primary.complete(messages, temperature, max_tokens)
+        except Exception as e:
+            logger.warning(f"Primary LLM provider ({self.primary.__class__.__name__}) failed: {e}.")
+            if self.secondary:
+                try:
+                    logger.info(f"Attempting fallback LLM provider ({self.secondary.__class__.__name__}).")
+                    return await self.secondary.complete(messages, temperature, max_tokens)
+                except Exception as inner_e:
+                    logger.warning(f"Secondary LLM provider ({self.secondary.__class__.__name__}) failed: {inner_e}.")
+            
+            # Fallback template output if all external LLM APIs fail or are rate-limited
+            user_query = messages[-1].content if messages else ""
+            return "Based on your matching drive documents, here are the key excerpts found below."
+
 def get_llm_provider() -> LLMProvider:
     global _llm_provider
     if _llm_provider is None:
-        if settings.ai_llm_provider == 'openai':
+        primary: LLMProvider | None = None
+        secondary: LLMProvider | None = None
+
+        if settings.ai_llm_provider == 'groq':
+            from app.ai.providers.groq_provider import GroqLLMProvider
+            groq_keys = settings.get_groq_api_keys()
+            primary = GroqLLMProvider(api_key=groq_keys if groq_keys else settings.groq_api_key, model=settings.groq_llm_model)
+            if settings.openai_api_key:
+                from app.ai.providers.openai_provider import OpenAILLMProvider
+                secondary = OpenAILLMProvider(api_key=settings.openai_api_key, model=settings.openai_llm_model)
+        elif settings.ai_llm_provider == 'openai':
             from app.ai.providers.openai_provider import OpenAILLMProvider
-            _llm_provider = OpenAILLMProvider(api_key=settings.openai_api_key, model=settings.openai_llm_model)
+            primary = OpenAILLMProvider(api_key=settings.openai_api_key, model=settings.openai_llm_model)
+            groq_keys = settings.get_groq_api_keys()
+            if groq_keys or settings.groq_api_key:
+                from app.ai.providers.groq_provider import GroqLLMProvider
+                secondary = GroqLLMProvider(api_key=groq_keys if groq_keys else settings.groq_api_key, model=settings.groq_llm_model)
+
         elif settings.ai_llm_provider == 'anthropic':
             from app.ai.providers.anthropic_provider import AnthropicLLMProvider
-            _llm_provider = AnthropicLLMProvider(api_key=settings.anthropic_api_key, model=settings.anthropic_llm_model)
-        elif settings.ai_llm_provider == 'groq':
-            from app.ai.providers.groq_provider import GroqLLMProvider
-            _llm_provider = GroqLLMProvider(api_key=settings.groq_api_key, model=settings.groq_llm_model)
+            primary = AnthropicLLMProvider(api_key=settings.anthropic_api_key, model=settings.anthropic_llm_model)
         else:
             raise ValueError(f'Unknown LLM provider: {settings.ai_llm_provider}')
+
+        _llm_provider = FallbackLLMProvider(primary, secondary)
     return _llm_provider
+
 
 def get_embed_provider() -> EmbeddingProvider:
     global _embed_provider

@@ -1,5 +1,10 @@
 # Ignore node_modules, but not in the frontend directory
 **/node_modules
+.venv
+__pycache__
+**/__pycache__
+.next
+backend/data
 
 # Ignore .git and .idea directories
 .git
@@ -7,3 +12,4 @@
 
 # Allow the frontend lib directory
 !frontend/lib
+

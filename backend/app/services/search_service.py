@@ -228,22 +228,26 @@ async def search(
             break
             
     # 7. Generate Natural, Professional AI Summary using LLM
-    llm = get_llm_provider()
-    sys_msg = (
-        "You are an enterprise document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
-        "- Highlight key numbers, policies, dates, and names in bold formatting.\n"
-        "- Organize information with clean bullet points or numbered lists where appropriate.\n"
-        "- If multiple documents describe policies for different companies, clearly distinguish each company's policy.\n"
-        "- Do NOT invent details outside the excerpts."
-    )
-    user_msg = f"Question: {query}\n\nRelevant Document Excerpts:\n" + "\n---\n".join(snippets_for_llm)
-    summary = await llm.complete([
-        Message(role="system", content=sys_msg),
-        Message(role="user", content=user_msg)
-    ])
-    
-    # Enforce AI Output Guardrails
-    summary = validate_output_summary(summary)
+    try:
+        llm = get_llm_provider()
+        sys_msg = (
+            "You are an enterprise document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
+            "- Highlight key numbers, policies, dates, and names in bold formatting.\n"
+            "- Organize information with clean bullet points or numbered lists where appropriate.\n"
+            "- If multiple documents describe policies for different companies, clearly distinguish each company's policy.\n"
+            "- Do NOT invent details outside the excerpts."
+        )
+        user_msg = f"Question: {query}\n\nRelevant Document Excerpts:\n" + "\n---\n".join(snippets_for_llm)
+        summary = await llm.complete([
+            Message(role="system", content=sys_msg),
+            Message(role="user", content=user_msg)
+        ])
+        summary = validate_output_summary(summary)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).warning(f"AI Summary generation error in search: {e}")
+        summary = f"Found {len(final_results)} matching document(s) for '{query}' in your drive. Preview excerpts below."
+
     
     took_ms = int((time.time() - start_time) * 1000)
     

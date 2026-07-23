@@ -15,12 +15,13 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
             return []
         
         # Google Generative Language API uses batchEmbedContents for multiple inputs
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{self.model}:batchEmbedContents?key={self.api_key}"
+        model_name = self.model if self.model.startswith("models/") else f"models/{self.model}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:batchEmbedContents?key={self.api_key}"
         
         # Prepare batch requests payload
         requests_payload = [
             {
-                "model": f"models/{self.model}",
+                "model": model_name,
                 "content": {
                     "parts": [{"text": t}]
                 }
@@ -33,6 +34,7 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
             response = await client.post(url, json=payload)
             if response.status_code != 200:
                 raise Exception(f"Gemini Embedding request failed with status {response.status_code}: {response.text}")
+
             
             data = response.json()
             embeddings = [emb["values"] for emb in data.get("embeddings", [])]

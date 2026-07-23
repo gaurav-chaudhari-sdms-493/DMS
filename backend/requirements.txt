@@ -25,3 +25,12 @@ numpy==1.26.4
 email-validator==2.2.0
 celery==5.4.0
 flower==2.0.1
+python-docx>=1.1.0
+openpyxl>=3.1.0
+python-pptx>=1.0.0
+striprtf>=0.0.26
+pandas>=2.0.0
+xlrd>=2.0.1
+
+
+
