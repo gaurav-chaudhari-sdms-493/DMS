@@ -15,6 +15,8 @@ import { AISummary } from "@/components/search/AISummary";
 import { ResultCard } from "@/components/search/ResultCard";
 import { PersistentChatPanel } from "@/components/chat/PersistentChatPanel";
 import { RightSideChatDrawer } from "@/components/chat/RightSideChatDrawer";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
+
 
 import { isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -62,6 +64,22 @@ export default function DrivePage() {
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [itemToRename, setItemToRename] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
   const [itemToMove, setItemToMove] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
+
+  // Custom Modal Dialog State
+  const [confirmModalConfig, setConfirmModalConfig] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    type?: "danger" | "warning" | "info" | "success";
+    confirmText?: string;
+    showCancel?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    message: "",
+    onConfirm: () => {},
+  });
+
 
   // Uploads & Drag-and-Drop State
   const [uploads, setUploads] = useState<UploadItem[]>([]);

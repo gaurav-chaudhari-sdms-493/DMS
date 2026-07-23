@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   MessageSquare,
   Plus,
@@ -9,17 +9,22 @@ import {
   FileText,
   Eye,
   Download,
-  Filter,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Tag,
-  Layers,
-  ArrowUpDown
+  Paperclip,
+  X,
+  Lightbulb,
+  Search,
+  Compass,
+  FileUp,
+  Bot
 } from "lucide-react";
 import { api } from "@/lib/api";
 import type { ChatSession, ChatSessionListItem, ChatMessage, SearchResult, DocumentListItem } from "@/types";
 import { MarkdownViewer } from "./MarkdownViewer";
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
+
 
 interface PersistentChatPanelProps {
   onPreviewDocument: (doc: DocumentListItem) => void;
@@ -30,11 +35,32 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
   const [sessions, setSessions] = useState<ChatSessionListItem[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [activeSession, setActiveSession] = useState<ChatSession | null>(null);
-  
+
   const [query, setQuery] = useState("");
   const [sending, setSending] = useState(false);
   const [loadingSessions, setLoadingSessions] = useState(true);
   const [isDocsExpanded, setIsDocsExpanded] = useState(true);
+
+  // File Attachments for Chat State
+  const [attachedFiles, setAttachedFiles] = useState<File[]>([]);
+  const [uploadingAttached, setUploadingAttached] = useState(false);
+  const chatFileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Custom Modal Dialog State
+  const [modalConfig, setModalConfig] = useState<{
+    isOpen: boolean;
+    title?: string;
+    message: string;
+    type?: "danger" | "warning" | "info" | "success";
+    confirmText?: string;
+    showCancel?: boolean;
+    onConfirm: () => void;
+  }>({
+    isOpen: false,
+    message: "",
+    onConfirm: () => {},
+  });
+
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -90,7 +116,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
 
   const handleCreateNewSession = async (customInitialQuery?: string) => {
     try {
-      const title = customInitialQuery ? customInitialQuery.slice(0, 30) : "New Persistent Chat";
+      const title = customInitialQuery ? customInitialQuery.slice(0, 30) : "New Chat";
       const newSession = await api.chat.createSession(title, customInitialQuery);
       setSessions((prev) => [
         {
@@ -115,37 +141,109 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
 
   const handleDeleteSession = async (sessionId: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!confirm("Are you sure you want to delete this persistent chat session?")) return;
+    setModalConfig({
+      isOpen: true,
+      title: "Delete Chat Thread",
+      message: "Are you sure you want to delete this chat thread? This action cannot be undone.",
+      type: "danger",
+      confirmText: "Delete",
+      showCancel: true,
+      onConfirm: async () => {
+        try {
+          await api.chat.deleteSession(sessionId);
+          const updatedList = sessions.filter((s) => s.id !== sessionId);
+          setSessions(updatedList);
 
-    try {
-      await api.chat.deleteSession(sessionId);
-      const updatedList = sessions.filter((s) => s.id !== sessionId);
-      setSessions(updatedList);
-
-      if (activeSessionId === sessionId) {
-        if (updatedList.length > 0) {
-          loadSessionDetails(updatedList[0].id);
-        } else {
-          setActiveSession(null);
-          setActiveSessionId(null);
-          handleCreateNewSession();
+          if (activeSessionId === sessionId) {
+            if (updatedList.length > 0) {
+              loadSessionDetails(updatedList[0].id);
+            } else {
+              setActiveSession(null);
+              setActiveSessionId(null);
+              handleCreateNewSession();
+            }
+          }
+        } catch (err) {
+          console.error("Failed to delete session:", err);
         }
-      }
+      },
+    });
+  };
+
+  // Helper: Ensure "Chat Uploads" folder exists in Drive
+  const ensureChatUploadsFolder = async (): Promise<string | null> => {
+    try {
+      const existing = await api.folders.list({ is_trashed: false });
+      const found = existing.find((f) => f.name === "Chat Uploads");
+      if (found) return found.id;
+
+      const created = await api.folders.create("Chat Uploads", null, "#0b57d0");
+      return created.id;
     } catch (err) {
-      console.error("Failed to delete session:", err);
+      console.warn("Could not resolve Chat Uploads folder:", err);
+      return null;
     }
   };
 
+  const handleChatFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      setAttachedFiles((prev) => [...prev, ...files]);
+    }
+    if (chatFileInputRef.current) chatFileInputRef.current.value = "";
+  };
+
+  const removeAttachedFile = (index: number) => {
+    setAttachedFiles((prev) => prev.filter((_, i) => i !== index));
+  };
+
   const handleSendMessage = async (customQuery?: string, targetSessionId?: string) => {
-    const textToSend = customQuery || query;
+    let textToSend = customQuery || query;
     const sId = targetSessionId || activeSessionId;
 
-    if (!textToSend.trim() || !sId || sending) return;
+    if ((!textToSend.trim() && attachedFiles.length === 0) || !sId || sending) return;
+
+    if (!textToSend.trim() && attachedFiles.length > 0) {
+      textToSend = "Please analyze and summarize the attached documents.";
+    }
 
     if (!customQuery) {
       setQuery("");
     }
     setSending(true);
+
+    // If files are attached, upload them into "Chat Uploads" folder first
+    let attachedFileNames = "";
+    if (attachedFiles.length > 0) {
+      setUploadingAttached(true);
+      try {
+        const folderId = await ensureChatUploadsFolder();
+        if (attachedFiles.length === 1) {
+          await api.documents.upload(attachedFiles[0], folderId);
+        } else {
+          await api.documents.uploadBulk(attachedFiles, folderId);
+        }
+        attachedFileNames = attachedFiles.map((f) => f.name).join(", ");
+        textToSend = `${textToSend}\n\n[Attached Context Files: ${attachedFileNames}]`;
+        setAttachedFiles([]);
+      } catch (err: any) {
+        console.error("Failed to upload chat files:", err);
+        setModalConfig({
+          isOpen: true,
+          title: "Upload Failed",
+          message: err.message || "Failed to upload attached files.",
+          type: "danger",
+          showCancel: false,
+          confirmText: "OK",
+          onConfirm: () => {},
+        });
+        setSending(false);
+        setUploadingAttached(false);
+        return;
+      } finally {
+        setUploadingAttached(false);
+      }
+    }
 
     const tempUserMsg: ChatMessage = {
       id: `temp-${Date.now()}`,
@@ -179,11 +277,20 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
       setSessions(updatedList);
     } catch (err: any) {
       console.error("Failed to send chat message:", err);
-      alert(err.message || "Failed to send message.");
+      setModalConfig({
+        isOpen: true,
+        title: "Message Error",
+        message: err.message || "Failed to send message.",
+        type: "danger",
+        showCancel: false,
+        confirmText: "OK",
+        onConfirm: () => {},
+      });
     } finally {
       setSending(false);
     }
   };
+
 
   // Get active listed results from the latest assistant message with results
   const getActiveLoadedDocs = (): SearchResult[] => {
@@ -199,59 +306,6 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
 
   const activeLoadedDocs = getActiveLoadedDocs();
 
-  // DYNAMIC CONTEXT-BASED QUICK FILTERS
-  const dynamicFilters = useMemo(() => {
-    const chips: { label: string; actionQuery: string; icon: "tag" | "score" | "list" | "sort" }[] = [];
-
-    const tagCounts: Record<string, number> = {};
-    activeLoadedDocs.forEach((doc) => {
-      if (doc.tags && Array.isArray(doc.tags)) {
-        doc.tags.forEach((t) => {
-          if (t && t.trim()) {
-            const tagClean = t.trim();
-            tagCounts[tagClean] = (tagCounts[tagClean] || 0) + 1;
-          }
-        });
-      }
-    });
-
-    const sortedTags = Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag]) => tag);
-
-    sortedTags.slice(0, 4).forEach((tag) => {
-      chips.push({
-        label: tag,
-        actionQuery: `filter documents related to ${tag}`,
-        icon: "tag"
-      });
-    });
-
-    const hasHighScore = activeLoadedDocs.some((d) => (d.score || 0) >= 0.85);
-    if (hasHighScore) {
-      chips.push({
-        label: "Score >= 85",
-        actionQuery: "filter documents which have score >= 85",
-        icon: "score"
-      });
-    }
-
-    if (chips.length < 3) {
-      chips.push({
-        label: "List Loaded Docs",
-        actionQuery: "list all loaded documents with details",
-        icon: "list"
-      });
-      chips.push({
-        label: "Sort by Score",
-        actionQuery: "sort documents by highest match score",
-        icon: "sort"
-      });
-    }
-
-    return chips;
-  }, [activeLoadedDocs]);
-
   const handlePreviewCard = (res: SearchResult) => {
     const docItem: DocumentListItem = {
       id: res.document_id,
@@ -266,9 +320,46 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
     onPreviewDocument(docItem);
   };
 
+  // ChatGPT FAQ Dynamic Prompt Suggestions
+  const faqSuggestions = [
+    {
+      icon: Lightbulb,
+      title: "Summarize Insights",
+      prompt: "Summarize key findings, main decisions, and action items from my uploaded files.",
+      bg: "bg-amber-50 hover:bg-amber-100/70 border-amber-200/60 text-amber-900"
+    },
+    {
+      icon: Search,
+      title: "Financial & Invoices",
+      prompt: "Find all financial metrics, total costs, invoices, and pricing details in my documents.",
+      bg: "bg-emerald-50 hover:bg-emerald-100/70 border-emerald-200/60 text-emerald-900"
+    },
+    {
+      icon: FileText,
+      title: "Policy & Agreement Compare",
+      prompt: "Compare terms, rules, conditions, and compliance requirements across policy documents.",
+      bg: "bg-blue-50 hover:bg-blue-100/70 border-blue-200/60 text-blue-900"
+    },
+    {
+      icon: Compass,
+      title: "Topic Discovery",
+      prompt: "What are the primary topics, project updates, and metadata stored in my repository?",
+      bg: "bg-purple-50 hover:bg-purple-100/70 border-purple-200/60 text-purple-900"
+    }
+  ];
+
   return (
     <div className="flex-1 flex h-full bg-[#f8fafd] rounded-3xl border border-[#e1e3e1] shadow-sm overflow-hidden select-none">
-      {/* Persistent Threads Sidebar */}
+      {/* Hidden File Input for Chat Attachments */}
+      <input
+        type="file"
+        multiple
+        ref={chatFileInputRef}
+        onChange={handleChatFileSelect}
+        className="hidden"
+      />
+
+      {/* Chat Threads Sidebar */}
       <div className="w-64 border-r border-[#e1e3e1] bg-white flex flex-col justify-between">
         <div className="p-4 border-b border-[#e1e3e1]">
           <button
@@ -283,16 +374,16 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
         {/* Sessions list */}
         <div className="flex-1 overflow-y-auto p-2 space-y-1">
           <div className="px-3 py-2 text-xs font-semibold text-[#444746] uppercase tracking-wider">
-            Persistent Threads
+            Chat History
           </div>
 
           {loadingSessions ? (
             <div className="px-4 py-8 text-center text-xs text-[#444746] animate-pulse">
-              Loading chat sessions...
+              Loading chat history...
             </div>
           ) : sessions.length === 0 ? (
             <div className="px-4 py-6 text-center text-xs text-[#747775]">
-              No persistent chats yet. Start a new one!
+              No chats yet. Start a new one!
             </div>
           ) : (
             sessions.map((s) => (
@@ -325,48 +416,35 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
         {/* Footer info */}
         <div className="p-3 border-t border-[#e1e3e1] bg-[#f8fafd] text-[11px] text-[#747775] flex items-center gap-2">
           <Sparkles className="w-3.5 h-3.5 text-[#0b57d0]" />
-          <span>Multi-turn Persistent Memory</span>
+          <span>Powered by Stark AI Engine</span>
         </div>
       </div>
 
-      {/* Main Persistent Conversation Canvas */}
+      {/* Main Conversation Canvas */}
       <div className="flex-1 flex flex-col bg-white overflow-hidden">
         {/* Header */}
         <div className="px-6 py-4 border-b border-[#e1e3e1] flex items-center justify-between bg-white shadow-xs">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-50 text-[#0b57d0] flex items-center justify-center border border-blue-100">
-              <Sparkles className="w-5 h-5" />
+            <div className="w-9 h-9 rounded-xl bg-[#0b57d0] text-white flex items-center justify-center shadow-md">
+              <Bot className="w-5 h-5" />
             </div>
             <div>
               <h2 className="text-base font-bold text-[#1f1f1f]">
-                {activeSession?.title || "Persistent Chat Session"}
+                {activeSession?.title === "New Persistent Chat" ? "Stark AI Assistant" : activeSession?.title || "Stark AI Assistant"}
               </h2>
               <div className="flex items-center gap-2 text-xs text-[#444746] mt-0.5">
                 <span className="flex items-center gap-1 font-medium text-[#0b57d0]">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  Grounded in Listed Files
+                  Grounded in My Drive
                 </span>
-                <span>•</span>
-                <span>{activeLoadedDocs.length} documents loaded</span>
+                {activeLoadedDocs.length > 0 && (
+                  <>
+                    <span>•</span>
+                    <span>{activeLoadedDocs.length} documents loaded</span>
+                  </>
+                )}
               </div>
             </div>
-          </div>
-
-          {/* DYNAMIC CONTEXT-BASED QUICK ACTION CHIPS */}
-          <div className="flex items-center gap-2 overflow-x-auto">
-            {dynamicFilters.map((chip, idx) => (
-              <button
-                key={`${chip.label}-${idx}`}
-                onClick={() => handleSendMessage(chip.actionQuery)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#f0f4f9] hover:bg-[#e1e5ea] text-[#001d35] rounded-full text-xs font-semibold border border-[#d3d7dc] transition-all hover:scale-105"
-              >
-                {chip.icon === "tag" && <Tag className="w-3.5 h-3.5 text-[#0b57d0]" />}
-                {chip.icon === "score" && <Filter className="w-3.5 h-3.5 text-[#108554]" />}
-                {chip.icon === "list" && <Layers className="w-3.5 h-3.5 text-[#00639b]" />}
-                {chip.icon === "sort" && <ArrowUpDown className="w-3.5 h-3.5 text-[#b45309]" />}
-                <span>{chip.label}</span>
-              </button>
-            ))}
           </div>
         </div>
 
@@ -462,7 +540,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
               >
                 <div className="flex items-center gap-2 px-1 text-xs text-[#747775]">
                   <span className="font-semibold">
-                    {m.role === "user" ? "You" : "Document Assistant"}
+                    {m.role === "user" ? "You" : "Stark AI Assistant"}
                   </span>
                   <span>•</span>
                   <span>{new Date(m.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
@@ -472,8 +550,8 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                 <div
                   className={`max-w-[85%] rounded-3xl p-5 shadow-xs ${
                     m.role === "user"
-                      ? "bg-[#c2e7ff] text-[#001d35] rounded-tr-xs font-medium"
-                      : "bg-white border border-[#e1e3e1] text-[#1f1f1f] rounded-tl-xs"
+                      ? "bg-[#0b57d0] text-white rounded-tr-xs font-medium shadow-md"
+                      : "bg-white border border-[#e1e3e1] text-[#1f1f1f] rounded-tl-xs shadow-xs"
                   }`}
                 >
                   {/* Markdown Answer Text */}
@@ -488,54 +566,128 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
               </div>
             ))
           ) : (
-            <div className="h-full flex flex-col items-center justify-center text-center py-20">
-              <div className="w-16 h-16 rounded-3xl bg-blue-50 text-[#0b57d0] flex items-center justify-center mb-4 border border-blue-100 shadow-xs">
+            /* ChatGPT Empty State with Dynamic Prompt Cards */
+            <div className="h-full flex flex-col items-center justify-center text-center py-8 px-4 max-w-3xl mx-auto">
+              <div className="w-16 h-16 rounded-3xl bg-[#0b57d0] text-white flex items-center justify-center mb-4 shadow-xl shadow-[#0b57d0]/20">
                 <Sparkles className="w-8 h-8" />
               </div>
-              <h3 className="text-lg font-bold text-[#1f1f1f]">Universal Persistent Chat</h3>
-              <p className="text-sm text-[#444746] max-w-md mt-1 leading-relaxed">
-                Search documents, refine results (e.g. <span className="font-semibold text-[#0b57d0]">score &gt;= 85</span>), filter metadata, or ask any question grounded strictly in your listed files.
+              <h3 className="text-2xl font-bold text-[#1f1f1f] mb-1">Stark AI Assistant</h3>
+              <p className="text-sm text-[#444746] max-w-md mb-8">
+                Ask questions across your entire Drive repository or upload files below to chat directly with specific documents.
               </p>
+
+              {/* Dynamic ChatGPT FAQ Prompt Cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full text-left">
+                {faqSuggestions.map((card, idx) => {
+                  const CardIcon = card.icon;
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => handleSendMessage(card.prompt)}
+                      className={`p-4 rounded-2xl border transition-all duration-200 group flex flex-col justify-between ${card.bg} shadow-2xs hover:shadow-md cursor-pointer`}
+                    >
+                      <div className="flex items-center gap-2 font-bold text-sm mb-1">
+                        <CardIcon className="w-4 h-4 flex-shrink-0" />
+                        <span>{card.title}</span>
+                      </div>
+                      <p className="text-xs opacity-80 leading-relaxed font-normal">
+                        "{card.prompt}"
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
 
           {sending && (
-            <div className="flex items-center gap-3 p-4 bg-white border border-[#e1e3e1] rounded-2xl max-w-xs animate-pulse">
+            <div className="flex items-center gap-3 p-4 bg-white border border-[#e1e3e1] rounded-2xl max-w-xs animate-pulse shadow-sm">
               <Sparkles className="w-4 h-4 text-[#0b57d0] animate-spin" />
-              <span className="text-xs font-semibold text-[#444746]">Processing query & grounding context...</span>
+              <span className="text-xs font-semibold text-[#444746]">
+                {uploadingAttached ? "Uploading attached documents..." : "Stark AI is searching & thinking..."}
+              </span>
             </div>
           )}
 
           <div ref={messagesEndRef} />
         </div>
 
-        {/* Input Controls Bar */}
+        {/* ChatGPT Style Input Controls Bar */}
         <div className="p-4 bg-white border-t border-[#e1e3e1]">
+          {/* Attached Files Badges Pill */}
+          {attachedFiles.length > 0 && (
+            <div className="flex items-center gap-2 mb-2 overflow-x-auto pb-1">
+              <span className="text-xs font-semibold text-[#444746] flex items-center gap-1">
+                <FileUp className="w-3.5 h-3.5 text-[#0b57d0]" />
+                Attached:
+              </span>
+              {attachedFiles.map((file, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 text-[#0b57d0] rounded-full text-xs font-medium"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  <span className="truncate max-w-[140px]">{file.name}</span>
+                  <button
+                    onClick={() => removeAttachedFile(idx)}
+                    className="p-0.5 hover:bg-blue-100 rounded-full transition-colors"
+                  >
+                    <X className="w-3 h-3 text-[#0b57d0]" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+
           <form
             onSubmit={(e) => {
               e.preventDefault();
               handleSendMessage();
             }}
-            className="flex items-center gap-3 bg-[#f0f4f9] rounded-2xl p-2 pl-4 border border-[#d3d7dc] focus-within:border-[#0b57d0] focus-within:bg-white transition-all shadow-xs"
+            className="flex items-center gap-2 bg-[#f0f4f9] rounded-3xl p-2 pl-4 border border-[#d3d7dc] focus-within:border-[#0b57d0] focus-within:bg-white transition-all shadow-xs"
           >
+            {/* Paperclip Button for Chat File Attachments */}
+            <button
+              type="button"
+              onClick={() => chatFileInputRef.current?.click()}
+              className="p-2 text-[#444746] hover:text-[#0b57d0] hover:bg-[#e1e5ea] rounded-full transition-all"
+              title="Attach document(s) to chat"
+            >
+              <Paperclip className="w-5 h-5" />
+            </button>
+
             <input
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Ask any question, filter (e.g. score >= 85), or search any document..."
+              placeholder="Ask anything or attach file(s) to chat with documents..."
               className="flex-1 bg-transparent text-sm text-[#1f1f1f] focus:outline-none placeholder-[#747775]"
             />
 
             <button
               type="submit"
-              disabled={!query.trim() || sending}
-              className="p-2.5 bg-[#0b57d0] hover:bg-[#0945a5] disabled:opacity-40 text-white rounded-xl shadow-xs transition-all flex items-center justify-center"
+              disabled={(!query.trim() && attachedFiles.length === 0) || sending}
+              className="p-2.5 bg-[#0b57d0] hover:bg-[#0945a5] disabled:opacity-40 text-white rounded-full shadow-xs transition-all flex items-center justify-center"
             >
               <Send className="w-4 h-4 stroke-[2.5]" />
             </button>
           </form>
         </div>
       </div>
+
+      {/* Custom Stark AI Confirm & Alert Modal */}
+      <ConfirmModal
+        isOpen={modalConfig.isOpen}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        type={modalConfig.type}
+        confirmText={modalConfig.confirmText}
+        showCancel={modalConfig.showCancel}
+        onConfirm={modalConfig.onConfirm}
+        onClose={() => setModalConfig((prev) => ({ ...prev, isOpen: false }))}
+      />
     </div>
   );
 }
+
+

@@ -109,7 +109,7 @@ export function DriveSidebar({
             <span>Home</span>
           </button>
 
-          {/* AI Persistent Chat */}
+          {/* AI Chat */}
           <button
             onClick={() => onSelectView("chat")}
             className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "chat"
@@ -118,8 +118,9 @@ export function DriveSidebar({
               }`}
           >
             <Sparkles className="w-4 h-4 text-[#0b57d0]" />
-            <span>AI Persistent Chat</span>
+            <span>AI Chat</span>
           </button>
+
 
 
           {/* My Drive Node */}
