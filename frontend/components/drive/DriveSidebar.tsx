@@ -11,13 +11,14 @@ import {
   Trash2,
   FolderPlus,
   Upload,
+  Sparkles,
 } from "lucide-react";
 import type { DriveStats, FolderTreeNode } from "@/types";
 import { FolderTreeSidebar } from "./FolderTreeSidebar";
 
 interface DriveSidebarProps {
-  currentView: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared";
-  onSelectView: (view: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared") => void;
+  currentView: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat";
+  onSelectView: (view: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat") => void;
   onOpenNewFolderModal: () => void;
   onTriggerFileUpload: () => void;
   stats: DriveStats | null;
@@ -99,25 +100,36 @@ export function DriveSidebar({
           {/* Home */}
           <button
             onClick={() => onSelectView("home")}
-            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${
-              currentView === "home"
-                ? "bg-[#c2e7ff] text-[#001d35] font-bold"
-                : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
-            }`}
+            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "home"
+              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
+              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+              }`}
           >
             <Home className="w-4 h-4" />
             <span>Home</span>
           </button>
 
+          {/* AI Persistent Chat */}
+          <button
+            onClick={() => onSelectView("chat")}
+            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "chat"
+              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
+              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+              }`}
+          >
+            <Sparkles className="w-4 h-4 text-[#0b57d0]" />
+            <span>AI Persistent Chat</span>
+          </button>
+
+
           {/* My Drive Node */}
           <div>
             <div
               onClick={() => onSelectView("my-drive")}
-              className={`flex items-center justify-between w-full px-4 py-2 rounded-r-full text-sm font-medium cursor-pointer transition-all ${
-                currentView === "my-drive" && !activeFolderId
-                  ? "bg-[#c2e7ff] text-[#001d35] font-bold"
-                  : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
-              }`}
+              className={`flex items-center justify-between w-full px-4 py-2 rounded-r-full text-sm font-medium cursor-pointer transition-all ${currentView === "my-drive" && !activeFolderId
+                ? "bg-[#c2e7ff] text-[#001d35] font-bold"
+                : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+                }`}
             >
               <div className="flex items-center gap-4">
                 <HardDrive className="w-4 h-4" />
@@ -153,11 +165,10 @@ export function DriveSidebar({
           {/* Shared with me */}
           <button
             onClick={() => onSelectView("shared")}
-            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${
-              currentView === "shared"
-                ? "bg-[#c2e7ff] text-[#001d35] font-bold"
-                : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
-            }`}
+            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "shared"
+              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
+              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+              }`}
           >
             <Users className="w-4 h-4" />
             <span>Shared with me</span>
@@ -166,11 +177,10 @@ export function DriveSidebar({
           {/* Recent */}
           <button
             onClick={() => onSelectView("recent")}
-            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${
-              currentView === "recent"
-                ? "bg-[#c2e7ff] text-[#001d35] font-bold"
-                : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
-            }`}
+            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "recent"
+              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
+              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+              }`}
           >
             <Clock className="w-4 h-4" />
             <span>Recent</span>
@@ -179,11 +189,10 @@ export function DriveSidebar({
           {/* Starred */}
           <button
             onClick={() => onSelectView("starred")}
-            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${
-              currentView === "starred"
-                ? "bg-[#c2e7ff] text-[#001d35] font-bold"
-                : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
-            }`}
+            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "starred"
+              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
+              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+              }`}
           >
             <Star className="w-4 h-4" />
             <span>Starred</span>
@@ -192,11 +201,10 @@ export function DriveSidebar({
           {/* Bin */}
           <button
             onClick={() => onSelectView("trash")}
-            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${
-              currentView === "trash"
-                ? "bg-[#c2e7ff] text-[#001d35] font-bold"
-                : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
-            }`}
+            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "trash"
+              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
+              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+              }`}
           >
             <Trash2 className="w-4 h-4" />
             <span>Bin</span>

@@ -98,6 +98,7 @@ export interface SearchResult {
   page_number: number | null;
   snippet: string;
   score: number;
+  tags?: string[];
   metadata: Record<string, unknown>;
 }
 
@@ -108,3 +109,32 @@ export interface SearchResponse {
   cached: boolean;
   took_ms: number;
 }
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  role: "user" | "assistant";
+  content: string;
+  results?: SearchResult[] | null;
+  filters?: Record<string, any> | null;
+  created_at: string;
+}
+
+export interface ChatSessionListItem {
+  id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  message_count: number;
+}
+
+export interface ChatSession {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+  messages: ChatMessage[];
+}
+

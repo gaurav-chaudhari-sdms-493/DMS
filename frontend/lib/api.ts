@@ -1,7 +1,16 @@
 import { getAccessToken } from "./auth";
-import type { Folder, FolderTreeNode, DocumentListItem, DocumentDetailResponse, DriveStats, SearchResponse } from "@/types";
+import type { Folder, FolderTreeNode, DocumentListItem, DocumentDetailResponse, DriveStats, SearchResponse, ChatSession, ChatMessage, ChatSessionListItem } from "@/types";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const getBaseUrl = (): string => {
+  let url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+  if (typeof window !== "undefined") {
+    // If in browser and URL points to internal docker service name 'backend', use 'localhost:8000'
+    if (url.includes("backend:8000")) {
+      url = "http://localhost:8000";
+    }
+  }
+  return url;
+};
 
 async function request(path: string, options: RequestInit = {}): Promise<any> {
   const headers = new Headers(options.headers || {});
@@ -15,7 +24,8 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
     headers.set("Content-Type", "application/json");
   }
   
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const baseUrl = getBaseUrl();
+  const response = await fetch(`${baseUrl}${path}`, {
     ...options,
     headers,
   });
@@ -25,9 +35,12 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
       if (typeof window !== "undefined") {
         localStorage.removeItem("access_token");
         localStorage.removeItem("refresh_token");
-        window.location.href = "/login";
+        if (window.location.pathname !== "/login") {
+          window.location.href = "/login";
+        }
       }
     }
+
     let errorDetail = "Request failed";
     try {
       const errJson = await response.json();
@@ -61,6 +74,37 @@ export const api = {
       return await request("/api/v1/search/", {
         method: "POST",
         body: JSON.stringify({ query, limit, filters }),
+      });
+    },
+  },
+  chat: {
+    listSessions: async (): Promise<ChatSessionListItem[]> => {
+      return await request("/api/v1/chat/sessions");
+    },
+    createSession: async (title?: string, initialQuery?: string): Promise<ChatSession> => {
+      return await request("/api/v1/chat/sessions", {
+        method: "POST",
+        body: JSON.stringify({ title, initial_query: initialQuery }),
+      });
+    },
+    getSession: async (sessionId: string): Promise<ChatSession> => {
+      return await request(`/api/v1/chat/sessions/${sessionId}`);
+    },
+    sendMessage: async (sessionId: string, query: string, filters?: any): Promise<ChatMessage> => {
+      return await request(`/api/v1/chat/sessions/${sessionId}/messages`, {
+        method: "POST",
+        body: JSON.stringify({ query, filters }),
+      });
+    },
+    updateSessionTitle: async (sessionId: string, title: string): Promise<ChatSession> => {
+      return await request(`/api/v1/chat/sessions/${sessionId}`, {
+        method: "PATCH",
+        body: JSON.stringify({ title }),
+      });
+    },
+    deleteSession: async (sessionId: string): Promise<void> => {
+      return await request(`/api/v1/chat/sessions/${sessionId}`, {
+        method: "DELETE",
       });
     },
   },

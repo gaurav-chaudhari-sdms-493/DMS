@@ -13,11 +13,13 @@ import { NewFolderModal, RenameModal, MoveModal } from "@/components/drive/Modal
 import { UploadWidget, UploadItem } from "@/components/drive/UploadWidget";
 import { AISummary } from "@/components/search/AISummary";
 import { ResultCard } from "@/components/search/ResultCard";
+import { PersistentChatPanel } from "@/components/chat/PersistentChatPanel";
+import { RightSideChatDrawer } from "@/components/chat/RightSideChatDrawer";
 
 import { isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
 import type { Folder, FolderTreeNode, DocumentListItem, DriveStats, SearchResponse, SearchResult } from "@/types";
-import { Info, FolderSearch, Eye, Trash2, RotateCcw } from "lucide-react";
+import { Info, FolderSearch, Eye, Trash2, RotateCcw, Sparkles } from "lucide-react";
 
 const isUUID = (str: string | null | undefined): boolean => {
   if (!str) return false;
@@ -28,7 +30,7 @@ export default function DrivePage() {
   const router = useRouter();
 
   // Navigation View & Hierarchy State
-  const [currentView, setCurrentView] = useState<"home" | "my-drive" | "recent" | "starred" | "trash" | "shared">("home");
+  const [currentView, setCurrentView] = useState<"home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat">("home");
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [folderPath, setFolderPath] = useState<Folder[]>([]);
@@ -45,6 +47,7 @@ export default function DrivePage() {
 
   // UI State
   const [showDetailPanel, setShowDetailPanel] = useState(false);
+  const [showRightChatDrawer, setShowRightChatDrawer] = useState(false);
   const [loading, setLoading] = useState(false);
   const [driveStats, setDriveStats] = useState<DriveStats | null>(null);
 
@@ -164,12 +167,15 @@ export default function DrivePage() {
     try {
       const res = await api.search.query(query);
       setSearchResponse(res);
+      // AUTO-OPEN RIGHT-SIDE PERSISTENT CHAT JUST IN TIME ON SEARCH
+      setShowRightChatDrawer(true);
     } catch (err) {
       console.error("Search failed:", err);
     } finally {
       setSearching(false);
     }
   };
+
 
   const handleClearSearch = () => {
     setSearchQuery("");
@@ -386,8 +392,12 @@ export default function DrivePage() {
             </button>
           </div>
 
-          {/* Active Search Mode */}
-          {searchQuery ? (
+          {/* Active Chat Mode */}
+          {currentView === "chat" ? (
+            <div className="flex-1 flex overflow-hidden">
+              <PersistentChatPanel onPreviewDocument={(doc) => setPreviewDoc(doc)} />
+            </div>
+          ) : searchQuery ? (
             <div className="flex-1 space-y-6">
               {searching ? (
                 <div className="text-center py-12 text-sm text-[#444746] animate-pulse">
@@ -401,10 +411,21 @@ export default function DrivePage() {
 
                   <div className="flex items-center justify-between border-b border-[#e1e3e1] pb-2">
                     <h3 className="text-base font-semibold text-[#1f1f1f]">Search Results</h3>
-                    <span className="text-xs text-[#444746]">
-                      {searchResponse.results.length} matches ({searchResponse.took_ms}ms)
-                    </span>
+                    <div className="flex items-center gap-3">
+                      <button
+                        onClick={() => setShowRightChatDrawer(!showRightChatDrawer)}
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0b57d0] hover:bg-[#0945a5] text-white rounded-full text-xs font-semibold shadow-sm transition-all"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>{showRightChatDrawer ? "Hide AI Assistant" : "AI Persistent Chatbot"}</span>
+                      </button>
+                      <span className="text-xs text-[#444746]">
+                        {searchResponse.results.length} matches ({searchResponse.took_ms}ms)
+                      </span>
+                    </div>
                   </div>
+
+
 
                   {searchResponse.results.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4">
@@ -541,6 +562,15 @@ export default function DrivePage() {
             onClose={() => setShowDetailPanel(false)}
           />
         )}
+
+        {/* Right-Side Persistent Chat Drawer */}
+        <RightSideChatDrawer
+          isOpen={showRightChatDrawer}
+          onClose={() => setShowRightChatDrawer(false)}
+          initialQuery={searchQuery}
+          initialResults={searchResponse?.results}
+          onPreviewDocument={(doc) => setPreviewDoc(doc)}
+        />
 
         {/* Far Right Apps Dock */}
         <RightDock />

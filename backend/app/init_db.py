@@ -14,6 +14,9 @@ from app.models.metadata_item import MetadataItem
 from app.models.permission import Permission
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.models.chat_session import ChatSession
+from app.models.chat_message import ChatMessage
+
 
 
 async def init_db():
@@ -36,7 +39,7 @@ async def init_db():
         """))
         await conn.execute(text("""
             INSERT INTO users (id, tenant_id, email, full_name, hashed_password, role, created_at)
-            VALUES ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', 'default@example.com', 'Default User', 'hashedpassword', 'user', NOW())
+            VALUES ('00000000-0000-0000-0000-000000000000', '00000000-0000-0000-0000-000000000000', 'default@example.com', 'Default User', '$2b$12$XFAFoaYjR6IWuO8NbucOU.ZO8sfiO15s3ExDORTs.HRL7ASVxw92e', 'user', NOW())
             ON CONFLICT (id) DO NOTHING;
         """))
 
