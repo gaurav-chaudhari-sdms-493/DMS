@@ -15,6 +15,10 @@ class SignUpResponse(BaseModel):
     tenant_id: UUID
     full_name: str
     email: EmailStr
+    access_token: str | None = None
+    refresh_token: str | None = None
+    token_type: str = 'bearer'
+    expires_in: int | None = None
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -28,3 +32,34 @@ class TokenPayload(BaseModel):
     role: str
     exp: int
     jti: str  # JWT ID for refresh token tracking
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    reset_token: str | None = None
+
+class ResetPasswordRequest(BaseModel):
+    email: EmailStr
+    reset_token: str
+    new_password: str = Field(..., min_length=8)
+
+class FileTypeCount(BaseModel):
+    extension: str
+    count: int
+    size_bytes: int
+
+class UserProfileResponse(BaseModel):
+    user_id: UUID
+    full_name: str
+    email: EmailStr
+    role: str
+    tenant_id: UUID
+    tenant_name: str
+    created_at: str
+    total_files: int
+    total_folders: int
+    total_size_bytes: int
+    total_chunks: int
+    file_types_breakdown: list[FileTypeCount]

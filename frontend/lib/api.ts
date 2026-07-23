@@ -68,7 +68,39 @@ export const api = {
         body: JSON.stringify({ email, password }),
       });
     },
+    signUp: async (fullName: string, email: string, password: string): Promise<any> => {
+      return await request("/api/v1/auth/sign-up", {
+        method: "POST",
+        body: JSON.stringify({ full_name: fullName, email, password }),
+      });
+    },
+    forgotPassword: async (email: string): Promise<any> => {
+      return await request("/api/v1/auth/forgot-password", {
+        method: "POST",
+        body: JSON.stringify({ email }),
+      });
+    },
+    resetPassword: async (email: string, resetToken: string, newPassword: string): Promise<any> => {
+      return await request("/api/v1/auth/reset-password", {
+        method: "POST",
+        body: JSON.stringify({ email, reset_token: resetToken, new_password: newPassword }),
+      });
+    },
+    getProfile: async (): Promise<any> => {
+      return await request("/api/v1/auth/me", {
+        method: "GET",
+      });
+    },
+    logout: (): void => {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("access_token");
+        localStorage.removeItem("refresh_token");
+        window.location.href = "/login";
+      }
+    },
   },
+
+
   search: {
     query: async (query: string, limit: number = 5, filters: any = null): Promise<SearchResponse> => {
       return await request("/api/v1/search/", {

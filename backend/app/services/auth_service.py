@@ -45,11 +45,17 @@ async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
     await db.commit()
     await db.refresh(user)
 
+    acc = create_access_token(user.id, tenant.id, user.role.value)
+    ref = create_refresh_token(user.id, tenant.id, user.role.value)
+
     return SignUpResponse(
         user_id=user.id,
         tenant_id=tenant.id,
         full_name=user.full_name,
         email=user.email,
+        access_token=acc,
+        refresh_token=ref,
+        expires_in=settings.jwt_access_token_expire_minutes * 60
     )
 
 def create_access_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
@@ -73,6 +79,34 @@ def create_refresh_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) ->
         "jti": str(uuid.uuid4())
     }
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+def create_password_reset_token(email: str) -> str:
+    expire = datetime.utcnow() + timedelta(minutes=15)
+    to_encode = {
+        "sub": email,
+        "type": "reset_password",
+        "exp": int(expire.timestamp()),
+        "jti": str(uuid.uuid4())
+    }
+    return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
+
+async def reset_password_with_token(email: str, token: str, new_password: str, db: AsyncSession) -> bool:
+    try:
+        payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
+        if payload.get("type") != "reset_password" or payload.get("sub") != email:
+            raise HTTPException(status_code=400, detail="Invalid password reset token")
+    except JWTError:
+        raise HTTPException(status_code=400, detail="Invalid or expired reset token")
+
+    stmt = select(User).where(User.email == email)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=444, detail="User not found")
+
+    user.hashed_password = hash_password(new_password)
+    await db.commit()
+    return True
 
 def verify_token(token: str) -> TokenPayload:
     try:
