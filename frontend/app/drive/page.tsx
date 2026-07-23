@@ -19,7 +19,9 @@ import { RightSideChatDrawer } from "@/components/chat/RightSideChatDrawer";
 import { isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
 import type { Folder, FolderTreeNode, DocumentListItem, DriveStats, SearchResponse, SearchResult } from "@/types";
-import { Info, FolderSearch, Eye, Trash2, RotateCcw, Sparkles } from "lucide-react";
+import { Info, FolderSearch, Eye, Trash2, RotateCcw, Sparkles, FolderPlus, Upload, FolderUp, UploadCloud } from "lucide-react";
+
+
 
 const isUUID = (str: string | null | undefined): boolean => {
   if (!str) return false;
@@ -61,9 +63,55 @@ export default function DrivePage() {
   const [itemToRename, setItemToRename] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
   const [itemToMove, setItemToMove] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
 
-  // Uploads State
+  // Uploads & Drag-and-Drop State
   const [uploads, setUploads] = useState<UploadItem[]>([]);
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const folderInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Context Menu State
+  const [contextMenu, setContextMenu] = useState<{ visible: boolean; x: number; y: number }>({
+    visible: false,
+    x: 0,
+    y: 0,
+  });
+
+  const handleContextMenu = (e: React.MouseEvent) => {
+    e.preventDefault();
+    setContextMenu({
+      visible: true,
+      x: e.clientX,
+      y: e.clientY,
+    });
+  };
+
+  // Drag & Drop Handlers
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
+      setIsDragging(true);
+    }
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (e.currentTarget.contains(e.relatedTarget as Node)) return;
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setIsDragging(false);
+    const droppedFiles = Array.from(e.dataTransfer.files || []);
+    if (droppedFiles.length > 0) {
+      processFilesForUpload(droppedFiles);
+    }
+  };
+
+
 
   // Auth Protection
   useEffect(() => {
@@ -270,8 +318,7 @@ export default function DrivePage() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
+  const processFilesForUpload = async (files: File[]) => {
     if (files.length === 0) return;
 
     const validParentId = isUUID(currentFolderId) ? currentFolderId : null;
@@ -308,10 +355,18 @@ export default function DrivePage() {
             : u
         )
       );
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length > 0) {
+      await processFilesForUpload(files);
+    }
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    if (folderInputRef.current) folderInputRef.current.value = "";
+  };
+
 
   // Preview Document from Search Result
   const handlePreviewSearchResult = (res: SearchResult) => {
@@ -330,13 +385,21 @@ export default function DrivePage() {
 
   return (
     <div className="flex flex-col h-screen w-screen bg-gdriveBg overflow-hidden select-none">
-      {/* Hidden File Input */}
+      {/* Hidden File & Folder Inputs */}
       <input
         type="file"
         multiple
         ref={fileInputRef}
         onChange={handleFileChange}
         className="hidden"
+      />
+      <input
+        type="file"
+        multiple
+        ref={folderInputRef}
+        onChange={handleFileChange}
+        className="hidden"
+        {...({ webkitdirectory: "", directory: "" } as any)}
       />
 
       {/* Top Header */}
@@ -369,7 +432,27 @@ export default function DrivePage() {
         />
 
         {/* Center Main Dashboard Canvas */}
-        <main className="flex-1 bg-white rounded-3xl my-2 ml-1 mr-2 p-6 flex flex-col overflow-y-auto border border-[#e1e3e1] shadow-sm">
+        <main
+          onContextMenu={handleContextMenu}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className="flex-1 bg-white rounded-3xl my-2 ml-1 mr-2 p-6 flex flex-col overflow-y-auto border border-[#e1e3e1] shadow-sm relative"
+        >
+          {/* Drag and Drop Overlay Indicator */}
+          {isDragging && (
+            <div className="absolute inset-0 bg-[#0b57d0]/10 backdrop-blur-md rounded-3xl border-2 border-dashed border-[#0b57d0] z-40 flex flex-col items-center justify-center p-8 text-center animate-fadeIn pointer-events-none">
+              <div className="w-20 h-20 bg-[#0b57d0] text-white rounded-full flex items-center justify-center shadow-xl shadow-[#0b57d0]/30 mb-4 animate-bounce">
+                <UploadCloud className="w-10 h-10" />
+              </div>
+              <h3 className="text-xl font-bold text-[#001d35] mb-1">Drop files here to upload to DMS</h3>
+              <p className="text-sm text-[#444746] max-w-md">
+                Upload single or multiple documents directly into your current directory folder.
+              </p>
+            </div>
+          )}
+
+
           {/* Top Breadcrumb & Canvas Header */}
           <div className="flex items-center justify-between mb-4 border-b border-[#e1e3e1] pb-3">
             <DriveBreadcrumbs
@@ -617,6 +700,60 @@ export default function DrivePage() {
 
       {/* Upload Tracker Widget */}
       <UploadWidget uploads={uploads} onDismiss={() => setUploads([])} />
+
+      {/* Right-Click Context Menu */}
+      {contextMenu.visible && (
+        <div
+          className="fixed inset-0 z-50 pointer-events-auto"
+          onClick={() => setContextMenu((prev) => ({ ...prev, visible: false }))}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setContextMenu({ visible: true, x: e.clientX, y: e.clientY });
+          }}
+        >
+          <div
+            className="absolute w-56 bg-surface border border-borderDark rounded-2xl shadow-2xl py-2 text-textMain animate-fadeIn"
+            style={{
+              top: `${Math.min(contextMenu.y, typeof window !== "undefined" ? window.innerHeight - 160 : contextMenu.y)}px`,
+              left: `${Math.min(contextMenu.x, typeof window !== "undefined" ? window.innerWidth - 240 : contextMenu.x)}px`,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              onClick={() => {
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+                setIsNewFolderOpen(true);
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-textMain hover:bg-white/10 transition-colors text-left"
+            >
+              <FolderPlus className="w-4 h-4 text-primary" />
+              <span>Create new folder</span>
+            </button>
+            <div className="my-1 border-t border-borderDark/60" />
+            <button
+              onClick={() => {
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+                fileInputRef.current?.click();
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-textMain hover:bg-white/10 transition-colors text-left"
+            >
+              <Upload className="w-4 h-4 text-blue-400" />
+              <span>Upload file</span>
+            </button>
+            <button
+              onClick={() => {
+                setContextMenu((prev) => ({ ...prev, visible: false }));
+                folderInputRef.current?.click();
+              }}
+              className="w-full flex items-center gap-3 px-4 py-2.5 text-sm font-medium text-textMain hover:bg-white/10 transition-colors text-left"
+            >
+              <FolderUp className="w-4 h-4 text-amber-400" />
+              <span>Folder upload</span>
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
