@@ -19,6 +19,21 @@ A production-ready platform for multi-tenant document ingestion, processing, and
  (Async Tasks)     (Port 6379)         (Port 5432)
 ```
 
+## Documentation Suite
+
+The system includes comprehensive documentation for technical evaluation, setup, architecture, costing, and live demonstration:
+
+| Document | Description |
+|----------|-------------|
+| 📐 [**System Architecture & Security**](./docs/SYSTEM_ARCHITECTURE.md) | Component diagrams, multi-tenant Row-Level Security (RLS), and database schemas. |
+| 🧠 [**AI Pipeline & Provider Hot-Swapping**](./docs/AI_PIPELINE_AND_MODELS.md) | 4-layer RAG engine, vector chunking, metadata extraction, and provider configuration. |
+| 📚 [**Libraries & Tech Stack**](./docs/LIBRARIES_AND_TECH_STACK.md) | Full breakdown of all backend Python packages, frontend React/Next.js libraries, and container dependencies. |
+| 🔌 [**Backend REST API Reference**](./docs/BACKEND_ENDPOINTS.md) | Complete REST API specification covering Auth, Ingestion, Search, Chat, Folders, and Tenant Admin. |
+| 🛠️ [**Full Setup & Installation Guide**](./docs/SETUP_GUIDE.md) | Step-by-step setup guide for Docker Compose and local native development. |
+| 💰 [**Cloud Costing & Estimation**](./docs/COSTING_AND_ESTIMATION.md) | AWS cloud infrastructure hosting costs, AI API token pricing per 1,000 docs/queries, TCO tiers, and ROI strategies. |
+| 🎬 [**Demo & Presentation Guide**](./docs/DEMO_PRESENTATION_GUIDE.md) | Step-by-step script and cheat sheet for conducting a live demonstration. |
+
+
 ## Quick Start
 
 1. **Prerequisites**: Docker and Docker Compose installed.
