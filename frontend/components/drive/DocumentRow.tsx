@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { FileText, FileSpreadsheet, FileCode, Image, File, Download, ExternalLink, Star, Trash2, Edit2, FolderInput, RotateCcw, MoreVertical } from "lucide-react";
+import { FileText, FileSpreadsheet, FileCode, Image, File, Download, ExternalLink, Star, Trash2, Edit2, FolderInput, RotateCcw, MoreVertical, Eye } from "lucide-react";
 import type { DocumentListItem } from "@/types";
 
 interface DocumentRowProps {
@@ -78,7 +78,7 @@ export function DocumentRow({
         {new Date(doc.created_at).toLocaleDateString()}
       </div>
 
-      <div className="flex items-center gap-2 relative">
+      <div className="flex items-center gap-1.5 relative">
         <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize hidden lg:inline-block ${
           doc.status === "indexed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
         }`}>
@@ -92,9 +92,33 @@ export function DocumentRow({
         <button
           onClick={(e) => {
             e.stopPropagation();
+            onPreview(doc);
+          }}
+          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-textMuted hover:text-primary hover:bg-surface transition-all"
+          title="Preview"
+        >
+          <Eye className="w-4 h-4" />
+        </button>
+
+        {doc.download_url && (
+          <a
+            href={doc.download_url}
+            download={doc.title}
+            onClick={(e) => e.stopPropagation()}
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-textMuted hover:text-secondary hover:bg-surface transition-all"
+            title="Download"
+          >
+            <Download className="w-4 h-4" />
+          </a>
+        )}
+
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
             setShowMenu(!showMenu);
           }}
           className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-textMuted hover:text-textMain hover:bg-surface transition-all"
+          title="More options"
         >
           <MoreVertical className="w-4 h-4" />
         </button>

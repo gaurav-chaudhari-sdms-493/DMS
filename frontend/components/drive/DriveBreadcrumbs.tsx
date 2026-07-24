@@ -1,6 +1,5 @@
-"use client";
 import React from "react";
-import { ChevronRight, HardDrive, Folder as FolderIcon, Home } from "lucide-react";
+import { ChevronRight, HardDrive } from "lucide-react";
 import type { Folder } from "@/types";
 
 interface BreadcrumbItem {
@@ -45,13 +44,9 @@ export function DriveBreadcrumbs({
       {/* Root Node */}
       <button
         onClick={onNavigateRoot}
-        className="flex items-center gap-2 hover:bg-[#edf2fc] hover:text-[#0b57d0] px-2.5 py-1 rounded-lg transition-colors font-medium text-[#1f1f1f]"
+        className="flex items-center gap-2 hover:bg-[#edf2fc] hover:text-[#0b57d0] px-2 py-1 rounded-lg transition-colors font-semibold text-[#1f1f1f]"
       >
-        {currentView === "home" ? (
-          <Home className="w-4 h-4 text-[#0b57d0]" />
-        ) : (
-          <HardDrive className="w-4 h-4 text-[#0b57d0]" />
-        )}
+        {currentView !== "home" && <HardDrive className="w-4 h-4 text-[#0b57d0]" />}
         <span>{getViewTitle()}</span>
       </button>
 

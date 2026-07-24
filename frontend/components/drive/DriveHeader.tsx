@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Search, Sparkles, LayoutGrid, List, Info, X } from "lucide-react";
+import { Search, Sparkles, LayoutGrid, List, X } from "lucide-react";
 
 interface DriveHeaderProps {
   onSearch: (query: string, useAi: boolean) => void;
@@ -111,19 +111,6 @@ export function DriveHeader({
           ) : (
             <LayoutGrid className="w-4 h-4" />
           )}
-        </button>
-
-        {/* Info Drawer Toggle */}
-        <button
-          onClick={onToggleDetailPanel}
-          title="Details & Activity"
-          className={`p-2.5 rounded-full transition-colors border ${
-            showDetailPanel
-              ? "bg-primary/20 text-primary border-primary/40"
-              : "text-textMuted hover:text-textMain hover:bg-surface border-borderDark/50"
-          }`}
-        >
-          <Info className="w-4 h-4" />
         </button>
       </div>
     </header>

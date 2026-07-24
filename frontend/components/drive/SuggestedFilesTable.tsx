@@ -6,7 +6,6 @@ import {
   FileCode,
   Image as ImageIcon,
   MoreVertical,
-  Check,
   List,
   LayoutGrid,
   Star,
@@ -15,12 +14,14 @@ import {
   FolderInput,
   Trash2,
   UploadCloud,
+  Eye,
 } from "lucide-react";
 import type { DocumentListItem } from "@/types";
 
 interface SuggestedFilesTableProps {
   documents: DocumentListItem[];
   onSelectDoc: (doc: DocumentListItem) => void;
+  onPreviewDoc?: (doc: DocumentListItem) => void;
   selectedDocId?: string | null;
   onToggleStar: (doc: DocumentListItem) => void;
   onRename: (doc: DocumentListItem) => void;
@@ -31,6 +32,7 @@ interface SuggestedFilesTableProps {
 export function SuggestedFilesTable({
   documents,
   onSelectDoc,
+  onPreviewDoc,
   selectedDocId,
   onToggleStar,
   onRename,
@@ -114,12 +116,6 @@ export function SuggestedFilesTable({
         {/* View Mode Switcher Pills */}
         <div className="flex items-center gap-1 bg-[#edf2fc] p-1 rounded-full border border-[#e1e3e1]">
           <button
-            className="p-1.5 rounded-full text-[#444746] hover:bg-white transition-colors"
-            title="Filter checkmark"
-          >
-            <Check className="w-3.5 h-3.5" />
-          </button>
-          <button
             onClick={() => setViewMode("list")}
             className={`p-1.5 rounded-full transition-all ${
               viewMode === "list" ? "bg-white text-[#0b57d0] shadow-sm font-bold" : "text-[#444746] hover:bg-white"
@@ -152,7 +148,7 @@ export function SuggestedFilesTable({
                     <th className="py-2.5 px-3 font-medium">Date added</th>
                     <th className="py-2.5 px-3 font-medium">Owner</th>
                     <th className="py-2.5 px-3 font-medium">Location</th>
-                    <th className="py-2.5 px-3 w-10"></th>
+                    <th className="py-2.5 px-3 text-right font-medium">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f0f4f9]">
@@ -190,17 +186,44 @@ export function SuggestedFilesTable({
                         </div>
                       </td>
 
-                      {/* Actions 3-dots */}
+                      {/* Actions: Preview button to the left side of Download button on hover */}
                       <td className="py-3 px-3 text-right relative">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setActiveMenuId(activeMenuId === row.id ? null : row.id);
-                          }}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#444746] hover:bg-[#d3d7dc] transition-all"
-                        >
-                          <MoreVertical className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (onPreviewDoc) onPreviewDoc(row.raw);
+                              else onSelectDoc(row.raw);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#444746] hover:text-[#0b57d0] hover:bg-[#d3d7dc] transition-all"
+                            title="Preview"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+
+                          {row.downloadUrl && (
+                            <a
+                              href={row.downloadUrl}
+                              download
+                              onClick={(e) => e.stopPropagation()}
+                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#444746] hover:text-[#00639b] hover:bg-[#d3d7dc] transition-all"
+                              title="Download"
+                            >
+                              <Download className="w-4 h-4" />
+                            </a>
+                          )}
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setActiveMenuId(activeMenuId === row.id ? null : row.id);
+                            }}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#444746] hover:bg-[#d3d7dc] transition-all"
+                            title="More options"
+                          >
+                            <MoreVertical className="w-4 h-4" />
+                          </button>
+                        </div>
 
                         {activeMenuId === row.id && (
                           <>
@@ -210,12 +233,13 @@ export function SuggestedFilesTable({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setActiveMenuId(null);
-                                  onSelectDoc(row.raw);
+                                  if (onPreviewDoc) onPreviewDoc(row.raw);
+                                  else onSelectDoc(row.raw);
                                 }}
                                 className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-[#f0f4f9]"
                               >
-                                <FileText className="w-4 h-4 text-[#0b57d0]" />
-                                <span>View Details</span>
+                                <Eye className="w-4 h-4 text-[#0b57d0]" />
+                                <span>Preview</span>
                               </button>
 
                               {row.downloadUrl && (
@@ -295,11 +319,35 @@ export function SuggestedFilesTable({
                 <div
                   key={row.id}
                   onClick={() => onSelectDoc(row.raw)}
-                  className="p-4 rounded-2xl bg-white border border-[#e1e3e1] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
+                  className="group p-4 rounded-2xl bg-white border border-[#e1e3e1] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
                 >
                   <div className="flex items-start justify-between mb-3">
                     {getFileIcon(row.title)}
-                    <span className="text-[10px] text-[#444746] font-medium">{row.location}</span>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onPreviewDoc) onPreviewDoc(row.raw);
+                          else onSelectDoc(row.raw);
+                        }}
+                        className="opacity-0 group-hover:opacity-100 p-1 rounded-full text-[#444746] hover:text-[#0b57d0] hover:bg-[#edf2fc] transition-all"
+                        title="Preview"
+                      >
+                        <Eye className="w-4 h-4" />
+                      </button>
+                      {row.downloadUrl && (
+                        <a
+                          href={row.downloadUrl}
+                          download
+                          onClick={(e) => e.stopPropagation()}
+                          className="opacity-0 group-hover:opacity-100 p-1 rounded-full text-[#444746] hover:text-[#00639b] hover:bg-[#edf2fc] transition-all"
+                          title="Download"
+                        >
+                          <Download className="w-4 h-4" />
+                        </a>
+                      )}
+                      <span className="text-[10px] text-[#444746] font-medium">{row.location}</span>
+                    </div>
                   </div>
                   <div>
                     <h4 className="text-xs font-semibold text-[#1f1f1f] truncate mb-1" title={row.title}>

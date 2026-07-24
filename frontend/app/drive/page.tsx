@@ -201,7 +201,7 @@ export default function DrivePage() {
         ]);
         setFolders(fList);
         setDocuments(dList);
-      } else if (currentView === "recent") {
+      } else if (currentView === "home" || currentView === "recent") {
         const dList = await api.documents.list({ include_all: true, is_trashed: false });
         setFolders([]);
         setDocuments(dList);
@@ -483,14 +483,6 @@ export default function DrivePage() {
               }}
               onNavigateFolder={handleSelectFolderId}
             />
-
-            <button
-              onClick={() => setShowDetailPanel(!showDetailPanel)}
-              className="p-2 rounded-full text-[#444746] hover:bg-[#edf2fc] transition-colors"
-              title="Drive info"
-            >
-              <Info className="w-5 h-5" />
-            </button>
           </div>
 
           {/* Active Chat Mode */}
@@ -531,16 +523,7 @@ export default function DrivePage() {
                   {searchResponse.results.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4">
                       {searchResponse.results.map((res, idx) => (
-                        <div key={`${res.document_id}-${idx}`} className="relative group">
-                          <ResultCard result={res} />
-                          <button
-                            onClick={() => handlePreviewSearchResult(res)}
-                            className="absolute top-4 right-4 flex items-center gap-1.5 px-3 py-1.5 bg-[#0b57d0] hover:bg-[#0945a5] text-white rounded-full text-xs font-semibold shadow-md transition-all opacity-0 group-hover:opacity-100"
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                            <span>Preview</span>
-                          </button>
-                        </div>
+                        <ResultCard key={`${res.document_id}-${idx}`} result={res} onPreview={handlePreviewSearchResult} />
                       ))}
                     </div>
                   ) : (
@@ -603,8 +586,37 @@ export default function DrivePage() {
                 ))}
               </div>
             </div>
+          ) : currentView === "home" ? (
+            /* Home View - Shows Only Recent Files Open */
+            <div className="flex-1 space-y-4">
+              <SuggestedFilesTable
+                documents={documents}
+                onSelectDoc={(d) => {
+                  setSelectedDoc(d);
+                  setSelectedFolder(null);
+                  setPreviewDoc(d);
+                  setShowDetailPanel(true);
+                }}
+                onPreviewDoc={(d) => setPreviewDoc(d)}
+                selectedDocId={selectedDoc?.id}
+                onToggleStar={async (d) => {
+                  if (isUUID(d.id)) {
+                    await api.documents.toggleStar(d.id).catch(() => {});
+                  }
+                  loadContents();
+                }}
+                onRename={(d) => setItemToRename({ type: "doc", item: d })}
+                onMove={(d) => setItemToMove({ type: "doc", item: d })}
+                onTrash={async (d) => {
+                  if (isUUID(d.id)) {
+                    await api.documents.toggleTrash(d.id).catch(() => {});
+                  }
+                  loadContents();
+                }}
+              />
+            </div>
           ) : (
-            /* Authentic Google Drive Home View & Subfolder Navigation */
+            /* My Drive View & Subfolder Navigation */
             <div className="flex-1 space-y-6">
               {/* Suggested Folders Carousel */}
               <SuggestedFoldersSection
@@ -635,6 +647,7 @@ export default function DrivePage() {
                   setPreviewDoc(d);
                   setShowDetailPanel(true);
                 }}
+                onPreviewDoc={(d) => setPreviewDoc(d)}
                 selectedDocId={selectedDoc?.id}
                 onToggleStar={async (d) => {
                   if (isUUID(d.id)) {

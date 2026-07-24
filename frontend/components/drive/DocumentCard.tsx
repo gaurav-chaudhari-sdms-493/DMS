@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { FileText, FileSpreadsheet, FileCode, Image, File, Download, ExternalLink, Star, Trash2, Edit2, FolderInput, RotateCcw, MoreVertical } from "lucide-react";
+import { FileText, FileSpreadsheet, FileCode, Image, File, Download, ExternalLink, Star, Trash2, Edit2, FolderInput, RotateCcw, MoreVertical, Eye } from "lucide-react";
 import type { DocumentListItem } from "@/types";
 
 interface DocumentCardProps {
@@ -77,9 +77,33 @@ export function DocumentCard({
           <button
             onClick={(e) => {
               e.stopPropagation();
+              onPreview(doc);
+            }}
+            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-textMuted hover:text-primary hover:bg-surface border border-transparent hover:border-borderDark transition-all"
+            title="Preview"
+          >
+            <Eye className="w-4 h-4" />
+          </button>
+
+          {doc.download_url && (
+            <a
+              href={doc.download_url}
+              download={doc.title}
+              onClick={(e) => e.stopPropagation()}
+              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-textMuted hover:text-secondary hover:bg-surface border border-transparent hover:border-borderDark transition-all"
+              title="Download"
+            >
+              <Download className="w-4 h-4" />
+            </a>
+          )}
+
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
               setShowMenu(!showMenu);
             }}
             className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-textMuted hover:text-textMain hover:bg-surface border border-transparent hover:border-borderDark transition-all"
+            title="More options"
           >
             <MoreVertical className="w-4 h-4" />
           </button>

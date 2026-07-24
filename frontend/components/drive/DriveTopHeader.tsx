@@ -23,6 +23,32 @@ export function DriveTopHeader({
   const router = useRouter();
   const [query, setQuery] = useState(searchQuery);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [userName, setUserName] = useState<string>("User");
+  const [userEmail, setUserEmail] = useState<string>("");
+  const [userInitials, setUserInitials] = useState<string>("U");
+
+  React.useEffect(() => {
+    api.auth.getProfile()
+      .then((data) => {
+        if (data && data.full_name) {
+          setUserName(data.full_name);
+          setUserEmail(data.email || "");
+          const initials = data.full_name
+            .split(" ")
+            .map((n: string) => n[0])
+            .filter(Boolean)
+            .join("")
+            .toUpperCase()
+            .slice(0, 2);
+          setUserInitials(initials || "U");
+        } else if (data && data.email) {
+          setUserEmail(data.email);
+          setUserName(data.email.split("@")[0]);
+          setUserInitials(data.email.slice(0, 2).toUpperCase());
+        }
+      })
+      .catch(() => { });
+  }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,31 +63,30 @@ export function DriveTopHeader({
 
   return (
     <header className="h-16 px-4 flex items-center justify-between gap-4 bg-gdriveBg select-none border-b border-[#e1e3e1]/40 relative z-30">
-      {/* Left: Brand Logo & Title */}
-      <div className="flex items-center gap-3 flex-shrink-0">
-        <Link href="/drive" className="bg-[#1e1e24] px-3 py-1.5 rounded-xl border border-[#333538] flex items-center shadow-sm hover:border-primary/50 transition-colors">
+      {/* Left: Brand Logo */}
+      <div className="flex items-center flex-shrink-0 pl-1">
+        <Link href="/drive" className="flex items-center hover:opacity-90 transition-opacity">
           <img
-            src="/stark-logo-white.avif"
-            alt="Stark Logo"
-            className="h-6 w-auto object-contain"
+            src="/stark_drive_logo.png"
+            alt="Stark Drive Logo"
+            className="h-12 md:h-[58px] w-auto object-contain origin-left scale-110"
           />
         </Link>
-        <span className="text-xl font-bold text-[#1f1f1f] tracking-tight">DMS</span>
       </div>
 
-      {/* Center: Search Bar ("Get answers from Drive") */}
-      <form onSubmit={handleSubmit} className="flex-1 max-w-3xl">
-        <div className="relative flex items-center">
-          <button type="submit" className="absolute left-4 text-[#444746] hover:text-[#1f1f1f]">
-            <Sparkles className="w-5 h-5 text-[#0b57d0]" />
+      {/* Center: Search Bar ("Search anything with Stark AI...") */}
+      <form onSubmit={handleSubmit} className="flex-1 max-w-4xl">
+        <div className="relative flex items-center group">
+          <button type="submit" className="absolute left-4 text-[#0b57d0] hover:text-[#0945a5] z-10 transition-transform group-hover:scale-110">
+            <Sparkles className="w-5 h-5 text-[#0b57d0] animate-pulse" />
           </button>
 
           <input
             type="text"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Get answers from DMS (AI Search)..."
-            className="w-full pl-12 pr-12 py-3 rounded-full bg-[#edf2fc] text-[#1f1f1f] placeholder:text-[#444746] text-sm focus:outline-none focus:bg-white focus:shadow-md focus:ring-1 focus:ring-[#0b57d0] transition-all"
+            placeholder="Search anything with Stark AI..."
+            className="w-full pl-14 pr-12 py-3.5 rounded-full bg-[#edf2fc] text-[#1f1f1f] placeholder:text-[#444746] text-base font-normal border border-[#d3d7dc]/60 hover:bg-[#e4ebf7] hover:border-[#0b57d0]/30 focus:outline-none focus:bg-white focus:shadow-xl focus:ring-2 focus:ring-[#0b57d0]/50 focus:border-[#0b57d0] transition-all duration-300 shadow-inner"
           />
 
           {query && (
@@ -71,7 +96,7 @@ export function DriveTopHeader({
                 setQuery("");
                 onClearSearch();
               }}
-              className="absolute right-4 p-1.5 rounded-full text-[#444746] hover:bg-[#e1e3e1]"
+              className="absolute right-4 p-1.5 rounded-full text-[#444746] hover:bg-[#e1e3e1] transition-colors"
             >
               <X className="w-4 h-4" />
             </button>
@@ -89,7 +114,7 @@ export function DriveTopHeader({
             className="w-9 h-9 rounded-full bg-[#c2e7ff] text-[#001d35] font-bold text-xs flex items-center justify-center border border-[#727775] shadow-sm hover:ring-2 hover:ring-[#0b57d0] transition-all"
             title="Account Menu"
           >
-            DMS
+            {userInitials}
           </div>
           <ChevronDown className="w-3.5 h-3.5 text-[#444746]" />
         </button>
@@ -103,40 +128,25 @@ export function DriveTopHeader({
             <div className="absolute right-0 mt-2 w-56 bg-surface border border-borderDark rounded-xl shadow-xl z-50 py-2 animate-fadeIn text-textMain">
               <div className="px-4 py-2.5 border-b border-borderDark/60">
                 <p className="text-xs text-textMuted uppercase font-semibold tracking-wider">Account</p>
-                <p className="text-sm font-semibold truncate text-textMain mt-0.5">DocSearch User</p>
+                <p className="text-sm font-semibold truncate text-textMain mt-0.5">{userName}</p>
+                {userEmail && <p className="text-xs text-textMuted truncate">{userEmail}</p>}
               </div>
 
               <div className="py-1">
                 <Link
                   href="/profile"
                   onClick={() => setDropdownOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMain hover:bg-white/5 transition-colors"
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMain hover:bg-white/5 transition-colors font-medium"
                 >
                   <User className="w-4 h-4 text-primary" />
                   <span>Profile & Analytics</span>
-                </Link>
-                <Link
-                  href="/profile"
-                  onClick={() => setDropdownOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMuted hover:text-textMain hover:bg-white/5 transition-colors"
-                >
-                  <BarChart3 className="w-4 h-4 text-emerald-400" />
-                  <span>Storage Stats</span>
-                </Link>
-                <Link
-                  href="/admin"
-                  onClick={() => setDropdownOpen(false)}
-                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMuted hover:text-textMain hover:bg-white/5 transition-colors"
-                >
-                  <ShieldCheck className="w-4 h-4 text-violet-500" />
-                  <span>Admin Panel</span>
                 </Link>
               </div>
 
               <div className="border-t border-borderDark/60 pt-1 mt-1">
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left"
+                  className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left font-medium"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Log Out</span>

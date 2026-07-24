@@ -5,13 +5,11 @@ import Link from "next/link";
 import {
   User,
   Mail,
-  Building2,
   Calendar,
   ShieldCheck,
   FileText,
   Folder,
   HardDrive,
-  Cpu,
   LogOut,
   ArrowLeft,
   KeyRound,
@@ -81,11 +79,6 @@ export default function ProfilePage() {
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
-
-  // Quota calculation (Default 10 GB limit)
-  const quotaBytes = 10 * 1024 * 1024 * 1024; // 10 GB
-  const usedSize = profile?.total_size_bytes || 0;
-  const quotaPercent = Math.min(100, Math.round((usedSize / quotaBytes) * 100));
 
   return (
     <div className="min-h-screen bg-background text-textMain">
@@ -162,10 +155,6 @@ export default function ProfilePage() {
                         {profile.email}
                       </span>
                       <span className="flex items-center gap-1.5">
-                        <Building2 className="w-4 h-4 text-textMuted" />
-                        {profile.tenant_name}
-                      </span>
-                      <span className="flex items-center gap-1.5">
                         <Calendar className="w-4 h-4 text-textMuted" />
                         Joined {profile.created_at}
                       </span>
@@ -191,7 +180,7 @@ export default function ProfilePage() {
                 <span>Live Drive Analytics</span>
               </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <Card className="p-5 border-borderDark/80 hover:border-primary/40 transition-colors">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-wider text-textMuted">Total Files</span>
@@ -214,28 +203,7 @@ export default function ProfilePage() {
                   </div>
                   <div className="mt-4">
                     <p className="text-3xl font-extrabold text-textMain">{formatSize(profile.total_size_bytes)}</p>
-                    <div className="w-full bg-surface/80 rounded-full h-2 mt-2 overflow-hidden border border-borderDark/60">
-                      <div
-                        className="bg-primary h-full rounded-full transition-all duration-500"
-                        style={{ width: `${Math.max(3, quotaPercent)}%` }}
-                      />
-                    </div>
-                    <p className="text-xs text-textMuted mt-1.5 flex justify-between">
-                      <span>{quotaPercent}% of 10 GB Quota</span>
-                    </p>
-                  </div>
-                </Card>
-
-                <Card className="p-5 border-borderDark/80 hover:border-primary/40 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-semibold uppercase tracking-wider text-textMuted">AI Chunks</span>
-                    <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-                      <Cpu className="w-5 h-5" />
-                    </div>
-                  </div>
-                  <div className="mt-4">
-                    <p className="text-3xl font-extrabold text-textMain">{profile.total_chunks.toLocaleString()}</p>
-                    <p className="text-xs text-textMuted mt-1">Vector embeddings in pgvector</p>
+                    <p className="text-xs text-textMuted mt-1">Total document storage occupied</p>
                   </div>
                 </Card>
 

@@ -163,30 +163,6 @@ export function DriveSidebar({
 
           <div className="h-px bg-[#e1e3e1] my-2 mx-4" />
 
-          {/* Shared with me */}
-          <button
-            onClick={() => onSelectView("shared")}
-            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "shared"
-              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
-              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
-              }`}
-          >
-            <Users className="w-4 h-4" />
-            <span>Shared with me</span>
-          </button>
-
-          {/* Recent */}
-          <button
-            onClick={() => onSelectView("recent")}
-            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "recent"
-              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
-              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
-              }`}
-          >
-            <Clock className="w-4 h-4" />
-            <span>Recent</span>
-          </button>
-
           {/* Starred */}
           <button
             onClick={() => onSelectView("starred")}

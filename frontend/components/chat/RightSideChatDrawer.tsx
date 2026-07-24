@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Sparkles,
   X,
@@ -7,16 +7,14 @@ import {
   FileText,
   Eye,
   Download,
-  Filter,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
-  Tag,
-  Layers,
-  ArrowUpDown
+  PanelRightClose,
+  GripVertical
 } from "lucide-react";
 import { api } from "@/lib/api";
-import type { ChatSession, ChatMessage, SearchResult, DocumentListItem } from "@/types";
+import type { ChatMessage, SearchResult, DocumentListItem } from "@/types";
 import { MarkdownViewer } from "./MarkdownViewer";
 
 interface RightSideChatDrawerProps {
@@ -42,6 +40,11 @@ export function RightSideChatDrawer({
   const [loadedDocs, setLoadedDocs] = useState<SearchResult[]>([]);
   const [isDocsExpanded, setIsDocsExpanded] = useState(true);
 
+  // Extensible Resizable Width State
+  const [drawerWidth, setDrawerWidth] = useState<number>(420);
+  const [isResizing, setIsResizing] = useState(false);
+  const isResizingRef = useRef(false);
+
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
   const scrollToBottom = () => {
@@ -65,6 +68,30 @@ export function RightSideChatDrawer({
       initSessionWithQuery(initialQuery);
     }
   }, [isOpen, initialQuery]);
+
+  // Boundary Drag Resizing Logic
+  const handleMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault();
+    isResizingRef.current = true;
+    setIsResizing(true);
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingRef.current) return;
+      const newWidth = window.innerWidth - e.clientX;
+      const clampedWidth = Math.min(Math.max(newWidth, 340), Math.min(950, window.innerWidth - 200));
+      setDrawerWidth(clampedWidth);
+    };
+
+    const handleMouseUp = () => {
+      isResizingRef.current = false;
+      setIsResizing(false);
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+  };
 
   const initSessionWithQuery = async (queryText: string) => {
     try {
@@ -104,7 +131,7 @@ export function RightSideChatDrawer({
             id: `init-assistant`,
             session_id: "local",
             role: "assistant",
-            content: `I have loaded ${initialResults.length} documents for "${queryText}". You can search, filter (e.g., score >= 85), list, or ask any question related to these loaded files.`,
+            content: `I have loaded ${initialResults.length} documents for "${queryText}". You can search, list, or ask any question related to these loaded files.`,
             results: initialResults,
             created_at: new Date().toISOString()
           }
@@ -152,74 +179,32 @@ export function RightSideChatDrawer({
     }
   };
 
-  // DYNAMIC CONTEXT-BASED QUICK FILTERS
-  const dynamicFilters = useMemo(() => {
-    const chips: { label: string; actionQuery: string; icon: "tag" | "score" | "list" | "sort" }[] = [];
-
-    // 1. Extract dynamic tags from loaded docs
-    const tagCounts: Record<string, number> = {};
-    loadedDocs.forEach((doc) => {
-      if (doc.tags && Array.isArray(doc.tags)) {
-        doc.tags.forEach((t) => {
-          if (t && t.trim()) {
-            const tagClean = t.trim();
-            tagCounts[tagClean] = (tagCounts[tagClean] || 0) + 1;
-          }
-        });
-      }
-    });
-
-    const sortedTags = Object.entries(tagCounts)
-      .sort((a, b) => b[1] - a[1])
-      .map(([tag]) => tag);
-
-    sortedTags.slice(0, 4).forEach((tag) => {
-      chips.push({
-        label: tag,
-        actionQuery: `filter documents related to ${tag}`,
-        icon: "tag"
-      });
-    });
-
-    // 2. Score threshold chip if high score docs exist
-    const hasHighScore = loadedDocs.some((d) => (d.score || 0) >= 0.85);
-    if (hasHighScore) {
-      chips.push({
-        label: "Score >= 85",
-        actionQuery: "filter documents which have score >= 85",
-        icon: "score"
-      });
-    }
-
-    // 3. Fallback context chips if tags are scarce
-    if (chips.length < 3) {
-      chips.push({
-        label: "List Loaded Docs",
-        actionQuery: "list all loaded documents with details",
-        icon: "list"
-      });
-      chips.push({
-        label: "Sort by Score",
-        actionQuery: "sort documents by highest match score",
-        icon: "sort"
-      });
-    }
-
-    return chips;
-  }, [loadedDocs]);
-
   if (!isOpen) return null;
 
   return (
-    <aside className="w-[420px] flex-shrink-0 bg-white border-l border-[#e1e3e1] flex flex-col h-full select-none z-30 shadow-lg animate-fadeIn">
+    <aside
+      style={{ width: `${drawerWidth}px` }}
+      className="flex-shrink-0 bg-white border-l border-[#e1e3e1] flex flex-col h-full select-none z-30 shadow-lg animate-fadeIn relative transition-none"
+    >
+      {/* Draggable Left Boundary Handle */}
+      <div
+        onMouseDown={handleMouseDown}
+        className={`absolute left-0 top-0 bottom-0 w-2.5 -ml-1.5 cursor-col-resize z-50 flex items-center justify-center group hover:bg-[#0b57d0]/20 transition-colors ${
+          isResizing ? "bg-[#0b57d0]/30" : ""
+        }`}
+        title="Click and drag to extend/resize right sidebar width"
+      >
+        <div className="w-1 h-10 bg-[#c4c7c5] group-hover:bg-[#0b57d0] rounded-full transition-colors" />
+      </div>
+
       {/* Drawer Header */}
       <div className="p-3.5 border-b border-[#e1e3e1] flex items-center justify-between bg-[#f8fafd]">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0b57d0] flex items-center justify-center border border-blue-100 shadow-xs">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0b57d0] flex items-center justify-center border border-blue-100 shadow-xs flex-shrink-0">
             <Sparkles className="w-3.5 h-3.5" />
           </div>
-          <div>
-            <h3 className="text-xs font-bold text-[#1f1f1f] truncate max-w-[220px]">
+          <div className="min-w-0">
+            <h3 className="text-xs font-bold text-[#1f1f1f] truncate">
               {sessionTitle}
             </h3>
             <div className="flex items-center gap-1 text-[10px] text-[#0b57d0] font-semibold">
@@ -229,34 +214,25 @@ export function RightSideChatDrawer({
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="p-1 rounded-full text-[#444746] hover:bg-[#e1e3e1] transition-colors"
-          title="Close persistent chat"
-        >
-          <X className="w-4 h-4" />
-        </button>
-      </div>
-
-      {/* DYNAMIC CONTEXT-BASED QUICK FILTER BAR */}
-      <div className="px-3 py-2 bg-white border-b border-[#e1e3e1]/60 flex items-center gap-1.5 overflow-x-auto text-xs scrollbar-none">
-        <span className="text-[10px] font-bold text-[#747775] uppercase tracking-wider flex-shrink-0 mr-1">
-          Context Filters:
-        </span>
-
-        {dynamicFilters.map((chip, idx) => (
+        {/* Self Hide/Collapse & Close Buttons */}
+        <div className="flex items-center gap-1 flex-shrink-0">
           <button
-            key={`${chip.label}-${idx}`}
-            onClick={() => handleSendMessage(chip.actionQuery)}
-            className="flex items-center gap-1 px-2.5 py-1 bg-[#f0f4f9] hover:bg-[#e1e5ea] text-[#001d35] rounded-full text-[11px] font-semibold border border-[#d3d7dc] flex-shrink-0 transition-all hover:scale-105"
+            onClick={onClose}
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-[#444746] hover:bg-[#edf2fc] hover:text-[#0b57d0] transition-colors"
+            title="Hide right sidebar"
           >
-            {chip.icon === "tag" && <Tag className="w-3 h-3 text-[#0b57d0]" />}
-            {chip.icon === "score" && <Filter className="w-3 h-3 text-[#108554]" />}
-            {chip.icon === "list" && <Layers className="w-3 h-3 text-[#00639b]" />}
-            {chip.icon === "sort" && <ArrowUpDown className="w-3 h-3 text-[#b45309]" />}
-            <span>{chip.label}</span>
+            <PanelRightClose className="w-4 h-4" />
+            <span>Hide</span>
           </button>
-        ))}
+
+          <button
+            onClick={onClose}
+            className="p-1 rounded-full text-[#444746] hover:bg-[#e1e3e1] transition-colors"
+            title="Close chat"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* LOADED DOCUMENTS SHOWN ONLY ONCE AT THE TOP */}
@@ -279,7 +255,7 @@ export function RightSideChatDrawer({
           </button>
 
           {isDocsExpanded && (
-            <div className="p-3 pt-0 max-h-[190px] overflow-y-auto space-y-2 border-t border-[#e1e3e1]/50">
+            <div className="p-3 pt-0 max-h-[200px] overflow-y-auto space-y-2 border-t border-[#e1e3e1]/50">
               {loadedDocs.map((res, idx) => {
                 const scorePct = Math.round((res.score || 0) * 100);
                 const isHigh = scorePct >= 85;
@@ -287,7 +263,7 @@ export function RightSideChatDrawer({
                 return (
                   <div
                     key={`${res.document_id}-${idx}`}
-                    className="p-2 rounded-xl bg-white border border-[#e1e3e1] hover:border-[#0b57d0]/40 transition-all space-y-1.5 shadow-2xs"
+                    className="p-2.5 rounded-xl bg-white border border-[#e1e3e1] hover:border-[#0b57d0]/40 transition-all space-y-2 shadow-2xs"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
@@ -312,7 +288,8 @@ export function RightSideChatDrawer({
                       "{res.snippet}"
                     </p>
 
-                    <div className="flex items-center justify-between pt-0.5">
+                    {/* Preview button exactly to the left side of Download button */}
+                    <div className="flex items-center justify-end gap-2 pt-0.5">
                       <button
                         onClick={() =>
                           onPreviewDocument({
@@ -326,7 +303,8 @@ export function RightSideChatDrawer({
                             download_url: res.download_url
                           })
                         }
-                        className="flex items-center gap-1 text-[11px] font-semibold text-[#0b57d0] hover:underline"
+                        className="flex items-center gap-1 text-[11px] font-semibold text-[#0b57d0] hover:bg-[#edf2fc] px-2 py-0.5 rounded-lg border border-[#d3d7dc] transition-all cursor-pointer"
+                        title="Preview document"
                       >
                         <Eye className="w-3 h-3" />
                         <span>Preview</span>
@@ -337,10 +315,11 @@ export function RightSideChatDrawer({
                           href={res.download_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="p-1 text-[#747775] hover:text-[#0b57d0]"
+                          className="flex items-center gap-1 text-[11px] font-semibold text-[#00639b] hover:bg-[#edf2fc] px-2 py-0.5 rounded-lg border border-[#d3d7dc] transition-all"
                           title="Download document"
                         >
                           <Download className="w-3 h-3" />
+                          <span>Download</span>
                         </a>
                       )}
                     </div>

@@ -1,14 +1,15 @@
 import React from "react";
-import { FileText, Download, User, Calendar, Tag } from "lucide-react";
+import { FileText, Download, User, Calendar, Tag, Eye } from "lucide-react";
 import { Card } from "../ui/Card";
 import type { SearchResult } from "@/types";
 import { Badge } from "../ui/Badge";
 
 interface ResultCardProps {
   result: SearchResult;
+  onPreview?: (result: SearchResult) => void;
 }
 
-export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
+export const ResultCard: React.FC<ResultCardProps> = ({ result, onPreview }) => {
   const createMarkup = (html: string) => {
     return { __html: html };
   };
@@ -49,16 +50,9 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
   const metadata = (result.metadata || {}) as Record<string, any>;
   const author = metadata.author as string | undefined;
   const date = metadata.date as string | undefined;
-  const keyTopics = metadata.key_topics;
-
-  const topicsList = Array.isArray(keyTopics) 
-    ? keyTopics 
-    : typeof keyTopics === "string" 
-      ? JSON.parse(keyTopics) as string[]
-      : [] as string[];
 
   return (
-    <Card glow className="hover:border-primary/50 group animate-fadeIn flex flex-col gap-4">
+    <Card glow className="hover:border-primary/50 group animate-fadeIn flex flex-col gap-4 relative">
       {/* File Title and Page */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3 overflow-hidden">
@@ -103,19 +97,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
         dangerouslySetInnerHTML={createMarkup(result.snippet)}
       />
 
-      {/* Key Topics Tags if present */}
-      {topicsList && topicsList.length > 0 && (
-        <div className="flex items-center gap-2 flex-wrap pt-1">
-          <Tag className="w-3.5 h-3.5 text-textMuted" />
-          {topicsList.map((topic: string, i: number) => (
-            <span key={i} className="text-[10px] font-bold px-2 py-0.5 rounded bg-primary/5 text-primary border border-primary/20 hover:bg-primary/10 transition-colors">
-              {topic}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {/* Score Progress Bar and Download */}
+      {/* Score Progress Bar, Preview and Download */}
       <div className="flex items-center justify-between mt-auto pt-3 border-t border-borderDark/40">
         <div className="flex items-center gap-3">
           <div className="w-24 h-2 bg-surface rounded-full overflow-hidden" title={`Relevance: ${matchPct}%`}>
@@ -129,17 +111,32 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result }) => {
           </span>
         </div>
 
-        {result.download_url && (
-          <a 
-            href={result.download_url} 
-            target="_blank" 
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-indigo-400 bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg border border-primary/20 transition-all"
-          >
-            <Download className="w-3.5 h-3.5" />
-            Download
-          </a>
-        )}
+        {/* Action Buttons: Preview shown directly to the left side of Download button */}
+        <div className="flex items-center gap-2">
+          {onPreview && (
+            <button
+              onClick={() => onPreview(result)}
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#0b57d0] hover:text-[#0945a5] bg-[#edf2fc] hover:bg-[#c2e7ff] px-3 py-1.5 rounded-lg border border-[#d3d7dc] transition-all cursor-pointer shadow-xs opacity-90 group-hover:opacity-100"
+              title="Preview document"
+            >
+              <Eye className="w-3.5 h-3.5" />
+              <span>Preview</span>
+            </button>
+          )}
+
+          {result.download_url && (
+            <a 
+              href={result.download_url} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-1.5 text-xs font-semibold text-primary hover:text-indigo-400 bg-primary/10 hover:bg-primary/20 px-3 py-1.5 rounded-lg border border-primary/20 transition-all"
+              title="Download document"
+            >
+              <Download className="w-3.5 h-3.5" />
+              <span>Download</span>
+            </a>
+          )}
+        </div>
       </div>
     </Card>
   );
