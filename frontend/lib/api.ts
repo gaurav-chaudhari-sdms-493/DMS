@@ -240,4 +240,12 @@ export const api = {
       return await request("/api/v1/documents/drive/stats");
     },
   },
+  admin: {
+    getAnalytics: async (): Promise<any> => {
+      return await request("/api/v1/admin/analytics");
+    },
+    getApiAnalytics: async (): Promise<any> => {
+      return await request("/api/v1/admin/api-analytics");
+    },
+  },
 };

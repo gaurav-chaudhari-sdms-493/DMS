@@ -10,6 +10,7 @@ from .services.cache_service import init_redis
 from .tasks.worker import celery_app
 
 from .services.storage_service import ensure_bucket_exists
+from .api_logging_middleware import ApiLoggingMiddleware
 
 limiter = Limiter(key_func=get_remote_address)
 
@@ -36,6 +37,9 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    
+    # API call logging middleware (runs after CORS)
+    app.add_middleware(ApiLoggingMiddleware)
     
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)

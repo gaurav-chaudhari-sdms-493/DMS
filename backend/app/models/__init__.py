@@ -9,6 +9,7 @@ from app.models.permission import Permission
 from app.models.audit_log import AuditLog
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
+from app.models.api_log import ApiLog
 from app.database import Base
 
 
