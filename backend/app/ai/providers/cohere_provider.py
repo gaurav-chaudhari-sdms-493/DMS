@@ -16,22 +16,11 @@ class CohereEmbeddingProvider(EmbeddingProvider):
             model=self.model,
             input_type="search_document"
         )
-        embeddings = response.embeddings
-        
-        # Pad to 1536 dimensions to match pgvector db column definition
-        padded_embeddings = []
-        for emb in embeddings:
-            if len(emb) < 1536:
-                emb = emb + [0.0] * (1536 - len(emb))
-            elif len(emb) > 1536:
-                emb = emb[:1536]
-            padded_embeddings.append(emb)
-            
-        return padded_embeddings
+        return response.embeddings
 
     @property
     def dimensions(self) -> int:
-        return 1536
+        return 1024
 
 class CohereRerankerProvider(RerankerProvider):
     def __init__(self, api_key: str, model: str):

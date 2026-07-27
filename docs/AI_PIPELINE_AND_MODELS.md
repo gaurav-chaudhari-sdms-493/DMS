@@ -90,7 +90,7 @@ Layer 3: Generative LLM RAG Synthesis (GPT-4o / Claude 3.5 Sonnet) ────�
 | Role | Default Model | Supported Providers / Fallbacks |
 |------|---------------|----------------------------------|
 | **Ingestion Brain** | `gpt-4o-mini` | Anthropic (`claude-3-5-haiku`), Groq (`llama-3.3-70b-versatile`) |
-| **Embeddings** | `text-embedding-3-small` (1536d) | Google Gemini (`text-embedding-004`), BGE-M3 |
+| **Embeddings** | `BAAI/bge-m3` (1024d) | OpenAI (`text-embedding-3-small`), Google Gemini (`text-embedding-004`), Cohere |
 | **Re-Ranking** | `rerank-english-v3.0` | Cohere Rerank API, Local Cross-Encoder |
 | **Generative RAG** | `gpt-4o` | Anthropic (`claude-3-5-sonnet`), Groq (`llama-3.3-70b-versatile`) |
 | **Document OCR** | `pdfplumber` (native) | LlamaParse (LlamaIndex Cloud API) |

@@ -12,8 +12,10 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
     def _load_model(self):
         if self._model is None:
             try:
+                logger.info(f"Loading local BGE-M3 embedding model ({self.model_name})...")
                 from sentence_transformers import SentenceTransformer
                 self._model = SentenceTransformer(self.model_name)
+                logger.info("Local BGE-M3 embedding model loaded successfully.")
             except ImportError as e:
                 logger.error("sentence-transformers is not installed. Please install it using `pip install sentence-transformers`.")
                 raise e
@@ -31,21 +33,10 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
         from functools import partial
         
         loop = asyncio.get_running_loop()
-        func = partial(self._model.encode, texts, convert_to_numpy=True)
+        func = partial(self._model.encode, texts, convert_to_numpy=True, show_progress_bar=False)
         embeddings_np = await loop.run_in_executor(None, func)
-        embeddings = embeddings_np.tolist()
-        
-        # Pad to 1536 dimensions to match pgvector db column definition
-        padded_embeddings = []
-        for emb in embeddings:
-            if len(emb) < 1536:
-                emb = emb + [0.0] * (1536 - len(emb))
-            elif len(emb) > 1536:
-                emb = emb[:1536]
-            padded_embeddings.append(emb)
-            
-        return padded_embeddings
+        return embeddings_np.tolist()
 
     @property
     def dimensions(self) -> int:
-        return 1536
+        return 1024

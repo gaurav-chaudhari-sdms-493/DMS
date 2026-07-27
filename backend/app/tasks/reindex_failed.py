@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 async def reindex_all_failed_documents():
     """Find all documents with status='failed' and trigger Celery re-ingestion."""
     async with AsyncSessionLocal() as db:
-        stmt = select(Document).where(Document.status == "failed")
+        stmt = select(Document).where(Document.status == "failed", Document.is_trashed == False)
         res = await db.execute(stmt)
         failed_docs = res.scalars().all()
         

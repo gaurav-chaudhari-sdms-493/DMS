@@ -19,7 +19,7 @@ class Chunk(Base):
     version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_versions.id"), index=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)
     content: Mapped[str] = mapped_column(TEXT)
-    embedding: Mapped[Any] = mapped_column(Vector(1536))
+    embedding: Mapped[Any] = mapped_column(Vector(1024))
     chunk_metadata: Mapped[dict] = mapped_column(JSONB)
     page_number: Mapped[Optional[int]] = mapped_column(INTEGER)
     chunk_index: Mapped[int] = mapped_column(INTEGER)

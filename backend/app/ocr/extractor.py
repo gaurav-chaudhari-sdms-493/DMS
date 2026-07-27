@@ -10,12 +10,12 @@ def extract_pages_from_file(file_bytes: bytes, filename: str) -> List[Dict[str, 
     """
     Extract structured pages and text content from various file formats:
     PDF, Word (.docx), Excel (.xlsx, .csv), PowerPoint (.pptx), Markdown (.md),
-    RTF (.rtf), JSON (.json), and Plain Text / Code files.
+    RTF (.rtf), JSON (.json), Images (.jpg, .png, etc.), and Plain Text files.
     """
     ext = filename.lower().split(".")[-1] if "." in filename else ""
 
     if ext == "pdf":
-        return _extract_pdf(file_bytes)
+        return _extract_pdf(file_bytes, filename)
     elif ext in ["docx", "doc"]:
         return _extract_docx(file_bytes)
     elif ext in ["xlsx", "xls"]:
@@ -28,11 +28,35 @@ def extract_pages_from_file(file_bytes: bytes, filename: str) -> List[Dict[str, 
         return _extract_rtf(file_bytes)
     elif ext == "json":
         return _extract_json(file_bytes)
+    elif ext in ["jpg", "jpeg", "png", "bmp", "webp", "tiff"]:
+        return _extract_image(file_bytes, filename)
     else:
         return _extract_text(file_bytes)
 
 
-def _extract_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
+def _extract_image(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
+    text = ""
+    try:
+        from PIL import Image
+        import pytesseract
+        img = Image.open(io.BytesIO(file_bytes))
+        text = pytesseract.image_to_string(img) or ""
+        logger.info(f"Image OCR extracted {len(text)} chars from {filename}")
+    except Exception as e:
+        logger.warning(f"Failed to perform Tesseract OCR on image file {filename}: {e}")
+
+    if not text.strip():
+        text = f"Scanned image document: {filename}"
+
+    return [{
+        "page_number": 1,
+        "text": text.strip(),
+        "words": [],
+        "bbox": {}
+    }]
+
+
+def _extract_pdf(file_bytes: bytes, filename: str = "") -> List[Dict[str, Any]]:
     import pdfplumber
     pages = []
     try:
@@ -40,9 +64,25 @@ def _extract_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
             for i, page in enumerate(pdf.pages):
                 text = page.extract_text() or ""
                 words = page.extract_words() or []
+
+                # OCR Fallback for scanned/image PDF pages
+                if not text.strip():
+                    try:
+                        import pytesseract
+                        pil_img = page.to_image(resolution=150).original
+                        ocr_text = pytesseract.image_to_string(pil_img) or ""
+                        if ocr_text.strip():
+                            text = ocr_text
+                            logger.info(f"Tesseract OCR extracted {len(text)} chars from page {i+1} of {filename}")
+                    except Exception as ocr_err:
+                        logger.warning(f"OCR fallback failed for page {i+1} of {filename}: {ocr_err}")
+
+                if not text.strip():
+                    text = f"Scanned page {i+1} of document {filename}"
+
                 pages.append({
                     "page_number": i + 1,
-                    "text": text,
+                    "text": text.strip(),
                     "words": words,
                     "bbox": {"width": float(page.width), "height": float(page.height)}
                 })
@@ -50,11 +90,11 @@ def _extract_pdf(file_bytes: bytes) -> List[Dict[str, Any]]:
         logger.error(f"Error parsing PDF with pdfplumber: {e}")
         pages.append({
             "page_number": 1,
-            "text": file_bytes.decode("utf-8", errors="ignore"),
+            "text": f"Scanned PDF document: {filename}",
             "words": [],
             "bbox": {}
         })
-    return pages if pages else [{"page_number": 1, "text": "", "words": [], "bbox": {}}]
+    return pages if pages else [{"page_number": 1, "text": f"Scanned document: {filename}", "words": [], "bbox": {}}]
 
 
 def _clean_binary_strings(file_bytes: bytes) -> str:
@@ -126,8 +166,7 @@ def _extract_docx(file_bytes: bytes) -> List[Dict[str, Any]]:
             "bbox": {}
         })
 
-    return pages if pages else [{"page_number": 1, "text": "", "words": [], "bbox": {}}]
-
+    return pages if pages else [{"page_number": 1, "text": "Document content", "words": [], "bbox": {}}]
 
 
 def _extract_excel(file_bytes: bytes) -> List[Dict[str, Any]]:
@@ -177,7 +216,7 @@ def _extract_excel(file_bytes: bytes) -> List[Dict[str, Any]]:
                 "bbox": {}
             })
 
-    return pages if pages else [{"page_number": 1, "text": "", "words": [], "bbox": {}}]
+    return pages if pages else [{"page_number": 1, "text": "Excel sheet content", "words": [], "bbox": {}}]
 
 
 def _extract_pptx(file_bytes: bytes) -> List[Dict[str, Any]]:
@@ -208,7 +247,7 @@ def _extract_pptx(file_bytes: bytes) -> List[Dict[str, Any]]:
             "bbox": {}
         })
 
-    return pages if pages else [{"page_number": 1, "text": "", "words": [], "bbox": {}}]
+    return pages if pages else [{"page_number": 1, "text": "Presentation content", "words": [], "bbox": {}}]
 
 
 def _extract_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
@@ -240,7 +279,7 @@ def _extract_csv(file_bytes: bytes) -> List[Dict[str, Any]]:
             "bbox": {}
         })
 
-    return pages if pages else [{"page_number": 1, "text": "", "words": [], "bbox": {}}]
+    return pages if pages else [{"page_number": 1, "text": "CSV document content", "words": [], "bbox": {}}]
 
 
 def _extract_rtf(file_bytes: bytes) -> List[Dict[str, Any]]:
@@ -296,7 +335,7 @@ def _extract_text(file_bytes: bytes) -> List[Dict[str, Any]]:
 
     return [{
         "page_number": 1,
-        "text": text,
+        "text": text if text.strip() else "Document text",
         "words": [],
         "bbox": {}
     }]

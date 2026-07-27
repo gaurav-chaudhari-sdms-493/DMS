@@ -35,21 +35,20 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
             if response.status_code != 200:
                 raise Exception(f"Gemini Embedding request failed with status {response.status_code}: {response.text}")
 
-            
             data = response.json()
             embeddings = [emb["values"] for emb in data.get("embeddings", [])]
             
-            # Pad to 1536 dimensions to match pgvector db column definition
+            # Pad to 1024 dimensions to match pgvector db column definition
             padded_embeddings = []
             for emb in embeddings:
-                if len(emb) < 1536:
-                    emb = emb + [0.0] * (1536 - len(emb))
-                elif len(emb) > 1536:
-                    emb = emb[:1536]
+                if len(emb) < 1024:
+                    emb = emb + [0.0] * (1024 - len(emb))
+                elif len(emb) > 1024:
+                    emb = emb[:1024]
                 padded_embeddings.append(emb)
                 
             return padded_embeddings
 
     @property
     def dimensions(self) -> int:
-        return 1536
+        return 1024
