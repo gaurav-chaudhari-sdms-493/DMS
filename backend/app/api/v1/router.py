@@ -1,7 +1,8 @@
 from fastapi import APIRouter
-from . import auth, documents, search, folders, chat, admin
+from . import auth, documents, search, folders, chat, admin, health
 
 api_router = APIRouter(prefix='/api/v1')
+api_router.include_router(health.router, tags=['health'])
 api_router.include_router(auth.router, prefix='/auth', tags=['auth'])
 api_router.include_router(documents.router, prefix='/documents', tags=['documents'])
 api_router.include_router(folders.router)

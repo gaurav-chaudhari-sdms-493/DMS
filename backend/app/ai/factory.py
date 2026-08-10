@@ -42,12 +42,14 @@ class FallbackLLMProvider(LLMProvider):
                     return await self.secondary.complete(messages, temperature, max_tokens)
                 except Exception as inner_e:
                     logger.warning(f"Secondary LLM provider ({self.secondary.__class__.__name__}) failed: {inner_e}.")
-            
-            # Fallback template output if all external LLM APIs fail or are rate-limited
-            user_query = messages[-1].content if messages else ""
-            return "Based on your matching drive documents, here are the key excerpts found below."
+                    raise inner_e
+            raise e
 
 def get_llm_provider() -> LLMProvider:
+    global _llm_provider
+    if _llm_provider is not None:
+        return _llm_provider
+
     primary: LLMProvider | None = None
     secondary: LLMProvider | None = None
 
@@ -65,17 +67,21 @@ def get_llm_provider() -> LLMProvider:
         if groq_keys or settings.groq_api_key:
             from app.ai.providers.groq_provider import GroqLLMProvider
             secondary = GroqLLMProvider(api_key=groq_keys if groq_keys else settings.groq_api_key, model=settings.groq_llm_model)
-
     elif settings.ai_llm_provider == 'anthropic':
         from app.ai.providers.anthropic_provider import AnthropicLLMProvider
         primary = AnthropicLLMProvider(api_key=settings.anthropic_api_key, model=settings.anthropic_llm_model)
     else:
         raise ValueError(f'Unknown LLM provider: {settings.ai_llm_provider}')
 
-    return FallbackLLMProvider(primary, secondary)
+    _llm_provider = FallbackLLMProvider(primary, secondary)
+    return _llm_provider
 
 
 def get_embed_provider() -> EmbeddingProvider:
+    global _embed_provider
+    if _embed_provider is not None:
+        return _embed_provider
+
     primary_provider = None
     if settings.ai_embed_provider == 'openai':
         from app.ai.providers.openai_provider import OpenAIEmbeddingProvider
@@ -109,18 +115,26 @@ def get_embed_provider() -> EmbeddingProvider:
         )
 
     if fallback_provider:
-        return FallbackEmbeddingProvider(primary_provider, fallback_provider)
+        _embed_provider = FallbackEmbeddingProvider(primary_provider, fallback_provider)
     else:
-        return primary_provider
+        _embed_provider = primary_provider
+
+    return _embed_provider
 
 
 def get_rerank_provider() -> RerankerProvider:
+    global _rerank_provider
+    if _rerank_provider is not None:
+        return _rerank_provider
+
     if settings.ai_rerank_provider == 'cohere':
         from app.ai.providers.cohere_provider import CohereRerankerProvider
-        return CohereRerankerProvider(api_key=settings.cohere_api_key, model=settings.cohere_rerank_model)
+        _rerank_provider = CohereRerankerProvider(api_key=settings.cohere_api_key, model=settings.cohere_rerank_model)
     else:
         class DummyReranker(RerankerProvider):
             async def rerank(self, query: str, documents: list[str], top_n: int = 5):
                 from app.ai.base import RankedResult
                 return [RankedResult(index=i, score=1.0, text=d) for i, d in enumerate(documents[:top_n])]
-        return DummyReranker()
+        _rerank_provider = DummyReranker()
+
+    return _rerank_provider

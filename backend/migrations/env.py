@@ -1,34 +1,19 @@
-from logging.config import fileConfig
 import os
 import sys
+import asyncio
+from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import create_async_engine
 from sqlalchemy import pool
 from alembic import context
-import asyncio
+
+load_dotenv()
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
-
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
-config = context.config
-
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
-# if config.config_file_name is not None:
-#     fileConfig(config.config_file_name)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
 from app.database import Base
-# Import all models to ensure they are registered on the metadata object
-from app.models.tenant import Tenant
-from app.models.user import User, UserRole
-from app.models.document import Document
-from app.models.document_version import DocumentVersion
-from app.models.chunk import Chunk
-from app.models.metadata_item import MetadataItem
-from app.models.permission import Permission
-from app.models.audit_log import AuditLog
+import app.models  # noqa: F401
 
 target_metadata = Base.metadata
 

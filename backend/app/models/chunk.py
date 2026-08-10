@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 class Chunk(Base):
     __tablename__ = "chunks"
 
-    chunk_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
     version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_versions.id"), index=True)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)

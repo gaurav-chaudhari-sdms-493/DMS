@@ -12,6 +12,15 @@ async def init_redis():
     global _redis_pool
     _redis_pool = aioredis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
 
+async def close_redis():
+    global _redis_pool
+    if _redis_pool:
+        try:
+            await _redis_pool.aclose()
+        except Exception:
+            pass
+        _redis_pool = None
+
 @asynccontextmanager
 async def get_redis():
     if not _redis_pool:

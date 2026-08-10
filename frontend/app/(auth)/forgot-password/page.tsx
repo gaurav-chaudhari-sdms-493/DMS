@@ -29,9 +29,6 @@ export default function ForgotPasswordPage() {
     try {
       const res = await api.auth.forgotPassword(email);
       setInfoMessage(res.message);
-      if (res.reset_token) {
-        setResetToken(res.reset_token);
-      }
       setStep(2);
     } catch (err: any) {
       setError(err.message || "Failed to process request. Please try again.");

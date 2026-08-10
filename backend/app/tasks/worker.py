@@ -5,7 +5,7 @@ import os
 from uuid import UUID
 
 from celery import Celery
-from sqlalchemy import select, delete
+from sqlalchemy import select, delete, text
 
 from ..ai.base import Message
 from ..ai.factory import get_embed_provider, get_llm_provider
@@ -73,10 +73,12 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         chunker = TextChunker()
         chunks = chunker.chunk_pages(pages)
 
-        if not chunks:
-            logger.warning(f"No text extracted for document {filename}. Creating fallback document metadata chunk.")
-            from app.pipeline.chunker import Chunk as InternalChunk
-            chunks = [InternalChunk(content=f"Document: {filename}", page_number=1, chunk_index=0, token_count=5, bbox={})]
+        if not chunks or all(p.get("extraction_failed") for p in pages):
+            raise ValueError(
+                "No readable text could be extracted from this document. "
+                "It may be a scanned image requiring an OCR provider "
+                "(set AI_OCR_PROVIDER=gcv or llamaparse)."
+            )
 
         # 4. Embed chunks (batched for local BGE-M3 model / API providers)
         embed_provider = get_embed_provider()
@@ -117,6 +119,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         # All database writes (chunks, metadata, document status) occur inside a single atomic transaction.
         async with AsyncSessionLocal() as db:
             async with db.begin():
+                await db.execute(text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": tenant_id_str})
                 # Purge any pre-existing partial chunks or metadata for this version/document
                 await db.execute(delete(DBChunk).where(DBChunk.version_id == version_id))
                 await db.execute(delete(MetadataItem).where(MetadataItem.document_id == document_id))
@@ -163,6 +166,9 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 if doc:
                     doc.status = "indexed"
 
+        from app.services.cache_service import invalidate_tenant_cache
+        await invalidate_tenant_cache(tenant_id_str)
+
         logger.info(f"Successfully ingested document {document_id} with {len(chunks)} chunks and 1024d embeddings.")
 
     except Exception as e:
@@ -172,6 +178,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         async with AsyncSessionLocal() as db_fail:
             async with db_fail.begin():
                 try:
+                    await db_fail.execute(text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": tenant_id_str})
                     document_id = UUID(document_id_str)
                     version_id = UUID(version_id_str)
                     await db_fail.execute(delete(DBChunk).where(DBChunk.version_id == version_id))

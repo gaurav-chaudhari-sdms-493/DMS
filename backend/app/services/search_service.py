@@ -1,4 +1,5 @@
 import time
+import logging
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
@@ -10,6 +11,16 @@ from app.ai.factory import get_embed_provider, get_rerank_provider, get_llm_prov
 from app.ai.base import Message
 from app.models.metadata_item import MetadataItem
 
+logger = logging.getLogger(__name__)
+
+
+def _make_snippet(content: str, max_chars: int = 400) -> str:
+    """Truncate result snippet around boundary to keep payload light."""
+    if not content or len(content) <= max_chars:
+        return content or ""
+    return content[:max_chars].rsplit(" ", 1)[0] + "…"
+
+
 async def search(
     query: str,
     tenant_id: UUID,
@@ -19,7 +30,6 @@ async def search(
     db: AsyncSession,
     ip_address: str,
 ) -> SearchResponse:
-    
     start_time = time.time()
     
     # 1. Enforce AI Input Guardrails
@@ -52,17 +62,17 @@ async def search(
     filter_clauses = []
     params = {
         "query": query,
-        "tenant_id": tenant_id,
+        "tenant_id": str(tenant_id),
     }
     
     if filters:
         for idx, (k, v) in enumerate(filters.items()):
             if k == "doc_type":
                 filter_clauses.append(f"AND d.doc_type = :filter_{idx}")
-                params[f"filter_{idx}"] = v
+                params[f"filter_{idx}"] = str(v)
             elif k == "document_id":
                 filter_clauses.append(f"AND d.id = :filter_{idx}")
-                params[f"filter_{idx}"] = v
+                params[f"filter_{idx}"] = str(v)
             else:
                 # Treat as custom metadata item filter
                 filter_clauses.append(f"""
@@ -78,7 +88,7 @@ async def search(
                           )
                     )
                 """)
-                params[f"filter_key_{idx}"] = k
+                params[f"filter_key_{idx}"] = str(k)
                 params[f"filter_val_{idx}"] = str(v)
                 params[f"filter_like_val_{idx}"] = f'%"{v}"%'
                 
@@ -86,28 +96,29 @@ async def search(
     
     # 3. Vector search (pgvector <=> operator)
     vec_sql = text(f"""
-        SELECT c.chunk_id as id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
+        SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
                1 - (c.embedding <=> CAST(:query_embedding AS vector)) as vector_score
         FROM chunks c 
         JOIN documents d ON c.document_id = d.id
-        LEFT JOIN document_versions v ON c.version_id = v.id
-        WHERE d.tenant_id = :tenant_id AND d.status = 'indexed' {filter_str}
+        LEFT JOIN document_versions v ON v.id = d.current_version_id
+        WHERE d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
         ORDER BY c.embedding <=> CAST(:query_embedding AS vector)
         LIMIT 20
     """)
     
-    vec_res = await db.execute(vec_sql, {**params, "query_embedding": q_emb_str})
+    vec_params = {**params, "query_embedding": q_emb_str}
+    vec_res = await db.execute(vec_sql, vec_params)
     vec_rows = vec_res.fetchall()
     
     # 4. Keyword search (dynamic tsvector full-text search)
     kw_sql = text(f"""
-        SELECT c.chunk_id as id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
-               ts_rank(to_tsvector('english', c.content), q) as keyword_score
+        SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
+               ts_rank(c.content_tsv, q) as keyword_score
         FROM chunks c
         JOIN documents d ON c.document_id = d.id
-        LEFT JOIN document_versions v ON c.version_id = v.id,
+        LEFT JOIN document_versions v ON v.id = d.current_version_id,
         plainto_tsquery('english', :query) q
-        WHERE to_tsvector('english', c.content) @@ q AND d.tenant_id = :tenant_id AND d.status = 'indexed' {filter_str}
+        WHERE c.content_tsv @@ q AND d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
         ORDER BY keyword_score DESC
         LIMIT 20
     """)
@@ -149,15 +160,15 @@ async def search(
 
             if target_doc_id:
                 chunk_sql = text("""
-                    SELECT c.chunk_id as id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path
+                    SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path
                     FROM chunks c
                     JOIN documents d ON c.document_id = d.id
-                    LEFT JOIN document_versions v ON c.version_id = v.id
-                    WHERE d.id = :target_doc_id AND d.tenant_id = :tenant_id
+                    LEFT JOIN document_versions v ON v.id = d.current_version_id
+                    WHERE d.id = :target_doc_id AND d.tenant_id = CAST(:tenant_id AS uuid) AND d.is_trashed = false
                     ORDER BY c.page_number ASC, c.chunk_index ASC
                     LIMIT 30
                 """)
-                chunk_res = await db.execute(chunk_sql, {"target_doc_id": target_doc_id, "tenant_id": tenant_id})
+                chunk_res = await db.execute(chunk_sql, {"target_doc_id": target_doc_id, "tenant_id": str(tenant_id)})
                 doc_chunk_rows = chunk_res.fetchall()
 
                 snippets_for_llm = []
@@ -172,15 +183,11 @@ async def search(
                             document_name=r.title,
                             download_url=url,
                             page_number=r.page_number,
-                            snippet=r.content,
+                            snippet=_make_snippet(r.content),
                             score=1.0,
                             metadata={}
                         ))
                         snippets_for_llm.append(f"Document: {r.title} (Page {r.page_number or 1})\nExcerpt: {r.content}")
-                elif filters.get("document_text"):
-                    doc_text = str(filters["document_text"]).strip()
-                    if doc_text:
-                        snippets_for_llm.append(f"Document Extracted Content:\n{doc_text[:4000]}")
 
                 if snippets_for_llm:
                     try:
@@ -199,9 +206,11 @@ async def search(
                         ])
                         summary = validate_output_summary(summary)
                     except Exception as e:
-                        import logging
-                        logging.getLogger(__name__).warning(f"AI summary error for document preview: {e}")
-                        summary = f"Analysis of the document:\n\n{snippets_for_llm[0][:400]}"
+                        logger.warning("AI summary unavailable for document preview: %s", e)
+                        summary = (
+                            f"Found {len(fallback_results)} matching page(s) for '{query}'. "
+                            "AI summary is temporarily unavailable — the excerpts below are unedited source text."
+                        )
 
                     took_ms = int((time.time() - start_time) * 1000)
                     resp = SearchResponse(
@@ -217,8 +226,8 @@ async def search(
         took_ms = int((time.time() - start_time) * 1000)
 
         # Check if any documents in this tenant are currently being indexed
-        pending_sql = text("SELECT title FROM documents WHERE tenant_id = :tenant_id AND status IN ('pending', 'processing') AND is_trashed = false LIMIT 3")
-        pending_res = await db.execute(pending_sql, {"tenant_id": tenant_id})
+        pending_sql = text("SELECT title FROM documents WHERE tenant_id = CAST(:tenant_id AS uuid) AND status IN ('pending', 'processing') AND is_trashed = false LIMIT 3")
+        pending_res = await db.execute(pending_sql, {"tenant_id": str(tenant_id)})
         pending_titles = [r.title for r in pending_res.fetchall()]
 
         if pending_titles:
@@ -261,7 +270,7 @@ async def search(
         if len(final_results) >= limit:
             break
             
-    # Query metadata for returned documents
+    # Query metadata for returned documents (Task 6.4)
     meta_map = {}
     if doc_ids_for_metadata:
         stmt = select(MetadataItem).where(MetadataItem.document_id.in_(doc_ids_for_metadata))
@@ -294,7 +303,7 @@ async def search(
             document_name=row.title,
             download_url=url,
             page_number=row.page_number,
-            snippet=row.content,
+            snippet=_make_snippet(row.content),
             score=rank_res.score,
             metadata=meta_map.get(row.doc_id, {})
         ))
@@ -320,10 +329,11 @@ async def search(
         ])
         summary = validate_output_summary(summary)
     except Exception as e:
-        import logging
-        logging.getLogger(__name__).warning(f"AI Summary generation error in search: {e}")
-        summary = f"Found {len(final_results)} matching document(s) for '{query}' in your drive. Preview excerpts below."
-
+        logger.warning("AI summary unavailable: %s", e)
+        summary = (
+            f"Found {len(final_results)} matching document(s) for '{query}'. "
+            "AI summary is temporarily unavailable — the excerpts below are unedited source text."
+        )
     
     took_ms = int((time.time() - start_time) * 1000)
     

@@ -31,68 +31,75 @@ async def get_admin_analytics(
     current_user: TokenPayload = Depends(require_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """Comprehensive DMS analytics for the Admin Panel."""
+    """Comprehensive DMS analytics for the Admin Panel, scoped to active tenant."""
     require_admin(current_user)
+    tenant_id = uuid.UUID(current_user.tenant_id)
 
     # ── System Overview ──
-    total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
-    total_tenants = (await db.execute(select(func.count(Tenant.id)))).scalar() or 0
+    total_users = (await db.execute(
+        select(func.count(User.id)).where(User.tenant_id == tenant_id)
+    )).scalar() or 0
+
+    total_tenants = 1
+
     total_documents = (await db.execute(
-        select(func.count(Document.id)).where(Document.is_trashed == False)
+        select(func.count(Document.id)).where(Document.tenant_id == tenant_id, Document.is_trashed == False)
     )).scalar() or 0
+
     total_trashed = (await db.execute(
-        select(func.count(Document.id)).where(Document.is_trashed == True)
+        select(func.count(Document.id)).where(Document.tenant_id == tenant_id, Document.is_trashed == True)
     )).scalar() or 0
+
     total_folders = (await db.execute(
-        select(func.count(Folder.id)).where(Folder.is_trashed == False)
+        select(func.count(Folder.id)).where(Folder.tenant_id == tenant_id, Folder.is_trashed == False)
     )).scalar() or 0
 
     total_storage = (await db.execute(
         select(func.coalesce(func.sum(DocumentVersion.file_size_bytes), 0))
         .join(Document, Document.current_version_id == DocumentVersion.id)
-        .where(Document.is_trashed == False)
+        .where(Document.tenant_id == tenant_id, Document.is_trashed == False)
     )).scalar() or 0
 
     total_chunks = (await db.execute(
-        select(func.count(Chunk.chunk_id))
+        select(func.count(Chunk.id))
         .join(Document, Document.id == Chunk.document_id)
-        .where(Document.is_trashed == False)
+        .where(Chunk.tenant_id == tenant_id, Document.is_trashed == False)
     )).scalar() or 0
 
     total_chat_sessions = (await db.execute(
-        select(func.count(ChatSession.id))
+        select(func.count(ChatSession.id)).where(ChatSession.tenant_id == tenant_id)
     )).scalar() or 0
 
     total_audit_logs = (await db.execute(
-        select(func.count(AuditLog.id))
+        select(func.count(AuditLog.id)).where(AuditLog.actor_tenant_id == tenant_id)
     )).scalar() or 0
 
     # ── Documents by Status ──
     status_res = await db.execute(
         select(Document.status, func.count(Document.id))
-        .where(Document.is_trashed == False)
+        .where(Document.tenant_id == tenant_id, Document.is_trashed == False)
         .group_by(Document.status)
     )
     documents_by_status = {row[0]: row[1] for row in status_res.all()}
 
-    # ── File Types Breakdown (across ALL tenants) ──
+    # ── File Types Breakdown ──
     ft_res = await db.execute(
         select(
             Document.title,
-            Document.doc_type,
+            Document.mime_type,
             func.coalesce(DocumentVersion.file_size_bytes, 0)
         )
         .join(DocumentVersion, Document.current_version_id == DocumentVersion.id)
-        .where(Document.is_trashed == False)
+        .where(Document.tenant_id == tenant_id, Document.is_trashed == False)
     )
 
     type_counts: dict[str, dict] = {}
-    for title, doc_type, size in ft_res.all():
+    for title, mime_type, size in ft_res.all():
         ext = "other"
         if title and "." in title:
             ext = title.rpartition(".")[2].lower()
-        elif doc_type:
-            ext = str(doc_type).lower()
+        elif mime_type:
+            ext = str(mime_type).lower()
         if ext not in type_counts:
             type_counts[ext] = {"count": 0, "size_bytes": 0}
         type_counts[ext]["count"] += 1
@@ -110,7 +117,7 @@ async def get_admin_analytics(
             func.date(Document.created_at).label("date"),
             func.count(Document.id).label("count")
         )
-        .where(Document.created_at >= thirty_days_ago)
+        .where(Document.tenant_id == tenant_id, Document.created_at >= thirty_days_ago)
         .group_by(func.date(Document.created_at))
         .order_by(func.date(Document.created_at))
     )
@@ -127,9 +134,9 @@ async def get_admin_analytics(
             func.count(Document.id).label("doc_count"),
             func.coalesce(func.sum(DocumentVersion.file_size_bytes), 0).label("total_size")
         )
-        .join(Document, Document.created_by == User.id)
+        .join(Document, Document.tenant_id == User.tenant_id)
         .outerjoin(DocumentVersion, Document.current_version_id == DocumentVersion.id)
-        .where(Document.is_trashed == False)
+        .where(User.tenant_id == tenant_id, Document.is_trashed == False)
         .group_by(User.id, User.full_name, User.email)
         .order_by(func.count(Document.id).desc())
         .limit(10)
@@ -155,8 +162,8 @@ async def get_admin_analytics(
         .outerjoin(Document, Document.tenant_id == Tenant.id)
         .outerjoin(DocumentVersion, Document.current_version_id == DocumentVersion.id)
         .outerjoin(User, User.tenant_id == Tenant.id)
+        .where(Tenant.id == tenant_id)
         .group_by(Tenant.id, Tenant.name)
-        .order_by(func.coalesce(func.sum(DocumentVersion.file_size_bytes), 0).desc())
     )
     storage_per_tenant = [
         {
@@ -170,15 +177,16 @@ async def get_admin_analytics(
 
     # ── Recent Activity (Last 20 audit logs) ──
     activity_res = await db.execute(
-        select(AuditLog.action, AuditLog.resource_type, AuditLog.ip_address, AuditLog.created_at)
+        select(AuditLog.action, AuditLog.details, AuditLog.created_at)
+        .where(AuditLog.actor_tenant_id == tenant_id)
         .order_by(AuditLog.created_at.desc())
         .limit(20)
     )
     recent_activity = [
         {
             "action": row.action,
-            "resource_type": row.resource_type or "system",
-            "ip_address": row.ip_address or "—",
+            "resource_type": "system",
+            "ip_address": "—",
             "timestamp": row.created_at.isoformat() if row.created_at else None,
         }
         for row in activity_res.all()
@@ -210,32 +218,36 @@ async def get_api_analytics(
     current_user: TokenPayload = Depends(require_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """API call analytics from api_logs table."""
+    """API call analytics from api_logs table, scoped to active tenant."""
     require_admin(current_user)
+    tenant_id = uuid.UUID(current_user.tenant_id)
 
     # ── Total API Calls ──
-    total_calls = (await db.execute(select(func.count(ApiLog.id)))).scalar() or 0
+    total_calls = (await db.execute(
+        select(func.count(ApiLog.id)).where(ApiLog.tenant_id == tenant_id)
+    )).scalar() or 0
 
     # ── Calls Today ──
     today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     calls_today = (await db.execute(
-        select(func.count(ApiLog.id)).where(ApiLog.created_at >= today_start)
+        select(func.count(ApiLog.id)).where(ApiLog.tenant_id == tenant_id, ApiLog.created_at >= today_start)
     )).scalar() or 0
 
     # ── Average Response Time ──
     avg_response_time = (await db.execute(
-        select(func.coalesce(func.avg(ApiLog.response_time_ms), 0))
+        select(func.coalesce(func.avg(ApiLog.response_time_ms), 0)).where(ApiLog.tenant_id == tenant_id)
     )).scalar() or 0
 
     # ── Error Rate ──
     error_count = (await db.execute(
-        select(func.count(ApiLog.id)).where(ApiLog.status_code >= 400)
+        select(func.count(ApiLog.id)).where(ApiLog.tenant_id == tenant_id, ApiLog.status_code >= 400)
     )).scalar() or 0
     error_rate = round((error_count / total_calls * 100), 2) if total_calls > 0 else 0
 
     # ── Calls by HTTP Method ──
     method_res = await db.execute(
         select(ApiLog.method, func.count(ApiLog.id))
+        .where(ApiLog.tenant_id == tenant_id)
         .group_by(ApiLog.method)
         .order_by(func.count(ApiLog.id).desc())
     )
@@ -252,6 +264,7 @@ async def get_api_analytics(
             ).label("status_group"),
             func.count(ApiLog.id)
         )
+        .where(ApiLog.tenant_id == tenant_id)
         .group_by("status_group")
     )
     calls_by_status = {row[0]: row[1] for row in status_res.all()}
@@ -264,6 +277,7 @@ async def get_api_analytics(
             func.count(ApiLog.id).label("call_count"),
             func.round(cast(func.avg(ApiLog.response_time_ms), Float), 2).label("avg_time_ms"),
         )
+        .where(ApiLog.tenant_id == tenant_id)
         .group_by(ApiLog.method, ApiLog.path)
         .order_by(func.count(ApiLog.id).desc())
         .limit(15)
@@ -285,7 +299,7 @@ async def get_api_analytics(
             extract('hour', ApiLog.created_at).label("hour"),
             func.count(ApiLog.id).label("count")
         )
-        .where(ApiLog.created_at >= twenty_four_hours_ago)
+        .where(ApiLog.tenant_id == tenant_id, ApiLog.created_at >= twenty_four_hours_ago)
         .group_by(extract('hour', ApiLog.created_at))
         .order_by(extract('hour', ApiLog.created_at))
     )
@@ -303,6 +317,7 @@ async def get_api_analytics(
             func.round(cast(func.avg(ApiLog.response_time_ms), Float), 2).label("avg_time_ms"),
             func.round(cast(func.max(ApiLog.response_time_ms), Float), 2).label("max_time_ms"),
         )
+        .where(ApiLog.tenant_id == tenant_id)
         .group_by(ApiLog.method, ApiLog.path)
         .having(func.count(ApiLog.id) >= 2)
         .order_by(func.avg(ApiLog.response_time_ms).desc())
@@ -329,6 +344,7 @@ async def get_api_analytics(
             ApiLog.ip_address,
             ApiLog.created_at,
         )
+        .where(ApiLog.tenant_id == tenant_id)
         .order_by(ApiLog.created_at.desc())
         .limit(50)
     )

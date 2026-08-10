@@ -62,7 +62,7 @@ async def get_current_user_profile(
 
     # Analytics: Vector Chunks Count
     c_res = await db.execute(
-        select(func.count(Chunk.chunk_id))
+        select(func.count(Chunk.id))
         .join(Document, Document.id == Chunk.document_id)
         .where(Document.tenant_id == tenant_id, Document.is_trashed == False)
     )
@@ -164,6 +164,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
     from ...services.auth_service import verify_token
     payload = verify_token(refresh_token)
+    if payload.type != "refresh":
+        raise HTTPException(status_code=401, detail="Not a refresh token")
     
     import uuid
     user_id = uuid.UUID(payload.sub)
@@ -185,19 +187,15 @@ async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depend
     res = await db.execute(stmt)
     user = res.scalar_one_or_none()
     
-    if not user:
-        # Generic message to prevent user enumeration
-        return ForgotPasswordResponse(
-            message="If an account with that email exists, password reset instructions have been generated."
-        )
+    if user:
+        reset_token = create_password_reset_token(body.email)
+        from ...services.email_service import send_password_reset_email
+        await send_password_reset_email(user.email, reset_token)
+        await log_action(db, user.id, user.tenant_id, "auth.forgot_password", details={"email": body.email})
+        await db.commit()
         
-    reset_token = create_password_reset_token(body.email)
-    await log_action(db, user.id, user.tenant_id, "auth.forgot_password", details={"email": body.email})
-    await db.commit()
-    
     return ForgotPasswordResponse(
-        message="Password reset token generated successfully. Use this token to reset your password.",
-        reset_token=reset_token
+        message="If an account with that email exists, a reset link has been sent."
     )
 
 @router.post('/reset-password')

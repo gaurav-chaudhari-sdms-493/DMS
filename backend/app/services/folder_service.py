@@ -67,6 +67,21 @@ async def get_folder(db: AsyncSession, folder_id: UUID, tenant_id: UUID) -> Fold
     return folder
 
 
+async def _is_descendant(db: AsyncSession, candidate_id: Optional[UUID], ancestor_id: UUID) -> bool:
+    current = candidate_id
+    for _ in range(100):
+        if current is None:
+            return False
+        if current == ancestor_id:
+            return True
+        res = await db.execute(select(Folder.parent_id).where(Folder.id == current))
+        row = res.first()
+        if not row:
+            return False
+        current = row[0]
+    return True
+
+
 async def update_folder(
     db: AsyncSession,
     folder_id: UUID,
@@ -78,6 +93,8 @@ async def update_folder(
     if folder_in.parent_id is not None:
         if folder_in.parent_id == folder_id:
             raise HTTPException(status_code=400, detail="Folder cannot be its own parent")
+        if await _is_descendant(db, folder_in.parent_id, folder_id):
+            raise HTTPException(status_code=400, detail="Cannot move a folder into one of its own subfolders")
         parent = await db.get(Folder, folder_in.parent_id)
         if not parent or parent.tenant_id != tenant_id:
             raise HTTPException(status_code=404, detail="Target parent folder not found")
