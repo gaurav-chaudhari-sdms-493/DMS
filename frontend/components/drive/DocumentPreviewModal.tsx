@@ -222,16 +222,22 @@ export function DocumentPreviewModal({
     setAiThinking(true);
 
     try {
-      const searchRes = await api.search.query(textToSend, 5, { document_id: doc.id });
+      const extractedText = textContent || (docxHtml ? docxHtml.replace(/<[^>]+>/g, " ") : null) || (excelSheets.length > 0 ? excelSheets.map(s => `${s.name}:\n${s.html.replace(/<[^>]+>/g, " ")}`).join("\n") : null);
+      const filters: any = { document_id: doc.id };
+      if (extractedText) {
+        filters.document_text = extractedText;
+      }
+
+      const searchRes = await api.search.query(textToSend, 5, filters);
 
       let aiResponseText = "";
-      if (searchRes && searchRes.ai_summary && !searchRes.ai_summary.includes("No matching documents")) {
+      if (searchRes && searchRes.ai_summary && !searchRes.ai_summary.includes("No matching documents were found in your drive")) {
         aiResponseText = searchRes.ai_summary;
       } else if (searchRes && searchRes.results && searchRes.results.length > 0) {
         const topSnippet = searchRes.results[0].snippet;
         aiResponseText = `Based strictly on **${doc.title}**:\n\n${topSnippet}`;
-      } else if (textContent) {
-        aiResponseText = `Based on the text contents of **${doc.title}**:\n\n` + textContent.slice(0, 400) + "...";
+      } else if (extractedText) {
+        aiResponseText = `Based on the text contents of **${doc.title}**:\n\n` + extractedText.slice(0, 400) + "...";
       } else {
         aiResponseText = `Analysis of **${doc.title}**:\n\nThis file contains key operational details. All parameters in **${doc.title}** are extracted and indexed.`;
       }
@@ -292,26 +298,33 @@ export function DocumentPreviewModal({
           </div>
         </div>
 
-        {/* Center Zoom Controls (for images) */}
-        {isImage && (
-          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#edf2fc] border border-[#e1e3e1] text-xs text-[#1f1f1f]">
+        {/* Center Zoom Controls */}
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#edf2fc] border border-[#e1e3e1] text-xs text-[#1f1f1f]">
+          <button
+            onClick={() => setZoom((z) => Math.max(25, z - 25))}
+            className="p-1 rounded-full hover:bg-[#d3d7dc] transition-colors"
+            title="Zoom out"
+          >
+            <ZoomOut className="w-4 h-4" />
+          </button>
+          <span className="w-12 text-center font-mono font-bold">{zoom}%</span>
+          <button
+            onClick={() => setZoom((z) => Math.min(300, z + 25))}
+            className="p-1 rounded-full hover:bg-[#d3d7dc] transition-colors"
+            title="Zoom in"
+          >
+            <ZoomIn className="w-4 h-4" />
+          </button>
+          {zoom !== 100 && (
             <button
-              onClick={() => setZoom((z) => Math.max(50, z - 25))}
-              className="p-1 rounded-full hover:bg-[#d3d7dc] transition-colors"
-              title="Zoom out"
+              onClick={() => setZoom(100)}
+              className="px-2 py-0.5 text-[10px] font-semibold bg-white border border-[#d3d7dc] rounded-full hover:bg-[#f0f4f9] ml-1 transition-colors"
+              title="Reset zoom"
             >
-              <ZoomOut className="w-4 h-4" />
+              Reset
             </button>
-            <span className="w-12 text-center font-mono font-bold">{zoom}%</span>
-            <button
-              onClick={() => setZoom((z) => Math.min(300, z + 25))}
-              className="p-1 rounded-full hover:bg-[#d3d7dc] transition-colors"
-              title="Zoom in"
-            >
-              <ZoomIn className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Right Actions Toolbar & AI Chatbot Toggle */}
         <div className="flex items-center gap-3">
@@ -346,16 +359,32 @@ export function DocumentPreviewModal({
         <main className="flex-1 overflow-auto flex items-center justify-center p-6 relative">
           {/* PDF Viewer */}
           {isPdf && doc.download_url && (
-            <iframe
-              src={`${doc.download_url}#toolbar=1`}
-              className="w-full h-full max-w-5xl rounded-2xl bg-white shadow-xl border border-[#e1e3e1]"
-              title={doc.title}
-            />
+            <div
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "center center",
+                transition: "transform 0.15s ease-out",
+              }}
+              className="w-full h-full max-w-5xl flex items-center justify-center"
+            >
+              <iframe
+                src={`${doc.download_url}#toolbar=1`}
+                className="w-full h-full max-h-[85vh] rounded-2xl bg-white shadow-xl border border-[#e1e3e1]"
+                title={doc.title}
+              />
+            </div>
           )}
 
           {/* Word (DOCX) Viewer */}
           {isDocx && (
-            <div className="w-full max-w-4xl h-full max-h-[85vh] bg-white text-[#1f1f1f] rounded-2xl shadow-xl overflow-y-auto p-12 select-text border border-[#e1e3e1]">
+            <div
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "top center",
+                transition: "transform 0.15s ease-out",
+              }}
+              className="w-full max-w-4xl h-full max-h-[85vh] bg-white text-[#1f1f1f] rounded-2xl shadow-xl overflow-y-auto p-12 select-text border border-[#e1e3e1]"
+            >
               {loadingText ? (
                 <div className="text-[#444746] text-center py-20 flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-4 border-[#0b57d0] border-t-transparent rounded-full animate-spin" />
@@ -374,7 +403,14 @@ export function DocumentPreviewModal({
 
           {/* Excel / CSV Spreadsheet Viewer */}
           {(isExcel || isCsv) && (
-            <div className="w-full max-w-5xl h-full max-h-[85vh] flex flex-col bg-white border border-[#e1e3e1] rounded-2xl shadow-xl overflow-hidden">
+            <div
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "top center",
+                transition: "transform 0.15s ease-out",
+              }}
+              className="w-full max-w-5xl h-full max-h-[85vh] flex flex-col bg-white border border-[#e1e3e1] rounded-2xl shadow-xl overflow-hidden"
+            >
               {/* Sheet selector tabs */}
               {excelSheets.length > 0 && (
                 <div className="h-11 px-4 bg-[#f8fafd] border-b border-[#e1e3e1] flex items-center gap-2 overflow-x-auto">
@@ -416,7 +452,14 @@ export function DocumentPreviewModal({
 
           {/* PowerPoint (PPTX) Viewer */}
           {isPptx && (
-            <div className="w-full max-w-4xl h-full max-h-[85vh] bg-white text-[#1f1f1f] rounded-2xl shadow-xl p-8 overflow-y-auto border border-[#e1e3e1] flex flex-col items-center">
+            <div
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "top center",
+                transition: "transform 0.15s ease-out",
+              }}
+              className="w-full max-w-4xl h-full max-h-[85vh] bg-white text-[#1f1f1f] rounded-2xl shadow-xl p-8 overflow-y-auto border border-[#e1e3e1] flex flex-col items-center"
+            >
               <div className="w-16 h-16 rounded-2xl bg-amber-50 text-amber-600 flex items-center justify-center mb-4 border border-amber-200">
                 <Presentation className="w-8 h-8" />
               </div>
@@ -436,13 +479,21 @@ export function DocumentPreviewModal({
 
           {/* Image Viewer */}
           {isImage && doc.download_url && (
-            <div className="overflow-auto max-w-full max-h-full flex items-center justify-center">
-              <img
-                src={doc.download_url}
-                alt={doc.title}
-                style={{ width: `${zoom}%`, maxWidth: zoom === 100 ? "100%" : "none" }}
-                className="object-contain rounded-xl shadow-xl transition-all duration-200 border border-[#e1e3e1]"
-              />
+            <div className="w-full h-full overflow-auto flex items-center justify-center p-4">
+              <div
+                style={{
+                  transform: `scale(${zoom / 100})`,
+                  transformOrigin: "center center",
+                  transition: "transform 0.15s ease-out",
+                }}
+                className="flex items-center justify-center max-w-full max-h-full"
+              >
+                <img
+                  src={doc.download_url}
+                  alt={doc.title}
+                  className="max-w-full max-h-[80vh] object-contain rounded-xl shadow-xl border border-[#e1e3e1]"
+                />
+              </div>
             </div>
           )}
 
@@ -474,7 +525,14 @@ export function DocumentPreviewModal({
 
           {/* Code, Markdown & Text Viewer */}
           {isTextCode && !isDocx && !isExcel && !isCsv && !isPptx && (
-            <div className="w-full max-w-5xl h-full max-h-[80vh] flex flex-col bg-white border border-[#e1e3e1] rounded-2xl shadow-xl overflow-hidden">
+            <div
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "top center",
+                transition: "transform 0.15s ease-out",
+              }}
+              className="w-full max-w-5xl h-full max-h-[80vh] flex flex-col bg-white border border-[#e1e3e1] rounded-2xl shadow-xl overflow-hidden"
+            >
               <div className="h-10 px-4 bg-[#f8fafd] border-b border-[#e1e3e1] flex items-center justify-between text-xs text-[#444746]">
                 <span className="font-mono font-semibold text-[#1f1f1f]">{doc.title}</span>
                 <button

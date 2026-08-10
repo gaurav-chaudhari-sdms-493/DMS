@@ -129,30 +129,91 @@ async def search(
         cid = str(row.id)
         docs_map[cid] = row
         rrf_scores[cid] = rrf_scores.get(cid, 0) + 1.0 / (k + rank + 1)
-        
+
     merged = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:20]
+    relevant_ranks = []
+    if merged:
+        reranker = get_rerank_provider()
+        doc_texts = [docs_map[cid].content for cid, _ in merged]
+        reranked = await reranker.rerank(query, doc_texts, top_n=limit * 2)
+        RELEVANCE_THRESHOLD = 0.15
+        relevant_ranks = [r for r in reranked if r.score >= RELEVANCE_THRESHOLD]
     
-    if not merged:
-        took_ms = int((time.time() - start_time) * 1000)
-        resp = SearchResponse(
-            query=query,
-            ai_summary=f"No matching documents were found in your drive for '{query}'.",
-            results=[],
-            cached=False,
-            took_ms=took_ms
-        )
-        await log_action(db, user_id, tenant_id, "search.query", details={"query": query, "result_count": 0, "took_ms": took_ms}, ip_address=ip_address)
-        return resp
-        
-    # 6. Rerank & Apply Relevance Threshold (Score >= 0.15)
-    reranker = get_rerank_provider()
-    doc_texts = [docs_map[cid].content for cid, _ in merged]
-    reranked = await reranker.rerank(query, doc_texts, top_n=limit * 2)
-    
-    RELEVANCE_THRESHOLD = 0.15
-    relevant_ranks = [r for r in reranked if r.score >= RELEVANCE_THRESHOLD]
-    
-    if not relevant_ranks:
+    if not merged or not relevant_ranks:
+        if filters and "document_id" in filters:
+            doc_id_param = str(filters["document_id"])
+            try:
+                target_doc_id = UUID(doc_id_param)
+            except ValueError:
+                target_doc_id = None
+
+            if target_doc_id:
+                chunk_sql = text("""
+                    SELECT c.chunk_id as id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path
+                    FROM chunks c
+                    JOIN documents d ON c.document_id = d.id
+                    LEFT JOIN document_versions v ON c.version_id = v.id
+                    WHERE d.id = :target_doc_id AND d.tenant_id = :tenant_id
+                    ORDER BY c.page_number ASC, c.chunk_index ASC
+                    LIMIT 30
+                """)
+                chunk_res = await db.execute(chunk_sql, {"target_doc_id": target_doc_id, "tenant_id": tenant_id})
+                doc_chunk_rows = chunk_res.fetchall()
+
+                snippets_for_llm = []
+                fallback_results = []
+
+                if doc_chunk_rows:
+                    for r in doc_chunk_rows:
+                        s3_path = r.s3_path
+                        url = await generate_presigned_url(s3_path) if s3_path else ""
+                        fallback_results.append(SearchResult(
+                            document_id=r.doc_id,
+                            document_name=r.title,
+                            download_url=url,
+                            page_number=r.page_number,
+                            snippet=r.content,
+                            score=1.0,
+                            metadata={}
+                        ))
+                        snippets_for_llm.append(f"Document: {r.title} (Page {r.page_number or 1})\nExcerpt: {r.content}")
+                elif filters.get("document_text"):
+                    doc_text = str(filters["document_text"]).strip()
+                    if doc_text:
+                        snippets_for_llm.append(f"Document Extracted Content:\n{doc_text[:4000]}")
+
+                if snippets_for_llm:
+                    try:
+                        llm = get_llm_provider()
+                        sys_msg = (
+                            "You are an enterprise document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
+                            "- Highlight key numbers, prices, dates, names, policies, and terms in bold formatting.\n"
+                            "- Organize information with clean bullet points or numbered lists where appropriate.\n"
+                            "- If asked to summarize, give a clear, comprehensive summary of the document's contents.\n"
+                            "- Do NOT invent details outside the provided excerpts."
+                        )
+                        user_msg = f"Question: {query}\n\nDocument Contents:\n" + "\n---\n".join(snippets_for_llm)
+                        summary = await llm.complete([
+                            Message(role="system", content=sys_msg),
+                            Message(role="user", content=user_msg)
+                        ])
+                        summary = validate_output_summary(summary)
+                    except Exception as e:
+                        import logging
+                        logging.getLogger(__name__).warning(f"AI summary error for document preview: {e}")
+                        summary = f"Analysis of the document:\n\n{snippets_for_llm[0][:400]}"
+
+                    took_ms = int((time.time() - start_time) * 1000)
+                    resp = SearchResponse(
+                        query=query,
+                        ai_summary=summary,
+                        results=fallback_results,
+                        cached=False,
+                        took_ms=took_ms
+                    )
+                    await log_action(db, user_id, tenant_id, "search.query", details={"query": query, "result_count": len(fallback_results), "took_ms": took_ms}, ip_address=ip_address)
+                    return resp
+
         took_ms = int((time.time() - start_time) * 1000)
         resp = SearchResponse(
             query=query,
