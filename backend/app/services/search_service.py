@@ -215,9 +215,24 @@ async def search(
                     return resp
 
         took_ms = int((time.time() - start_time) * 1000)
+
+        # Check if any documents in this tenant are currently being indexed
+        pending_sql = text("SELECT title FROM documents WHERE tenant_id = :tenant_id AND status IN ('pending', 'processing') AND is_trashed = false LIMIT 3")
+        pending_res = await db.execute(pending_sql, {"tenant_id": tenant_id})
+        pending_titles = [r.title for r in pending_res.fetchall()]
+
+        if pending_titles:
+            titles_str = ", ".join([f"'{t}'" for t in pending_titles])
+            summary_text = (
+                f"No indexed matches found for '{query}'.\n\n"
+                f"ℹ️ **AI Indexing Notice**: {len(pending_titles)} document(s) ({titles_str}) are currently being processed in the background (OCR, text chunking, and 1024d vector embedding generation). Please wait a few seconds for indexing to finish and search again."
+            )
+        else:
+            summary_text = f"No matching documents were found in your drive for '{query}'."
+
         resp = SearchResponse(
             query=query,
-            ai_summary=f"No matching documents were found in your drive for '{query}'.",
+            ai_summary=summary_text,
             results=[],
             cached=False,
             took_ms=took_ms

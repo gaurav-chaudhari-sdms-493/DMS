@@ -226,6 +226,55 @@ export default function DrivePage() {
     }
   }, [currentView, currentFolderId, searchQuery]);
 
+  // Smart background polling while any document is pending/indexing embeddings
+  useEffect(() => {
+    const hasPendingDocs = documents.some((d) => d.status === "pending" || d.status === "processing");
+    const hasIndexingUploads = uploads.some((u) => u.status === "indexing" || u.status === "uploading");
+
+    if (!hasPendingDocs && !hasIndexingUploads) return;
+
+    const interval = setInterval(async () => {
+      try {
+        const validParentId = isUUID(currentFolderId) ? currentFolderId : null;
+        let latestDocs: DocumentListItem[] = [];
+        if (currentView === "starred") {
+          latestDocs = await api.documents.list({ is_starred: true, is_trashed: false });
+        } else if (currentView === "trash") {
+          latestDocs = await api.documents.list({ is_trashed: true });
+        } else if (currentView === "home" || currentView === "recent") {
+          latestDocs = await api.documents.list({ include_all: true, is_trashed: false });
+        } else {
+          latestDocs = await api.documents.list({ folder_id: validParentId, is_trashed: false });
+        }
+
+        setDocuments(latestDocs);
+
+        // Update upload widget items based on real DB status
+        setUploads((prev) =>
+          prev.map((u) => {
+            const matchDoc = latestDocs.find(
+              (d) => (u.documentId && d.id === u.documentId) || d.title === u.name
+            );
+            if (matchDoc) {
+              if (matchDoc.status === "indexed") {
+                return { ...u, progress: 100, status: "completed" };
+              } else if (matchDoc.status === "failed") {
+                return { ...u, status: "error", errorMsg: "Indexing failed" };
+              } else {
+                return { ...u, progress: 100, status: "indexing" };
+              }
+            }
+            return u;
+          })
+        );
+      } catch (err) {
+        console.warn("Background polling notice:", err);
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [documents, uploads, currentView, currentFolderId, searchQuery]);
+
   // Handlers
   const handleSearch = async (query: string, useAi: boolean) => {
     setSearchQuery(query);
@@ -352,18 +401,26 @@ export default function DrivePage() {
 
     try {
       if (files.length === 1) {
-        await api.documents.upload(files[0], validParentId);
+        const resp = await api.documents.upload(files[0], validParentId);
+        setUploads((prev) =>
+          prev.map((u) =>
+            newUploadItems.some((n) => n.id === u.id)
+              ? { ...u, documentId: resp.document_id, progress: 100, status: "indexing" }
+              : u
+          )
+        );
       } else {
-        await api.documents.uploadBulk(files, validParentId);
+        const resp = await api.documents.uploadBulk(files, validParentId);
+        setUploads((prev) =>
+          prev.map((u) => {
+            const matchingDoc = resp.documents?.find((d: any) => d.title === u.name);
+            return newUploadItems.some((n) => n.id === u.id)
+              ? { ...u, documentId: matchingDoc?.document_id, progress: 100, status: "indexing" }
+              : u;
+          })
+        );
       }
 
-      setUploads((prev) =>
-        prev.map((u) =>
-          newUploadItems.some((n) => n.id === u.id)
-            ? { ...u, progress: 100, status: "completed" }
-            : u
-        )
-      );
       loadContents();
     } catch (err: any) {
       setUploads((prev) =>

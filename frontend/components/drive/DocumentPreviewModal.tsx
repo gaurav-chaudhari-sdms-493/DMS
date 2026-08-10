@@ -141,11 +141,14 @@ export function DocumentPreviewModal({
     setChatInput("");
 
     if (isOpen && doc) {
+      const isPending = doc.status === "pending" || doc.status === "processing";
       setChatMessages([
         {
           id: "welcome-1",
           sender: "ai",
-          text: `Hi! I'm your AI assistant for **${doc.title}**. Ask me any question about this document's content!`,
+          text: isPending
+            ? `Hi! I'm your AI assistant for **${doc.title}**. *(Note: Background AI indexing & 1024d vector embedding generation is currently in progress. I will answer your questions using preview text in the meantime!)*`
+            : `Hi! I'm your AI assistant for **${doc.title}**. Ask me any question about this document's content!`,
           timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
         },
       ]);
@@ -352,6 +355,21 @@ export function DocumentPreviewModal({
           )}
         </div>
       </header>
+
+      {/* Pending Indexing Banner Notice */}
+      {(doc.status === "pending" || doc.status === "processing") && (
+        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between text-xs text-amber-800 font-medium select-none z-10 shadow-xs">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 text-amber-600 animate-spin" />
+            <span>
+              <strong>AI Indexing In Progress:</strong> Generating OCR, text chunks, and 1024d vector embeddings in background...
+            </span>
+          </div>
+          <span className="text-[10px] bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded-full font-mono font-bold uppercase">
+            Status: {doc.status}
+          </span>
+        </div>
+      )}
 
       {/* Main Body: Left Preview Canvas + Right AI Chat Sidebar */}
       <div className="flex-1 flex overflow-hidden bg-[#f8fafd]">

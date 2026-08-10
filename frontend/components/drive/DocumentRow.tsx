@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { FileText, FileSpreadsheet, FileCode, Image, File, Download, ExternalLink, Star, Trash2, Edit2, FolderInput, RotateCcw, MoreVertical, Eye } from "lucide-react";
+import { FileText, FileSpreadsheet, FileCode, Image, File, Download, ExternalLink, Star, Trash2, Edit2, FolderInput, RotateCcw, MoreVertical, Eye, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
 import type { DocumentListItem } from "@/types";
 
 interface DocumentRowProps {
@@ -53,6 +53,34 @@ export function DocumentRow({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
+  const renderStatusBadge = () => {
+    if (doc.status === "indexed") {
+      return (
+        <span className="hidden lg:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+          <CheckCircle className="w-3 h-3 text-emerald-400" />
+          <span>Indexed</span>
+        </span>
+      );
+    }
+    if (doc.status === "failed") {
+      return (
+        <span className="hidden lg:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
+          <AlertCircle className="w-3 h-3 text-red-400" />
+          <span>Failed</span>
+        </span>
+      );
+    }
+    return (
+      <span
+        className="hidden lg:inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse"
+        title="Generating OCR, text chunks, and 1024d vector embeddings in background..."
+      >
+        <Sparkles className="w-3 h-3 text-amber-300 animate-spin" />
+        <span>Indexing AI</span>
+      </span>
+    );
+  };
+
   return (
     <div
       onClick={() => onSelect(doc)}
@@ -79,11 +107,7 @@ export function DocumentRow({
       </div>
 
       <div className="flex items-center gap-1.5 relative">
-        <span className={`px-2 py-0.5 rounded-full text-[10px] font-medium capitalize hidden lg:inline-block ${
-          doc.status === "indexed" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20" : "bg-amber-500/10 text-amber-400 border border-amber-500/20"
-        }`}>
-          {doc.status}
-        </span>
+        {renderStatusBadge()}
 
         {doc.is_starred && (
           <Star className="w-4 h-4 text-amber-400 fill-amber-400 flex-shrink-0" />
