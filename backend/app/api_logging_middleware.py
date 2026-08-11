@@ -1,6 +1,7 @@
 import time
 import uuid
 import logging
+import asyncio
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
@@ -11,11 +12,20 @@ from app.models.api_log import ApiLog
 logger = logging.getLogger(__name__)
 
 
+async def _write_log(**kwargs):
+    try:
+        async with AsyncSessionLocal() as session:
+            session.add(ApiLog(**kwargs))
+            await session.commit()
+    except Exception as e:
+        logger.warning("Failed to log API call: %s", e)
+
+
 class ApiLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware that logs every API request to the api_logs table."""
 
     # Paths to skip logging (health checks, static files, docs)
-    SKIP_PREFIXES = ("/api/docs", "/api/redoc", "/openapi.json", "/_next", "/static", "/favicon")
+    SKIP_PREFIXES = ("/api/docs", "/api/redoc", "/openapi.json", "/_next", "/static", "/favicon", "/api/v1/health")
 
     async def dispatch(self, request: Request, call_next):
         path = request.url.path
@@ -55,22 +65,16 @@ class ApiLoggingMiddleware(BaseHTTPMiddleware):
 
         user_agent = request.headers.get("user-agent", "")[:500] if request.headers.get("user-agent") else None
 
-        # Write log entry asynchronously (fire-and-forget, don't block response)
-        try:
-            async with AsyncSessionLocal() as session:
-                log_entry = ApiLog(
-                    method=request.method,
-                    path=path,
-                    status_code=response.status_code,
-                    response_time_ms=round(elapsed_ms, 2),
-                    user_id=user_id,
-                    tenant_id=tenant_id,
-                    ip_address=ip_address,
-                    user_agent=user_agent,
-                )
-                session.add(log_entry)
-                await session.commit()
-        except Exception as e:
-            logger.warning(f"Failed to log API call: {e}")
+        # Non-blocking fire-and-forget task
+        asyncio.create_task(_write_log(
+            method=request.method,
+            path=path,
+            status_code=response.status_code,
+            response_time_ms=round(elapsed_ms, 2),
+            user_id=user_id,
+            tenant_id=tenant_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+        ))
 
         return response

@@ -18,6 +18,7 @@ class BatchDocumentUploadResponse(BaseModel):
     total: int
     succeeded: int
     failed: int
+    failures: List[Dict[str, Any]] = Field(default_factory=list)
 
 
 class DocumentUpdate(BaseModel):

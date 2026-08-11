@@ -1,3 +1,4 @@
+import time
 import uuid
 from datetime import datetime, timedelta
 from jose import jwt, JWTError
@@ -59,33 +60,35 @@ async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
     )
 
 def create_access_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=settings.jwt_access_token_expire_minutes)
+    exp = int(time.time()) + (settings.jwt_access_token_expire_minutes * 60)
     to_encode = {
         "sub": str(user_id),
         "tenant_id": str(tenant_id),
         "role": role,
-        "exp": int(expire.timestamp()),
-        "jti": str(uuid.uuid4())
+        "exp": exp,
+        "jti": str(uuid.uuid4()),
+        "type": "access"
     }
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 def create_refresh_token(user_id: uuid.UUID, tenant_id: uuid.UUID, role: str) -> str:
-    expire = datetime.utcnow() + timedelta(days=settings.jwt_refresh_token_expire_days)
+    exp = int(time.time()) + (settings.jwt_refresh_token_expire_days * 86400)
     to_encode = {
         "sub": str(user_id),
         "tenant_id": str(tenant_id),
         "role": role,
-        "exp": int(expire.timestamp()),
-        "jti": str(uuid.uuid4())
+        "exp": exp,
+        "jti": str(uuid.uuid4()),
+        "type": "refresh"
     }
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)
 
 def create_password_reset_token(email: str) -> str:
-    expire = datetime.utcnow() + timedelta(minutes=15)
+    exp = int(time.time()) + (15 * 60)
     to_encode = {
         "sub": email,
         "type": "reset_password",
-        "exp": int(expire.timestamp()),
+        "exp": exp,
         "jti": str(uuid.uuid4())
     }
     return jwt.encode(to_encode, settings.jwt_secret_key, algorithm=settings.jwt_algorithm)

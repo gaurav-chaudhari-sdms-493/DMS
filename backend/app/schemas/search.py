@@ -22,3 +22,5 @@ class SearchResponse(BaseModel):
     results: List[SearchResult]
     cached: bool = False
     took_ms: int
+    search_mode: Optional[str] = "direct"
+    hyde_triggered: Optional[bool] = False

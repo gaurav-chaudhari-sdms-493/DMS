@@ -66,12 +66,41 @@ export function DriveDetailPanel({
       {/* Item Icon Box */}
       <div className="p-6 flex flex-col items-center justify-center border-b border-[#e1e3e1] bg-[#f8f9fa]">
         {selectedFolder ? (
-          <div className="w-16 h-16 rounded-2xl bg-[#f0f4f9] flex items-center justify-center mb-3">
-            <FolderIcon className="w-8 h-8 text-[#5f6368] fill-[#fbbc04]" />
+          <div className="w-20 h-20 rounded-2xl bg-[#f0f4f9] flex items-center justify-center mb-3 shadow-xs border border-[#e1e3e1]">
+            <FolderIcon className="w-10 h-10 text-[#5f6368] fill-[#fbbc04]" />
+          </div>
+        ) : selectedDoc && selectedDoc.title.match(/\.(jpg|jpeg|png|webp|gif|svg|bmp)$/i) && selectedDoc.download_url ? (
+          <div className="relative w-full max-w-[200px] h-40 bg-white rounded-2xl border border-[#e1e3e1] p-1.5 flex items-center justify-center shadow-md overflow-hidden mb-3">
+            <img
+              src={selectedDoc.download_url}
+              alt={selectedDoc.title}
+              className="max-w-full max-h-full object-contain rounded-xl"
+            />
+          </div>
+        ) : selectedDoc && selectedDoc.title.toLowerCase().endsWith(".pdf") ? (
+          <div className="w-24 h-32 bg-white rounded-xl shadow-md border border-[#e1e3e1] flex flex-col overflow-hidden mb-3">
+            <div className="h-7 bg-[#ea4335] flex items-center px-2.5 text-xs font-bold text-white tracking-wider">
+              PDF
+            </div>
+            <div className="p-2.5 space-y-2 flex-1 bg-white">
+              <div className="h-2 bg-[#f1f3f4] rounded w-full" />
+              <div className="h-2 bg-[#f1f3f4] rounded w-4/5" />
+              <div className="h-2 bg-[#f1f3f4] rounded w-3/5" />
+              <div className="h-2 bg-[#f1f3f4] rounded w-full mt-3" />
+              <div className="h-2 bg-[#f1f3f4] rounded w-2/3" />
+            </div>
           </div>
         ) : (
-          <div className="w-16 h-16 rounded-2xl bg-[#edf2fc] border border-[#c2e7ff] flex items-center justify-center mb-3 text-[#0b57d0]">
-            <FileText className="w-8 h-8" />
+          <div className="w-24 h-32 bg-white rounded-xl shadow-md border border-[#e1e3e1] flex flex-col overflow-hidden mb-3">
+            <div className="h-7 bg-[#0b57d0] flex items-center px-2.5 text-xs font-bold text-white tracking-wider">
+              DOC
+            </div>
+            <div className="p-2.5 space-y-2 flex-1 bg-white">
+              <div className="h-2 bg-[#edf2fc] rounded w-full" />
+              <div className="h-2 bg-[#edf2fc] rounded w-3/4" />
+              <div className="h-2 bg-[#edf2fc] rounded w-5/6" />
+              <div className="h-2 bg-[#edf2fc] rounded w-1/2" />
+            </div>
           </div>
         )}
 

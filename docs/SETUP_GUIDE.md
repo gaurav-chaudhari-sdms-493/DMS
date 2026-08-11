@@ -11,7 +11,7 @@ Before installing, ensure your machine has the following tools installed:
 | Tool | Minimum Version | Recommended Version |
 |------|-----------------|---------------------|
 | **Docker & Docker Compose** | Docker v24.0+ | Docker Desktop 4.25+ / Docker Engine 25+ |
-| **Python** | 3.11 | 3.11.9+ |
+| **Python** | 3.12 | 3.12.3+ |
 | **Node.js** | 18.x LTS | Node.js 20 LTS |
 | **PostgreSQL** | 16 with `pgvector` | `ankane/pgvector:latest` image |
 | **Redis** | 7.0+ | Redis Alpine image |

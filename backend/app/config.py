@@ -1,4 +1,4 @@
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 from typing import Literal, List
 import json
@@ -7,6 +7,13 @@ class Settings(BaseSettings):
     # App
     app_env: Literal['development', 'production', 'test'] = 'development'
     cors_origins: List[str] = ['*']
+    
+    # File Upload limits
+    max_upload_size_mb: int = 50
+    allowed_upload_extensions: List[str] = [
+        "pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt",
+        "csv", "txt", "md", "rtf", "json", "jpg", "jpeg", "png", "webp", "bmp"
+    ]
     
     # Database
     postgres_url: str
@@ -82,6 +89,14 @@ class Settings(BaseSettings):
         if isinstance(v, str):
             return json.loads(v)
         return v
+    
+    @model_validator(mode='after')
+    def validate_production_jwt_secret(self):
+        WEAK_SECRETS = {"secret", "change_me", "changeme", "secretkey", "jwtsecret", "password", "123456"}
+        if self.app_env == "production":
+            if self.jwt_secret_key.lower() in WEAK_SECRETS or len(self.jwt_secret_key) < 32:
+                raise ValueError("In production, JWT_SECRET_KEY must be a strong secret of at least 32 characters")
+        return self
     
     class Config:
         env_file = '.env'

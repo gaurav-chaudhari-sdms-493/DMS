@@ -111,6 +111,15 @@ async def toggle_trash_document_api(
     return await document_service.toggle_trash_document(db, document_id, tenant_id)
 
 
+@router.post('/trash/cleanup')
+async def cleanup_trashed_items_api(
+    retention_days: int = 30,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    return await document_service.cleanup_expired_trashed_items(db, retention_days=retention_days)
+
+
 @router.delete('/{document_id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document_api(
     document_id: uuid.UUID,

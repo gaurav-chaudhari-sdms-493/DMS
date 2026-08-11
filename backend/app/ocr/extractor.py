@@ -47,6 +47,13 @@ def _extract_image(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
 
     if not text.strip():
         text = f"Scanned image document: {filename}"
+        return [{
+            "page_number": 1,
+            "text": text.strip(),
+            "words": [],
+            "bbox": {},
+            "extraction_failed": True
+        }]
 
     return [{
         "page_number": 1,
@@ -77,14 +84,17 @@ def _extract_pdf(file_bytes: bytes, filename: str = "") -> List[Dict[str, Any]]:
                     except Exception as ocr_err:
                         logger.warning(f"OCR fallback failed for page {i+1} of {filename}: {ocr_err}")
 
+                failed = False
                 if not text.strip():
                     text = f"Scanned page {i+1} of document {filename}"
+                    failed = True
 
                 pages.append({
                     "page_number": i + 1,
                     "text": text.strip(),
                     "words": words,
-                    "bbox": {"width": float(page.width), "height": float(page.height)}
+                    "bbox": {"width": float(page.width), "height": float(page.height)},
+                    "extraction_failed": failed
                 })
     except Exception as e:
         logger.error(f"Error parsing PDF with pdfplumber: {e}")
@@ -92,9 +102,10 @@ def _extract_pdf(file_bytes: bytes, filename: str = "") -> List[Dict[str, Any]]:
             "page_number": 1,
             "text": f"Scanned PDF document: {filename}",
             "words": [],
-            "bbox": {}
+            "bbox": {},
+            "extraction_failed": True
         })
-    return pages if pages else [{"page_number": 1, "text": f"Scanned document: {filename}", "words": [], "bbox": {}}]
+    return pages if pages else [{"page_number": 1, "text": f"Scanned document: {filename}", "words": [], "bbox": {}, "extraction_failed": True}]
 
 
 def _clean_binary_strings(file_bytes: bytes) -> str:

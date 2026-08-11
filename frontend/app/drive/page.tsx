@@ -21,13 +21,25 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
 import type { Folder, FolderTreeNode, DocumentListItem, DriveStats, SearchResponse, SearchResult } from "@/types";
-import { Info, FolderSearch, Eye, Trash2, RotateCcw, Sparkles, FolderPlus, Upload, FolderUp, UploadCloud } from "lucide-react";
-
+import { Info, FolderSearch, Eye, Trash2, RotateCcw, Sparkles, FolderPlus, Upload, FolderUp, UploadCloud, Clock, CheckSquare, X, Star, FolderInput, Download, Edit2 } from "lucide-react";
 
 
 const isUUID = (str: string | null | undefined): boolean => {
   if (!str) return false;
   return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
+};
+
+const getDaysRemainingInBin = (trashedAtStr?: string | null): { text: string; daysLeft: number } => {
+  if (!trashedAtStr) return { text: "30 days left", daysLeft: 30 };
+  const trashedDate = new Date(trashedAtStr).getTime();
+  if (isNaN(trashedDate)) return { text: "30 days left", daysLeft: 30 };
+  const now = new Date().getTime();
+  const diffDays = Math.floor((now - trashedDate) / (1000 * 60 * 60 * 24));
+  const daysLeft = Math.max(0, 30 - diffDays);
+
+  if (daysLeft === 0) return { text: "Deletes today", daysLeft: 0 };
+  if (daysLeft === 1) return { text: "1 day left", daysLeft: 1 };
+  return { text: `${daysLeft} days left`, daysLeft };
 };
 
 export default function DrivePage() {
@@ -45,6 +57,48 @@ export default function DrivePage() {
   const [documents, setDocuments] = useState<DocumentListItem[]>([]);
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DocumentListItem | null>(null);
+
+  // Multi-Selection State
+  const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
+  const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+
+  // Right-Click Item Context Menu State
+  const [itemContextMenu, setItemContextMenu] = useState<{
+    isOpen: boolean;
+    x: number;
+    y: number;
+    type: "folder" | "doc";
+    item: Folder | DocumentListItem;
+  } | null>(null);
+
+  const handleItemContextMenu = (
+    e: React.MouseEvent,
+    type: "folder" | "doc",
+    item: Folder | DocumentListItem
+  ) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    // If item is ALREADY part of multi-selection, keep current selection!
+    const isAlreadySelected =
+      type === "folder" ? selectedFolderIds.has(item.id) : selectedDocIds.has(item.id);
+
+    if (!isAlreadySelected) {
+      if (type === "folder") {
+        handleSelectFolder(item as Folder, false);
+      } else {
+        handleSelectDoc(item as DocumentListItem, false);
+      }
+    }
+
+    setItemContextMenu({
+      isOpen: true,
+      x: Math.min(e.clientX, window.innerWidth - 240),
+      y: Math.min(e.clientY, window.innerHeight - 300),
+      type,
+      item,
+    });
+  };
 
   // Document Previewer Modal State
   const [previewDoc, setPreviewDoc] = useState<DocumentListItem | null>(null);
@@ -96,6 +150,10 @@ export default function DrivePage() {
 
   const handleContextMenu = (e: React.MouseEvent) => {
     e.preventDefault();
+    if (currentView === "trash" || currentView === "chat" || currentView === "starred" || currentView === "recent" || currentView === "shared") {
+      setContextMenu({ visible: false, x: 0, y: 0 });
+      return;
+    }
     setContextMenu({
       visible: true,
       x: e.clientX,
@@ -107,6 +165,7 @@ export default function DrivePage() {
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (currentView === "trash" || currentView === "chat") return;
     if (e.dataTransfer.types && Array.from(e.dataTransfer.types).includes("Files")) {
       setIsDragging(true);
     }
@@ -123,6 +182,7 @@ export default function DrivePage() {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
+    if (currentView === "trash" || currentView === "chat") return;
     const droppedFiles = Array.from(e.dataTransfer.files || []);
     if (droppedFiles.length > 0) {
       processFilesForUpload(droppedFiles);
@@ -298,17 +358,121 @@ export default function DrivePage() {
     loadContents();
   };
 
+  const handleSelectFolder = (folder: Folder, isMulti?: boolean) => {
+    setSelectedDoc(null);
+    setSelectedFolder(folder);
+    setShowDetailPanel(true);
+
+    setSelectedFolderIds((prev) => {
+      const next = new Set(isMulti ? prev : []);
+      if (next.has(folder.id)) {
+        next.delete(folder.id);
+      } else {
+        next.add(folder.id);
+      }
+      return next;
+    });
+    if (!isMulti) {
+      setSelectedDocIds(new Set());
+    }
+  };
+
+  const handleSelectDoc = (doc: DocumentListItem, isMulti?: boolean) => {
+    setSelectedFolder(null);
+    setSelectedDoc(doc);
+    setShowDetailPanel(true);
+
+    setSelectedDocIds((prev) => {
+      const next = new Set(isMulti ? prev : []);
+      if (next.has(doc.id)) {
+        next.delete(doc.id);
+      } else {
+        next.add(doc.id);
+      }
+      return next;
+    });
+    if (!isMulti) {
+      setSelectedFolderIds(new Set());
+    }
+  };
+
+  const handleToggleSelectAll = () => {
+    const totalVisible = folders.length + documents.length;
+    const totalSelected = selectedFolderIds.size + selectedDocIds.size;
+    if (totalSelected >= totalVisible && totalVisible > 0) {
+      setSelectedFolderIds(new Set());
+      setSelectedDocIds(new Set());
+    } else {
+      setSelectedFolderIds(new Set(folders.map((f) => f.id)));
+      setSelectedDocIds(new Set(documents.map((d) => d.id)));
+    }
+  };
+
+  const handleBulkStar = async () => {
+    for (const fId of Array.from(selectedFolderIds)) {
+      await api.folders.toggleStar(fId).catch(() => {});
+    }
+    for (const dId of Array.from(selectedDocIds)) {
+      await api.documents.toggleStar(dId).catch(() => {});
+    }
+    setSelectedFolderIds(new Set());
+    setSelectedDocIds(new Set());
+    loadContents();
+  };
+
+  const handleBulkDownload = () => {
+    selectedDocIds.forEach((dId) => {
+      const doc = documents.find((d) => d.id === dId);
+      if (doc?.download_url) {
+        const a = document.createElement("a");
+        a.href = doc.download_url;
+        a.download = doc.title;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+      }
+    });
+  };
+
+  const handleBulkTrash = async () => {
+    const count = selectedFolderIds.size + selectedDocIds.size;
+    if (currentView === "trash") {
+      if (confirm(`Are you sure you want to permanently delete ${count} selected items?`)) {
+        for (const fId of Array.from(selectedFolderIds)) {
+          await api.folders.deletePermanent(fId).catch(() => {});
+        }
+        for (const dId of Array.from(selectedDocIds)) {
+          await api.documents.deletePermanent(dId).catch(() => {});
+        }
+      }
+    } else {
+      for (const fId of Array.from(selectedFolderIds)) {
+        await api.folders.toggleTrash(fId).catch(() => {});
+      }
+      for (const dId of Array.from(selectedDocIds)) {
+        await api.documents.toggleTrash(dId).catch(() => {});
+      }
+    }
+    setSelectedFolderIds(new Set());
+    setSelectedDocIds(new Set());
+    loadContents();
+  };
+
   const handleOpenFolder = (folder: Folder) => {
     setCurrentView("my-drive");
     setCurrentFolderId(folder.id);
     setSelectedFolder(folder);
     setSelectedDoc(null);
+    setSelectedFolderIds(new Set());
+    setSelectedDocIds(new Set());
   };
 
   const handleSelectFolderId = (folderId: string) => {
     setCurrentView("my-drive");
     setCurrentFolderId(folderId);
     setSelectedDoc(null);
+    setSelectedFolderIds(new Set());
+    setSelectedDocIds(new Set());
   };
 
   const handleCreateFolder = async (name: string, color: string) => {
@@ -339,21 +503,31 @@ export default function DrivePage() {
   };
 
   const handlePerformMove = async (targetFolderId: string | null) => {
-    if (!itemToMove) return;
-    try {
-      const validTargetId = isUUID(targetFolderId) ? targetFolderId : null;
-      if (isUUID(itemToMove.item.id)) {
+    const validTargetId = isUUID(targetFolderId) ? targetFolderId : null;
+    if (itemToMove?.item?.id === "bulk" || selectedFolderIds.size > 0 || selectedDocIds.size > 0) {
+      for (const fId of Array.from(selectedFolderIds)) {
+        await api.folders.update(fId, { parent_id: validTargetId }).catch(() => {});
+      }
+      for (const dId of Array.from(selectedDocIds)) {
+        await api.documents.update(dId, { folder_id: validTargetId }).catch(() => {});
+      }
+      setSelectedFolderIds(new Set());
+      setSelectedDocIds(new Set());
+    }
+
+    if (itemToMove && isUUID(itemToMove.item.id)) {
+      try {
         if (itemToMove.type === "folder") {
           await api.folders.update(itemToMove.item.id, { parent_id: validTargetId });
         } else {
           await api.documents.update(itemToMove.item.id, { folder_id: validTargetId });
         }
+      } catch (err: any) {
+        console.warn("Move ignored for item:", err);
       }
-      setItemToMove(null);
-      loadContents();
-    } catch (err: any) {
-      console.warn("Move ignored for non-persistent item:", err);
     }
+    setItemToMove(null);
+    loadContents();
   };
 
   const handleRestoreItem = async (type: "folder" | "doc", id: string) => {
@@ -512,7 +686,9 @@ export default function DrivePage() {
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
-          className="flex-1 bg-white rounded-3xl my-2 ml-1 mr-2 p-6 flex flex-col overflow-y-auto border border-[#e1e3e1] shadow-sm relative"
+          className={`flex-1 bg-white rounded-3xl my-2 ml-1 mr-2 flex flex-col border border-[#e1e3e1] shadow-sm relative ${
+            currentView === "chat" ? "p-0 overflow-hidden" : "p-6 overflow-y-auto"
+          }`}
         >
           {/* Drag and Drop Overlay Indicator */}
           {isDragging && (
@@ -528,23 +704,27 @@ export default function DrivePage() {
           )}
 
 
-          {/* Top Breadcrumb & Canvas Header */}
-          <div className="flex items-center justify-between mb-4 border-b border-[#e1e3e1] pb-3">
-            <DriveBreadcrumbs
-              currentView={currentView}
-              currentFolder={currentFolder}
-              folderPath={folderPath}
-              onNavigateRoot={() => {
-                setCurrentView("home");
-                setCurrentFolderId(null);
-              }}
-              onNavigateFolder={handleSelectFolderId}
-            />
-          </div>
+          {/* Top Breadcrumb & Canvas Header (hidden in dedicated chat mode) */}
+          {currentView !== "chat" && (
+            <div className="flex items-center justify-between mb-4 border-b border-[#e1e3e1] pb-3">
+              <DriveBreadcrumbs
+                currentView={currentView}
+                currentFolder={currentFolder}
+                folderPath={folderPath}
+                onNavigateRoot={() => {
+                  setCurrentFolderId(null);
+                  setCurrentFolder(null);
+                  setFolderPath([]);
+                }}
+                onNavigateFolder={handleSelectFolderId}
+              />
+            </div>
+          )}
 
           {/* Active Chat Mode */}
+
           {currentView === "chat" ? (
-            <div className="flex-1 flex overflow-hidden">
+            <div className="flex-1 flex overflow-hidden h-full">
               <PersistentChatPanel onPreviewDocument={(doc) => setPreviewDoc(doc)} />
             </div>
           ) : searchQuery ? (
@@ -575,13 +755,29 @@ export default function DrivePage() {
                     </div>
                   </div>
 
-
-
                   {searchResponse.results.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4">
                       {searchResponse.results.map((res, idx) => (
                         <ResultCard key={`${res.document_id}-${idx}`} result={res} onPreview={handlePreviewSearchResult} />
                       ))}
+
+                      {/* Small technology message at bottom of loaded docs if results > 1 */}
+                      {searchResponse.results.length > 1 && (
+                        <div className="p-3 bg-[#edf2fc]/60 border border-[#c4c7c5]/50 rounded-2xl flex items-center justify-between text-xs text-[#444746] mt-2 shadow-2xs">
+                          <div className="flex items-center gap-2 font-medium">
+                            <Sparkles className="w-4 h-4 text-[#0b57d0]" />
+                            <span>Search Technology Used:</span>
+                            <span className="font-bold text-[#0b57d0] px-2.5 py-0.5 rounded-full bg-white border border-[#0b57d0]/20 shadow-2xs">
+                              {searchResponse.search_mode === "HyDE"
+                                ? "HyDE"
+                                : searchResponse.search_mode || "vector+keyword"}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-[#747775] font-medium">
+                            Retrieved {searchResponse.results.length} documents in {searchResponse.took_ms}ms
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-16 bg-[#f8f9fa] rounded-2xl border border-[#e1e3e1]">
@@ -594,68 +790,183 @@ export default function DrivePage() {
               ) : null}
             </div>
           ) : currentView === "trash" ? (
-            /* Trash View with Restore & Permanent Delete */
+            /* Trash View with Restore, Permanent Delete & 30-Day Auto-Delete Banner */
             <div className="flex-1 space-y-6">
-              <h2 className="text-xl font-normal text-[#1f1f1f]">Items in Bin</h2>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {folders.map((f) => (
-                  <div key={f.id} className="p-4 bg-[#f8f9fa] border border-[#e1e3e1] rounded-2xl flex items-center justify-between">
-                    <span className="font-semibold text-sm text-[#1f1f1f] truncate">{f.name}</span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleRestoreItem("folder", f.id)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                        title="Restore"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handlePermanentDelete("folder", f.id)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
-                        title="Delete permanently"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+              <div className="flex items-center justify-between border-b border-[#e1e3e1] pb-3">
+                <div>
+                  <h2 className="text-xl font-semibold text-[#1f1f1f]">Items in Bin</h2>
+                  <p className="text-xs text-[#747775] mt-1 font-medium flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-amber-600" />
+                    <span>Items in the Bin are permanently deleted automatically after 30 days.</span>
+                  </p>
+                </div>
 
-                {documents.map((d) => (
-                  <div key={d.id} className="p-4 bg-[#f8f9fa] border border-[#e1e3e1] rounded-2xl flex items-center justify-between">
-                    <span className="font-semibold text-sm text-[#1f1f1f] truncate">{d.title}</span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={() => handleRestoreItem("doc", d.id)}
-                        className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg"
-                        title="Restore"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handlePermanentDelete("doc", d.id)}
-                        className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg"
-                        title="Delete permanently"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
+                {(folders.length > 0 || documents.length > 0) && (
+                  <button
+                    onClick={async () => {
+                      if (confirm("Are you sure you want to empty the Bin? All items in the Bin will be permanently deleted immediately.")) {
+                        try {
+                          await api.documents.cleanupTrash(0);
+                          loadContents();
+                        } catch (err: any) {
+                          alert("Failed to empty Bin: " + (err.message || "Unknown error"));
+                        }
+                      }
+                    }}
+                    className="px-4 py-2 text-xs font-semibold text-red-600 hover:bg-red-50 border border-red-200 rounded-full transition-colors shadow-xs"
+                  >
+                    Empty Bin
+                  </button>
+                )}
               </div>
+
+              {folders.length === 0 && documents.length === 0 ? (
+                <div className="text-center py-20 bg-[#f8f9fa] rounded-3xl border border-[#e1e3e1]">
+                  <Trash2 className="w-12 h-12 text-[#747775] mx-auto mb-3 opacity-40" />
+                  <h3 className="text-sm font-semibold text-[#1f1f1f]">Bin is empty</h3>
+                  <p className="text-xs text-[#747775] mt-1">Items moved to the Bin will appear here for 30 days before permanent deletion.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                  {folders.map((f) => {
+                    const { text: daysText, daysLeft } = getDaysRemainingInBin(f.trashed_at);
+                    const isSelected = selectedFolderIds.has(f.id);
+                    return (
+                      <div
+                        key={f.id}
+                        onClick={(e) => handleSelectFolder(f, e.ctrlKey || e.metaKey || e.shiftKey)}
+                        className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
+                          isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 pr-2 flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleSelectFolder(f, true);
+                            }}
+                            className="w-3.5 h-3.5 rounded text-[#0b57d0] focus:ring-[#0b57d0] cursor-pointer"
+                          />
+                          <div>
+                            <span className="font-semibold text-sm text-[#1f1f1f] truncate block">{f.name}</span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] text-[#747775] font-medium">Folder</span>
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                daysLeft <= 5 
+                                  ? "bg-red-50 text-red-700 border-red-200" 
+                                  : "bg-amber-50 text-amber-700 border-amber-200/80"
+                              }`}>
+                                <Clock className="w-3 h-3" />
+                                {daysText}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRestoreItem("folder", f.id);
+                            }}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Restore folder"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePermanentDelete("folder", f.id);
+                            }}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete permanently"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {documents.map((d) => {
+                    const { text: daysText, daysLeft } = getDaysRemainingInBin(d.trashed_at);
+                    const isSelected = selectedDocIds.has(d.id);
+                    return (
+                      <div
+                        key={d.id}
+                        onClick={(e) => handleSelectDoc(d, e.ctrlKey || e.metaKey || e.shiftKey)}
+                        onDoubleClick={() => setPreviewDoc(d)}
+                        className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
+                          isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
+                        }`}
+                      >
+                        <div className="min-w-0 flex-1 pr-2 flex items-center gap-2">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={(e) => {
+                              e.stopPropagation();
+                              handleSelectDoc(d, true);
+                            }}
+                            className="w-3.5 h-3.5 rounded text-[#0b57d0] focus:ring-[#0b57d0] cursor-pointer"
+                          />
+                          <div>
+                            <span className="font-semibold text-sm text-[#1f1f1f] truncate block">{d.title}</span>
+                            <div className="flex items-center gap-2 mt-1">
+                              <span className="text-[10px] text-[#747775] font-medium">Document</span>
+                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                                daysLeft <= 5 
+                                  ? "bg-red-50 text-red-700 border-red-200" 
+                                  : "bg-amber-50 text-amber-700 border-amber-200/80"
+                              }`}>
+                                <Clock className="w-3 h-3" />
+                                {daysText}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 flex-shrink-0">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRestoreItem("doc", d.id);
+                            }}
+                            className="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="Restore document"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handlePermanentDelete("doc", d.id);
+                            }}
+                            className="p-1.5 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Delete permanently"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           ) : currentView === "home" ? (
             /* Home View - Shows Only Recent Files Open */
             <div className="flex-1 space-y-4">
               <SuggestedFilesTable
                 documents={documents}
-                onSelectDoc={(d) => {
-                  setSelectedDoc(d);
-                  setSelectedFolder(null);
-                  setPreviewDoc(d);
-                  setShowDetailPanel(true);
-                }}
+                onSelectDoc={handleSelectDoc}
                 onPreviewDoc={(d) => setPreviewDoc(d)}
+                onContextMenu={(e, d) => handleItemContextMenu(e, "doc", d)}
                 selectedDocId={selectedDoc?.id}
+                selectedDocIds={selectedDocIds}
+                onToggleSelectAll={handleToggleSelectAll}
+                isAllSelected={documents.length > 0 && selectedDocIds.size === documents.length}
                 onToggleStar={async (d) => {
                   if (isUUID(d.id)) {
                     await api.documents.toggleStar(d.id).catch(() => {});
@@ -679,6 +990,9 @@ export default function DrivePage() {
               <SuggestedFoldersSection
                 folders={folders}
                 onOpenFolder={handleOpenFolder}
+                onSelectFolder={handleSelectFolder}
+                onContextMenu={(e, f) => handleItemContextMenu(e, "folder", f)}
+                selectedFolderIds={selectedFolderIds}
                 onToggleStar={async (f) => {
                   if (isUUID(f.id)) {
                     await api.folders.toggleStar(f.id).catch(() => {});
@@ -698,14 +1012,13 @@ export default function DrivePage() {
               {/* Suggested Files Detailed Table */}
               <SuggestedFilesTable
                 documents={documents}
-                onSelectDoc={(d) => {
-                  setSelectedDoc(d);
-                  setSelectedFolder(null);
-                  setPreviewDoc(d);
-                  setShowDetailPanel(true);
-                }}
+                onSelectDoc={handleSelectDoc}
                 onPreviewDoc={(d) => setPreviewDoc(d)}
+                onContextMenu={(e, d) => handleItemContextMenu(e, "doc", d)}
                 selectedDocId={selectedDoc?.id}
+                selectedDocIds={selectedDocIds}
+                onToggleSelectAll={handleToggleSelectAll}
+                isAllSelected={documents.length > 0 && selectedDocIds.size === documents.length}
                 onToggleStar={async (d) => {
                   if (isUUID(d.id)) {
                     await api.documents.toggleStar(d.id).catch(() => {});
@@ -841,6 +1154,157 @@ export default function DrivePage() {
           </div>
         </div>
       )}
+
+      {/* Right-Click Item Context Menu */}
+      {itemContextMenu?.isOpen && (() => {
+        const totalSelected = selectedFolderIds.size + selectedDocIds.size;
+        const isMulti = totalSelected > 1;
+
+        return (
+          <>
+            <div
+              className="fixed inset-0 z-50"
+              onClick={() => setItemContextMenu(null)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                setItemContextMenu(null);
+              }}
+            />
+            <div
+              style={{ top: `${itemContextMenu.y}px`, left: `${itemContextMenu.x}px` }}
+              className="fixed z-50 w-56 bg-white rounded-2xl shadow-2xl border border-[#e1e3e1] p-1.5 text-xs text-[#1f1f1f] animate-fadeIn select-none"
+            >
+              {!isMulti && (
+                <button
+                  onClick={() => {
+                    setItemContextMenu(null);
+                    if (itemContextMenu.type === "folder") {
+                      handleOpenFolder(itemContextMenu.item as Folder);
+                    } else {
+                      setPreviewDoc(itemContextMenu.item as DocumentListItem);
+                    }
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-[#f0f4f9] font-medium"
+                >
+                  <Eye className="w-4 h-4 text-[#0b57d0]" />
+                  <span>{itemContextMenu.type === "folder" ? "Open Folder" : "Preview"}</span>
+                </button>
+              )}
+
+              {/* Download */}
+              {(isMulti ? selectedDocIds.size > 0 : itemContextMenu.type === "doc" && (itemContextMenu.item as DocumentListItem).download_url) && (
+                <button
+                  onClick={() => {
+                    setItemContextMenu(null);
+                    if (isMulti) {
+                      handleBulkDownload();
+                    } else if (itemContextMenu.type === "doc" && (itemContextMenu.item as DocumentListItem).download_url) {
+                      const a = document.createElement("a");
+                      a.href = (itemContextMenu.item as DocumentListItem).download_url || "#";
+                      a.download = (itemContextMenu.item as DocumentListItem).title;
+                      document.body.appendChild(a);
+                      a.click();
+                      document.body.removeChild(a);
+                    }
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-[#f0f4f9] font-medium"
+                >
+                  <Download className="w-4 h-4 text-[#00639b]" />
+                  <span>{isMulti ? `Download (${selectedDocIds.size} files)` : "Download"}</span>
+                </button>
+              )}
+
+              {/* Rename (Single item only) */}
+              {!isMulti && (
+                <button
+                  onClick={() => {
+                    setItemContextMenu(null);
+                    setItemToRename({ type: itemContextMenu.type, item: itemContextMenu.item });
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-[#f0f4f9] font-medium"
+                >
+                  <Edit2 className="w-4 h-4 text-[#444746]" />
+                  <span>Rename</span>
+                </button>
+              )}
+
+              {/* Move */}
+              {currentView !== "trash" && (
+                <button
+                  onClick={() => {
+                    setItemContextMenu(null);
+                    if (isMulti) {
+                      setItemToMove({ type: "doc", item: { id: "bulk" } as any });
+                    } else {
+                      setItemToMove({ type: itemContextMenu.type, item: itemContextMenu.item });
+                    }
+                  }}
+                  className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-[#f0f4f9] font-medium"
+                >
+                  <FolderInput className="w-4 h-4 text-[#444746]" />
+                  <span>{isMulti ? `Move (${totalSelected} items)` : "Move"}</span>
+                </button>
+              )}
+
+              {/* Star */}
+              <button
+                onClick={async () => {
+                  setItemContextMenu(null);
+                  if (isMulti) {
+                    await handleBulkStar();
+                  } else {
+                    if (itemContextMenu.type === "folder") {
+                      await api.folders.toggleStar(itemContextMenu.item.id).catch(() => {});
+                    } else {
+                      await api.documents.toggleStar(itemContextMenu.item.id).catch(() => {});
+                    }
+                    loadContents();
+                  }
+                }}
+                className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-[#f0f4f9] font-medium"
+              >
+                <Star className="w-4 h-4 text-amber-500" />
+                <span>{isMulti ? `Star (${totalSelected} items)` : itemContextMenu.item.is_starred ? "Unstar" : "Star"}</span>
+              </button>
+
+              <div className="h-px bg-[#e1e3e1] my-1" />
+
+              {/* Trash / Delete */}
+              <button
+                onClick={async () => {
+                  setItemContextMenu(null);
+                  if (isMulti) {
+                    await handleBulkTrash();
+                  } else {
+                    if (currentView === "trash") {
+                      handlePermanentDelete(itemContextMenu.type, itemContextMenu.item.id);
+                    } else {
+                      if (itemContextMenu.type === "folder") {
+                        await api.folders.toggleTrash(itemContextMenu.item.id).catch(() => {});
+                      } else {
+                        await api.documents.toggleTrash(itemContextMenu.item.id).catch(() => {});
+                      }
+                      loadContents();
+                    }
+                  }
+                }}
+                className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-red-50 text-red-600 font-medium"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>
+                  {currentView === "trash"
+                    ? isMulti
+                      ? `Delete permanently (${totalSelected} items)`
+                      : "Delete permanently"
+                    : isMulti
+                    ? `Move to Bin (${totalSelected} items)`
+                    : "Move to Bin"}
+                </span>
+              </button>
+            </div>
+          </>
+        );
+      })()}
     </div>
   );
 }

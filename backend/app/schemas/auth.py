@@ -32,13 +32,13 @@ class TokenPayload(BaseModel):
     role: str
     exp: int
     jti: str  # JWT ID for refresh token tracking
+    type: str = "access"
 
 class ForgotPasswordRequest(BaseModel):
     email: EmailStr
 
 class ForgotPasswordResponse(BaseModel):
     message: str
-    reset_token: str | None = None
 
 class ResetPasswordRequest(BaseModel):
     email: EmailStr

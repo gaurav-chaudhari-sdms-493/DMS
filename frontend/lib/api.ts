@@ -236,6 +236,11 @@ export const api = {
         method: "DELETE",
       });
     },
+    cleanupTrash: async (retentionDays: number = 30): Promise<any> => {
+      return await request(`/api/v1/documents/trash/cleanup?retention_days=${retentionDays}`, {
+        method: "POST",
+      });
+    },
     getStats: async (): Promise<DriveStats> => {
       return await request("/api/v1/documents/drive/stats");
     },

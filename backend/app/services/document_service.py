@@ -39,7 +39,16 @@ async def upload_document(
         if not folder or folder.tenant_id != tenant_id:
             raise HTTPException(status_code=404, detail="Target folder not found")
 
+    from app.config import settings
+    ext = (file.filename or "").rsplit(".", 1)[-1].lower()
+    if ext not in settings.allowed_upload_extensions:
+        raise HTTPException(status_code=400, detail=f"File type '.{ext}' is not supported")
+
     file_bytes = await file.read()
+    max_bytes = settings.max_upload_size_mb * 1024 * 1024
+    if len(file_bytes) > max_bytes:
+        raise HTTPException(status_code=413, detail=f"File exceeds the {settings.max_upload_size_mb} MB limit")
+
     file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     doc_id = uuid.uuid4()
@@ -103,7 +112,7 @@ async def upload_documents_bulk(
 ) -> BatchDocumentUploadResponse:
     """Upload multiple documents into a folder, create DB records, and schedule async ingestion."""
     uploaded_docs: List[DocumentUploadResponse] = []
-    failed_count = 0
+    failures: List[dict] = []
 
     for file in files:
         try:
@@ -111,13 +120,14 @@ async def upload_documents_bulk(
             uploaded_docs.append(doc_resp)
         except Exception as err:
             logger.error(f"Failed to upload document {file.filename}: {err}")
-            failed_count += 1
+            failures.append({"filename": file.filename, "error": str(err)})
 
     return BatchDocumentUploadResponse(
         documents=uploaded_docs,
         total=len(files),
         succeeded=len(uploaded_docs),
-        failed=failed_count,
+        failed=len(failures),
+        failures=failures,
     )
 
 
@@ -366,6 +376,19 @@ async def delete_document_permanently(db: AsyncSession, document_id: UUID, tenan
             except Exception as e:
                 logger.warning(f"Error deleting file from S3: {e}")
 
+    # Clear current_version_id self-referential foreign key
+    doc.current_version_id = None
+    await db.flush()
+
+    # Cascade delete dependent rows in database
+    from app.models.chunk import Chunk
+    from app.models.metadata_item import MetadataItem
+    from app.models.document_version import DocumentVersion
+
+    await db.execute(delete(Chunk).where(Chunk.document_id == document_id))
+    await db.execute(delete(MetadataItem).where(MetadataItem.document_id == document_id))
+    await db.execute(delete(DocumentVersion).where(DocumentVersion.document_id == document_id))
+
     await db.delete(doc)
     await db.commit()
 
@@ -391,16 +414,61 @@ async def get_drive_stats(db: AsyncSession, tenant_id: UUID) -> DriveStatsRespon
 
     # Total size in bytes
     v_res = await db.execute(
-        select(func.coalesce(func.sum(DocumentVersion.file_size_bytes), 0))
+        select(func.sum(DocumentVersion.file_size_bytes))
         .join(Document, Document.current_version_id == DocumentVersion.id)
-        .where(Document.tenant_id == tenant_id, Document.is_trashed == False)
+        .where(Document.tenant_id == tenant_id)
     )
-    total_size_bytes = v_res.scalar() or 0
+    total_bytes = v_res.scalar() or 0
 
     return DriveStatsResponse(
         total_files=total_files,
         total_folders=total_folders,
-        total_size_bytes=total_size_bytes,
         total_starred=total_starred,
         total_trashed=total_trashed,
+        total_bytes=total_bytes
     )
+
+
+async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 30) -> dict:
+    from datetime import datetime, timedelta
+    from app.models.folder import Folder
+    from app.services.folder_service import delete_folder_permanently
+
+    cutoff = datetime.utcnow() - timedelta(days=retention_days)
+
+    # 1. Fetch expired trashed documents (trashed_at <= cutoff)
+    doc_stmt = select(Document.id, Document.tenant_id).where(
+        Document.is_trashed == True,
+        Document.trashed_at.is_not(None),
+        Document.trashed_at <= cutoff
+    )
+    doc_res = await db.execute(doc_stmt)
+    expired_docs = doc_res.all()
+
+    deleted_doc_count = 0
+    for d_id, t_id in expired_docs:
+        try:
+            await delete_document_permanently(db, d_id, t_id)
+            deleted_doc_count += 1
+        except Exception as e:
+            logger.warning(f"Error purging expired trashed document {d_id}: {e}")
+
+    # 2. Fetch expired trashed folders (trashed_at <= cutoff)
+    folder_stmt = select(Folder.id, Folder.tenant_id).where(
+        Folder.is_trashed == True,
+        Folder.trashed_at.is_not(None),
+        Folder.trashed_at <= cutoff
+    )
+    folder_res = await db.execute(folder_stmt)
+    expired_folders = folder_res.all()
+
+    deleted_folder_count = 0
+    for f_id, t_id in expired_folders:
+        try:
+            await delete_folder_permanently(db, f_id, t_id)
+            deleted_folder_count += 1
+        except Exception as e:
+            logger.warning(f"Error purging expired trashed folder {f_id}: {e}")
+
+    logger.info(f"Purged {deleted_doc_count} expired documents and {deleted_folder_count} expired folders older than {retention_days} days in Bin.")
+    return {"deleted_documents": deleted_doc_count, "deleted_folders": deleted_folder_count}

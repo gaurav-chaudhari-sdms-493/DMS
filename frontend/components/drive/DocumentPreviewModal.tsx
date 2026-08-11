@@ -279,33 +279,34 @@ export function DocumentPreviewModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-black/60 backdrop-blur-md text-[#1f1f1f] select-none animate-fadeIn">
-      {/* Top Header Bar */}
-      <header className="h-16 px-6 border-b border-[#e1e3e1] flex items-center justify-between bg-white shadow-xs">
-        <div className="flex items-center gap-3 min-w-0 max-w-xl">
+    <div className="fixed inset-0 z-50 flex flex-col bg-[#111111]/95 backdrop-blur-md animate-fadeIn select-none">
+      {/* Google Drive Dark Header Bar */}
+      <header className="h-14 px-4 bg-[#1f1f1f] border-b border-[#333333] flex items-center justify-between z-30 text-white">
+        {/* Left Info & Close Button */}
+        <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-[#f0f4f9] text-[#444746] hover:text-[#1f1f1f] transition-colors"
+            className="p-2 rounded-full text-white/80 hover:text-white hover:bg-white/10 transition-colors"
             title="Close viewer"
           >
             <X className="w-5 h-5" />
           </button>
           {getFileIconHeader()}
           <div className="min-w-0">
-            <h2 className="text-sm font-bold text-[#1f1f1f] truncate" title={doc.title}>
+            <h2 className="text-sm font-semibold text-white truncate max-w-sm" title={doc.title}>
               {doc.title}
             </h2>
-            <span className="text-[11px] text-[#747775] uppercase font-semibold">
+            <span className="text-[10px] text-white/60 uppercase font-mono font-bold">
               {ext || "File"}
             </span>
           </div>
         </div>
 
         {/* Center Zoom Controls */}
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#edf2fc] border border-[#e1e3e1] text-xs text-[#1f1f1f]">
+        <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#2d2d2d] border border-white/10 text-xs text-white/90">
           <button
             onClick={() => setZoom((z) => Math.max(25, z - 25))}
-            className="p-1 rounded-full hover:bg-[#d3d7dc] transition-colors"
+            className="p-1 rounded-full hover:bg-white/15 transition-colors"
             title="Zoom out"
           >
             <ZoomOut className="w-4 h-4" />
@@ -313,7 +314,7 @@ export function DocumentPreviewModal({
           <span className="w-12 text-center font-mono font-bold">{zoom}%</span>
           <button
             onClick={() => setZoom((z) => Math.min(300, z + 25))}
-            className="p-1 rounded-full hover:bg-[#d3d7dc] transition-colors"
+            className="p-1 rounded-full hover:bg-white/15 transition-colors"
             title="Zoom in"
           >
             <ZoomIn className="w-4 h-4" />
@@ -321,7 +322,7 @@ export function DocumentPreviewModal({
           {zoom !== 100 && (
             <button
               onClick={() => setZoom(100)}
-              className="px-2 py-0.5 text-[10px] font-semibold bg-white border border-[#d3d7dc] rounded-full hover:bg-[#f0f4f9] ml-1 transition-colors"
+              className="px-2 py-0.5 text-[10px] font-semibold bg-white/20 hover:bg-white/30 rounded-full ml-1 transition-colors"
               title="Reset zoom"
             >
               Reset
@@ -336,7 +337,7 @@ export function DocumentPreviewModal({
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-xs ${
               showChat
                 ? "bg-[#0b57d0] text-white shadow-blue-500/20"
-                : "bg-[#f0f4f9] text-[#001d35] hover:bg-[#e1e5ea] border border-[#d3d7dc]"
+                : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
             }`}
           >
             <Sparkles className="w-4 h-4 text-amber-300 animate-spin-slow" />
@@ -358,42 +359,42 @@ export function DocumentPreviewModal({
 
       {/* Pending Indexing Banner Notice */}
       {(doc.status === "pending" || doc.status === "processing") && (
-        <div className="bg-amber-50 border-b border-amber-200 px-6 py-2.5 flex items-center justify-between text-xs text-amber-800 font-medium select-none z-10 shadow-xs">
+        <div className="bg-amber-900/40 border-b border-amber-500/30 px-6 py-2.5 flex items-center justify-between text-xs text-amber-200 font-medium select-none z-10 shadow-xs backdrop-blur-md">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-amber-600 animate-spin" />
+            <Sparkles className="w-4 h-4 text-amber-400 animate-spin" />
             <span>
               <strong>AI Indexing In Progress:</strong> Generating OCR, text chunks, and 1024d vector embeddings in background...
             </span>
           </div>
-          <span className="text-[10px] bg-amber-200/70 text-amber-900 px-2 py-0.5 rounded-full font-mono font-bold uppercase">
+          <span className="text-[10px] bg-amber-500/30 text-amber-100 px-2 py-0.5 rounded-full font-mono font-bold uppercase">
             Status: {doc.status}
           </span>
         </div>
       )}
 
       {/* Main Body: Left Preview Canvas + Right AI Chat Sidebar */}
-      <div className="flex-1 flex overflow-hidden bg-[#f8fafd]">
+      <div className="flex-1 flex overflow-hidden bg-[#1a1a1a]">
         {/* Document Preview Canvas */}
-        <main className="flex-1 overflow-auto flex items-center justify-center p-6 relative">
+        <main className="flex-1 overflow-y-auto flex justify-center p-8 relative scrollbar-thin">
           {/* PDF Viewer */}
           {isPdf && doc.download_url && (
             <div
               style={{
                 transform: `scale(${zoom / 100})`,
-                transformOrigin: "center center",
+                transformOrigin: "top center",
                 transition: "transform 0.15s ease-out",
               }}
-              className="w-full h-full max-w-5xl flex items-center justify-center"
+              className="w-full flex justify-center"
             >
               <iframe
                 src={`${doc.download_url}#toolbar=1`}
-                className="w-full h-full max-h-[85vh] rounded-2xl bg-white shadow-xl border border-[#e1e3e1]"
+                className="w-[850px] max-w-[95%] h-[90vh] rounded-sm bg-white shadow-2xl border-0"
                 title={doc.title}
               />
             </div>
           )}
 
-          {/* Word (DOCX) Viewer */}
+          {/* Word (DOCX) Viewer - Styled like Google Docs A4 Paper */}
           {isDocx && (
             <div
               style={{
@@ -401,20 +402,87 @@ export function DocumentPreviewModal({
                 transformOrigin: "top center",
                 transition: "transform 0.15s ease-out",
               }}
-              className="w-full max-w-4xl h-full max-h-[85vh] bg-white text-[#1f1f1f] rounded-2xl shadow-xl overflow-y-auto p-12 select-text border border-[#e1e3e1]"
+              className="w-[816px] max-w-[95%] min-h-[1056px] bg-white text-[#1f1f1f] rounded-sm shadow-2xl p-16 select-text border border-[#dedede] my-4 relative mx-auto"
             >
+              <style>{`
+                .docx-preview-paper {
+                  color: #111827 !important;
+                  font-family: 'Google Sans', Inter, system-ui, -apple-system, sans-serif !important;
+                }
+                .docx-preview-paper p, 
+                .docx-preview-paper span, 
+                .docx-preview-paper div,
+                .docx-preview-paper li,
+                .docx-preview-paper td,
+                .docx-preview-paper th {
+                  color: #111827 !important;
+                  line-height: 1.6 !important;
+                }
+                .docx-preview-paper p {
+                  margin-bottom: 0.75rem !important;
+                }
+                .docx-preview-paper h1, 
+                .docx-preview-paper h2, 
+                .docx-preview-paper h3, 
+                .docx-preview-paper h4 {
+                  color: #000000 !important;
+                  font-weight: 700 !important;
+                  margin-top: 1.5rem !important;
+                  margin-bottom: 0.5rem !important;
+                  line-height: 1.3 !important;
+                }
+                .docx-preview-paper h1 { font-size: 1.5rem !important; border-bottom: 1px solid #e5e7eb; padding-bottom: 0.35rem; }
+                .docx-preview-paper h2 { font-size: 1.25rem !important; }
+                .docx-preview-paper h3 { font-size: 1.1rem !important; }
+                .docx-preview-paper img {
+                  max-width: 240px !important;
+                  max-height: 240px !important;
+                  width: auto !important;
+                  height: auto !important;
+                  object-fit: contain !important;
+                  margin: 1.25rem auto !important;
+                  display: block !important;
+                  border-radius: 8px;
+                }
+                .docx-preview-paper table {
+                  width: 100% !important;
+                  border-collapse: collapse !important;
+                  margin: 1rem 0 !important;
+                }
+                .docx-preview-paper td, .docx-preview-paper th {
+                  border: 1px solid #e5e7eb !important;
+                  padding: 8px 12px !important;
+                  vertical-align: top !important;
+                  color: #111827 !important;
+                  background-color: #ffffff !important;
+                }
+                .docx-preview-paper ul {
+                  list-style-type: disc !important;
+                  margin-left: 1.5rem !important;
+                  margin-bottom: 1rem !important;
+                }
+                .docx-preview-paper ol {
+                  list-style-type: decimal !important;
+                  margin-left: 1.5rem !important;
+                  margin-bottom: 1rem !important;
+                }
+                .docx-preview-paper a {
+                  color: #2563eb !important;
+                  text-decoration: underline !important;
+                }
+              `}</style>
               {loadingText ? (
-                <div className="text-[#444746] text-center py-20 flex flex-col items-center gap-3">
+                <div className="text-[#444746] text-center py-32 flex flex-col items-center gap-3">
                   <div className="w-8 h-8 border-4 border-[#0b57d0] border-t-transparent rounded-full animate-spin" />
                   <span>Converting Word Document preview...</span>
                 </div>
               ) : docxHtml ? (
                 <div
-                  className="prose max-w-none text-sm leading-relaxed text-[#1f1f1f]"
+                  className="docx-preview-paper prose max-w-none text-sm leading-relaxed text-[#1f1f1f]"
                   dangerouslySetInnerHTML={{ __html: docxHtml }}
                 />
               ) : (
-                <div className="text-[#747775] text-center py-12">No text content extracted.</div>
+                <div className="text-[#747775] text-center py-20">No text content extracted.</div>
               )}
             </div>
           )}

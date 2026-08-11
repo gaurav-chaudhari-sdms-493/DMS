@@ -14,7 +14,7 @@ class Tenant(Base):
     __tablename__ = "tenants"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    name: Mapped[str] = mapped_column(unique=True, index=True)
+    name: Mapped[str] = mapped_column(index=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     users: Mapped[List["User"]] = relationship("User", back_populates="tenant")
