@@ -23,9 +23,9 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
         elements.push(
           <ListTag
             key={`list-${elements.length}`}
-            className={`my-2 space-y-1 pl-5 ${
+            className={`my-3 space-y-1.5 pl-6 ${
               listBuffer.type === "ul" ? "list-disc" : "list-decimal"
-            } text-xs text-[#1f1f1f]`}
+            } text-sm text-[#1f1f1f]`}
           >
             {listBuffer.items.map((item, idx) => (
               <li key={idx} className="leading-relaxed">
@@ -43,7 +43,7 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
         elements.push(
           <div
             key={`code-${elements.length}`}
-            className="my-2.5 p-3 bg-[#1e1e1e] text-[#d4d4d4] rounded-xl font-mono text-[11px] overflow-x-auto border border-gray-700 shadow-inner"
+            className="my-3 p-3.5 bg-[#1e1e1e] text-[#d4d4d4] rounded-xl font-mono text-xs overflow-x-auto border border-gray-700 shadow-inner"
           >
             <pre>{codeBuffer.join("\n")}</pre>
           </div>
@@ -74,7 +74,7 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
           return (
             <code
               key={i}
-              className="px-1.5 py-0.5 bg-[#f0f4f9] text-[#0b57d0] rounded font-mono text-[11px] border border-[#d3d7dc]"
+              className="px-1.5 py-0.5 bg-[#f0f4f9] text-[#0b57d0] rounded font-mono text-xs border border-[#d3d7dc]"
             >
               {part.slice(1, -1)}
             </code>
@@ -110,7 +110,7 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
         elements.push(
           <h3
             key={`h3-${lineIdx}`}
-            className="text-sm font-bold text-[#001d35] mt-3 mb-1.5 pb-1 border-b border-[#e1e3e1]/60 flex items-center gap-1.5"
+            className="text-base font-bold text-[#001d35] mt-4 mb-2 pb-1 border-b border-[#e1e3e1]/60 flex items-center gap-1.5"
           >
             {parseInline(trimmed.slice(4))}
           </h3>
@@ -122,7 +122,7 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
         elements.push(
           <h2
             key={`h2-${lineIdx}`}
-            className="text-sm font-extrabold text-[#001d35] mt-4 mb-2 pb-1 border-b border-[#0b57d0]/20"
+            className="text-lg font-extrabold text-[#001d35] mt-5 mb-2.5 pb-1 border-b border-[#0b57d0]/20"
           >
             {parseInline(trimmed.slice(3))}
           </h2>
@@ -134,7 +134,7 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
         elements.push(
           <h1
             key={`h1-${lineIdx}`}
-            className="text-base font-black text-[#0b57d0] mt-4 mb-2 pb-1 border-b-2 border-[#0b57d0]"
+            className="text-xl font-black text-[#0b57d0] mt-5 mb-3 pb-1 border-b-2 border-[#0b57d0]"
           >
             {parseInline(trimmed.slice(2))}
           </h1>
@@ -173,7 +173,7 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
         elements.push(
           <blockquote
             key={`quote-${lineIdx}`}
-            className="my-2 p-2.5 border-l-4 border-[#0b57d0] bg-[#f0f4f9] rounded-r-xl text-xs text-[#444746] italic"
+            className="my-3 p-3 border-l-4 border-[#0b57d0] bg-[#f0f4f9] rounded-r-xl text-sm text-[#444746] italic"
           >
             {parseInline(trimmed.slice(2))}
           </blockquote>
@@ -185,7 +185,7 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
       if (trimmed === "---" || trimmed === "***") {
         flushList();
         elements.push(
-          <hr key={`hr-${lineIdx}`} className="my-3 border-t border-[#e1e3e1]" />
+          <hr key={`hr-${lineIdx}`} className="my-4 border-t border-[#e1e3e1]" />
         );
         return;
       }
@@ -194,7 +194,7 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
       if (trimmed.length > 0) {
         flushList();
         elements.push(
-          <p key={`p-${lineIdx}`} className="my-1.5 leading-relaxed text-xs text-[#1f1f1f]">
+          <p key={`p-${lineIdx}`} className="my-2 leading-relaxed text-sm text-[#1f1f1f]">
             {parseInline(line)}
           </p>
         );
@@ -207,5 +207,5 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
     return elements;
   };
 
-  return <div className={`markdown-viewer space-y-1 ${className}`}>{renderMarkdown(content)}</div>;
+  return <div className={`markdown-viewer space-y-1.5 ${className}`}>{renderMarkdown(content)}</div>;
 }

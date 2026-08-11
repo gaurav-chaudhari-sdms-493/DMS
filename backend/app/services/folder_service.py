@@ -131,7 +131,26 @@ async def toggle_trash_folder(db: AsyncSession, folder_id: UUID, tenant_id: UUID
 
 
 async def delete_folder_permanently(db: AsyncSession, folder_id: UUID, tenant_id: UUID) -> None:
-    folder = await get_folder(db, folder_id, tenant_id)
+    from app.services.document_service import delete_document_permanently
+
+    folder = await db.get(Folder, folder_id)
+    if not folder or folder.tenant_id != tenant_id:
+        return
+
+    # 1. Delete all documents in this folder
+    doc_stmt = select(Document.id).where(Document.folder_id == folder_id, Document.tenant_id == tenant_id)
+    doc_res = await db.execute(doc_stmt)
+    doc_ids = doc_res.scalars().all()
+    for d_id in doc_ids:
+        await delete_document_permanently(db, d_id, tenant_id)
+
+    # 2. Delete all subfolders recursively
+    sub_stmt = select(Folder.id).where(Folder.parent_id == folder_id, Folder.tenant_id == tenant_id)
+    sub_res = await db.execute(sub_stmt)
+    sub_ids = sub_res.scalars().all()
+    for s_id in sub_ids:
+        await delete_folder_permanently(db, s_id, tenant_id)
+
     await db.delete(folder)
     await db.commit()
 

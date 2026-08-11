@@ -166,8 +166,11 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 if doc:
                     doc.status = "indexed"
 
-        from app.services.cache_service import invalidate_tenant_cache
-        await invalidate_tenant_cache(tenant_id_str)
+        try:
+            from app.services.cache_service import invalidate_tenant_cache
+            await invalidate_tenant_cache(tenant_id_str)
+        except Exception as cache_err:
+            logger.warning(f"Tenant cache invalidation warning for {tenant_id_str}: {cache_err}")
 
         logger.info(f"Successfully ingested document {document_id} with {len(chunks)} chunks and 1024d embeddings.")
 
@@ -195,7 +198,27 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         await engine.dispose()
 
 
+celery_app.conf.beat_schedule = {
+    "cleanup-30-day-trashed-items": {
+        "task": "app.tasks.cleanup_trashed_items_task",
+        "schedule": 86400.0,  # Run daily (every 24 hours)
+    },
+}
+
+
 @celery_app.task(name="app.tasks.ingest_document_task")
 def ingest_document_task(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
     import asyncio
     asyncio.run(_ingest_document_task_async(document_id_str, version_id_str, s3_path, tenant_id_str))
+
+
+async def _cleanup_trashed_items_async() -> None:
+    from app.services.document_service import cleanup_expired_trashed_items
+    async with AsyncSessionLocal() as db:
+        await cleanup_expired_trashed_items(db, retention_days=30)
+
+
+@celery_app.task(name="app.tasks.cleanup_trashed_items_task")
+def cleanup_trashed_items_task() -> None:
+    import asyncio
+    asyncio.run(_cleanup_trashed_items_async())

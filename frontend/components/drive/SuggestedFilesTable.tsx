@@ -20,9 +20,13 @@ import type { DocumentListItem } from "@/types";
 
 interface SuggestedFilesTableProps {
   documents: DocumentListItem[];
-  onSelectDoc: (doc: DocumentListItem) => void;
+  onSelectDoc: (doc: DocumentListItem, isMulti: boolean) => void;
   onPreviewDoc?: (doc: DocumentListItem) => void;
+  onContextMenu?: (e: React.MouseEvent, doc: DocumentListItem) => void;
   selectedDocId?: string | null;
+  selectedDocIds?: Set<string>;
+  onToggleSelectAll?: () => void;
+  isAllSelected?: boolean;
   onToggleStar: (doc: DocumentListItem) => void;
   onRename: (doc: DocumentListItem) => void;
   onMove: (doc: DocumentListItem) => void;
@@ -33,7 +37,11 @@ export function SuggestedFilesTable({
   documents,
   onSelectDoc,
   onPreviewDoc,
+  onContextMenu,
   selectedDocId,
+  selectedDocIds = new Set(),
+  onToggleSelectAll,
+  isAllSelected = false,
   onToggleStar,
   onRename,
   onMove,
@@ -43,8 +51,25 @@ export function SuggestedFilesTable({
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
 
-  const getFileIcon = (title: string, type?: string) => {
-    const ext = title.split(".").pop()?.toLowerCase() || type || "";
+  const isImageFile = (filename: string) => {
+    const ext = filename.split(".").pop()?.toLowerCase() || "";
+    return ["jpg", "jpeg", "png", "webp", "gif", "svg", "bmp"].includes(ext);
+  };
+
+  const getFileIcon = (title: string, downloadUrl?: string | null) => {
+    const ext = title.split(".").pop()?.toLowerCase() || "";
+    if (["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext) && downloadUrl) {
+      return (
+        <img
+          src={downloadUrl}
+          alt={title}
+          className="w-5 h-5 object-cover rounded shadow-xs border border-[#e1e3e1] flex-shrink-0"
+          onError={(e) => {
+            (e.target as HTMLElement).style.display = "none";
+          }}
+        />
+      );
+    }
     if (["xlsx", "xls", "csv", "excel"].includes(ext)) {
       return (
         <div className="w-5 h-5 bg-[#107c41] rounded text-white flex items-center justify-center font-bold text-[10px]">
@@ -75,6 +100,93 @@ export function SuggestedFilesTable({
     return <FileText className="w-5 h-5 text-[#0b57d0]" />;
   };
 
+  const renderGridThumbnail = (row: { title: string; downloadUrl?: string | null }) => {
+    const isImg = isImageFile(row.title);
+    const ext = row.title.split(".").pop()?.toLowerCase() || "";
+
+    if (isImg && row.downloadUrl) {
+      return (
+        <div className="relative w-full h-32 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] overflow-hidden flex items-center justify-center">
+          <img
+            src={row.downloadUrl}
+            alt={row.title}
+            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+            onError={(e) => {
+              (e.target as HTMLElement).style.display = "none";
+            }}
+          />
+        </div>
+      );
+    }
+
+    if (ext === "pdf" && row.downloadUrl) {
+      return (
+        <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] overflow-hidden flex items-center justify-center pointer-events-none">
+          <iframe
+            src={`${row.downloadUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0`}
+            className="w-full h-[180%] border-0 bg-white scale-100 transform origin-top pointer-events-none select-none"
+            title={row.title}
+          />
+        </div>
+      );
+    }
+
+    if (["doc", "docx"].includes(ext)) {
+      return (
+        <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] flex items-center justify-center p-3 overflow-hidden">
+          <div className="w-20 h-28 bg-white rounded-md shadow-md border border-[#e1e3e1] flex flex-col p-2 overflow-hidden group-hover:scale-105 transition-transform">
+            <div className="flex items-center gap-1 border-b border-[#e1e3e1] pb-1 mb-1.5">
+              <div className="w-2.5 h-2.5 bg-[#0b57d0] rounded-xs flex-shrink-0" />
+              <span className="text-[7px] font-bold text-[#1f1f1f] truncate leading-none" title={row.title}>
+                {row.title.replace(/\.[^/.]+$/, "")}
+              </span>
+            </div>
+            <div className="space-y-1 text-[5px] text-[#444746] leading-tight flex-1 font-serif select-none overflow-hidden opacity-80">
+              <p className="font-bold text-[6px] text-[#1f1f1f]">{row.title.split(".")[0]}</p>
+              <p className="line-clamp-2">This document contains indexed text and metadata extracted for search & retrieval.</p>
+              <div className="h-0.5 bg-[#edf2fc] rounded w-full my-0.5" />
+              <div className="h-0.5 bg-[#edf2fc] rounded w-5/6" />
+              <div className="h-0.5 bg-[#edf2fc] rounded w-3/4" />
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    if (["xlsx", "xls", "csv"].includes(ext)) {
+      return (
+        <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] flex items-center justify-center p-3 overflow-hidden">
+          <div className="w-20 h-28 bg-white rounded-md shadow-md border border-[#e1e3e1] flex flex-col p-1.5 overflow-hidden group-hover:scale-105 transition-transform">
+            <div className="flex items-center gap-1 border-b border-emerald-200 pb-1 mb-1">
+              <div className="w-2.5 h-2.5 bg-[#107c41] rounded-xs text-white text-[5px] font-bold flex items-center justify-center">X</div>
+              <span className="text-[7px] font-bold text-emerald-800 truncate leading-none">Sheet 1</span>
+            </div>
+            <div className="grid grid-cols-3 gap-0.5 border border-[#e1e3e1] rounded-xs p-0.5 bg-[#f8fafd] flex-1">
+              <div className="bg-emerald-100 h-2 text-[5px] font-bold text-center">A</div>
+              <div className="bg-emerald-100 h-2 text-[5px] font-bold text-center">B</div>
+              <div className="bg-emerald-100 h-2 text-[5px] font-bold text-center">C</div>
+              {Array.from({ length: 9 }).map((_, i) => (
+                <div key={i} className="bg-white border border-[#e1e3e1]/60 h-2" />
+              ))}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // Default Document / Code / Text
+    return (
+      <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] flex items-center justify-center p-3 overflow-hidden">
+        <div className="w-20 h-28 bg-[#1e1e1e] rounded-md shadow-md border border-[#333333] flex flex-col p-2 overflow-hidden group-hover:scale-105 transition-transform font-mono text-[5.5px] text-emerald-400">
+          <div className="text-gray-400 border-b border-gray-700 pb-1 mb-1 font-sans text-[6px]">code.py</div>
+          <p><span className="text-blue-400">import</span> os, sys</p>
+          <p><span className="text-purple-400">def</span> main():</p>
+          <p className="pl-1 text-gray-300">print(<span className="text-amber-300">"DMS AI"</span>)</p>
+        </div>
+      </div>
+    );
+  };
+
   if (documents.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-[#f0f4f9] rounded-3xl border border-dashed border-[#c4c7c5] text-center my-6 select-none">
@@ -103,7 +215,6 @@ export function SuggestedFilesTable({
 
   return (
     <div className="select-none">
-      {/* Header Controls */}
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => setCollapsed(!collapsed)}
@@ -113,7 +224,6 @@ export function SuggestedFilesTable({
           <span>Files ({documents.length})</span>
         </button>
 
-        {/* View Mode Switcher Pills */}
         <div className="flex items-center gap-1 bg-[#edf2fc] p-1 rounded-full border border-[#e1e3e1]">
           <button
             onClick={() => setViewMode("list")}
@@ -137,9 +247,8 @@ export function SuggestedFilesTable({
       </div>
 
       {!collapsed && (
-        <div className="w-full">
+        <div>
           {viewMode === "list" ? (
-            /* Table View */
             <div className="w-full overflow-x-auto">
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
@@ -152,211 +261,220 @@ export function SuggestedFilesTable({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-[#f0f4f9]">
-                  {fileRows.map((row) => (
-                    <tr
-                      key={row.id}
-                      onClick={() => onSelectDoc(row.raw)}
-                      className={`group hover:bg-[#edf2fc] transition-colors cursor-pointer ${
-                        selectedDocId === row.id ? "bg-[#c2e7ff]/40 font-semibold" : ""
-                      }`}
-                    >
-                      {/* Name Column */}
-                      <td className="py-3 px-3">
-                        <div className="flex items-center gap-3 min-w-[240px]">
-                          {getFileIcon(row.title)}
-                          <span className="font-semibold text-[#1f1f1f] truncate max-w-xs" title={row.title}>
-                            {row.title}
-                          </span>
-                        </div>
-                      </td>
-
-                      {/* Reason / Date Column */}
-                      <td className="py-3 px-3 text-[#444746] whitespace-nowrap">{row.reason}</td>
-
-                      {/* Owner Column */}
-                      <td className="py-3 px-3 whitespace-nowrap">
-                        <span className="text-[#444746] font-medium">me</span>
-                      </td>
-
-                      {/* Location Column */}
-                      <td className="py-3 px-3 text-[#444746] whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[#5f6368]">📁</span>
-                          <span>{row.location}</span>
-                        </div>
-                      </td>
-
-                      {/* Actions: Preview button to the left side of Download button on hover */}
-                      <td className="py-3 px-3 text-right relative">
-                        <div className="flex items-center justify-end gap-1">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (onPreviewDoc) onPreviewDoc(row.raw);
-                              else onSelectDoc(row.raw);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#444746] hover:text-[#0b57d0] hover:bg-[#d3d7dc] transition-all"
-                            title="Preview"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          {row.downloadUrl && (
-                            <a
-                              href={row.downloadUrl}
-                              download
-                              onClick={(e) => e.stopPropagation()}
-                              className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#444746] hover:text-[#00639b] hover:bg-[#d3d7dc] transition-all"
-                              title="Download"
+                  {fileRows.map((row) => {
+                    const isSelected = selectedDocIds.has(row.id) || selectedDocId === row.id;
+                    return (
+                      <tr
+                        key={row.id}
+                        onClick={(e) => onSelectDoc(row.raw, e.ctrlKey || e.metaKey || e.shiftKey)}
+                        onDoubleClick={() => {
+                          if (onPreviewDoc) onPreviewDoc(row.raw);
+                        }}
+                        onContextMenu={(e) => {
+                          if (onContextMenu) onContextMenu(e, row.raw);
+                        }}
+                        className={`group transition-colors cursor-pointer select-none ${
+                          isSelected ? "bg-[#c2e7ff] text-[#001d35] font-semibold" : "hover:bg-[#edf2fc]"
+                        }`}
+                      >
+                        <td className="py-3 px-3">
+                          <div className="flex items-center gap-3 min-w-[240px]">
+                            {getFileIcon(row.title, row.downloadUrl)}
+                            <span className="font-semibold text-[#1f1f1f] truncate max-w-xs" title={row.title}>
+                              {row.title}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-[#444746] whitespace-nowrap">{row.reason}</td>
+                        <td className="py-3 px-3 whitespace-nowrap">
+                          <span className="text-[#444746] font-medium">me</span>
+                        </td>
+                        <td className="py-3 px-3 text-[#444746] whitespace-nowrap">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[#5f6368]">📁</span>
+                            <span>{row.location}</span>
+                          </div>
+                        </td>
+                        <td className="py-3 px-3 text-right relative">
+                          <div className="flex items-center justify-end gap-1">
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleStar(row.raw);
+                              }}
+                              className="p-1.5 rounded-full text-[#444746] hover:bg-[#d3d7dc] transition-colors"
+                              title={row.raw.is_starred ? "Unstar" : "Star"}
                             >
-                              <Download className="w-4 h-4" />
-                            </a>
-                          )}
-
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setActiveMenuId(activeMenuId === row.id ? null : row.id);
-                            }}
-                            className="opacity-0 group-hover:opacity-100 p-1.5 rounded-full text-[#444746] hover:bg-[#d3d7dc] transition-all"
-                            title="More options"
-                          >
-                            <MoreVertical className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                        {activeMenuId === row.id && (
-                          <>
-                            <div className="fixed inset-0 z-40" onClick={() => setActiveMenuId(null)} />
-                            <div className="absolute right-2 top-8 z-50 w-44 bg-white rounded-xl shadow-xl border border-[#e1e3e1] p-1.5 text-xs text-[#1f1f1f]">
-                              <button
+                              <Star
+                                className={`w-4 h-4 ${
+                                  row.raw.is_starred ? "text-amber-500 fill-amber-500" : "text-[#444746]"
+                                }`}
+                              />
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setActiveMenuId(activeMenuId === row.id ? null : row.id);
+                              }}
+                              className="p-1.5 rounded-full text-[#444746] hover:bg-[#d3d7dc] transition-colors"
+                              title="More options"
+                            >
+                              <MoreVertical className="w-4 h-4" />
+                            </button>
+                          </div>
+                          {activeMenuId === row.id && (
+                            <>
+                              <div
+                                className="fixed inset-0 z-10"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   setActiveMenuId(null);
-                                  if (onPreviewDoc) onPreviewDoc(row.raw);
-                                  else onSelectDoc(row.raw);
                                 }}
-                                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-[#f0f4f9]"
-                              >
-                                <Eye className="w-4 h-4 text-[#0b57d0]" />
-                                <span>Preview</span>
-                              </button>
-
-                              {row.downloadUrl && (
-                                <a
-                                  href={row.downloadUrl}
-                                  download
-                                  onClick={(e) => e.stopPropagation()}
-                                  className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-[#f0f4f9]"
+                              />
+                              <div className="absolute right-3 top-10 w-44 bg-white border border-[#e1e3e1] rounded-2xl shadow-xl z-20 py-1.5 text-left animate-fadeIn">
+                                {onPreviewDoc && (
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveMenuId(null);
+                                      onPreviewDoc(row.raw);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#1f1f1f] hover:bg-[#f0f4f9] font-medium"
+                                  >
+                                    <Eye className="w-3.5 h-3.5 text-[#0b57d0]" />
+                                    <span>Preview</span>
+                                  </button>
+                                )}
+                                {row.downloadUrl && (
+                                  <a
+                                    href={row.downloadUrl}
+                                    download
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveMenuId(null);
+                                    }}
+                                    className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#1f1f1f] hover:bg-[#f0f4f9] font-medium"
+                                  >
+                                    <Download className="w-3.5 h-3.5 text-[#00639b]" />
+                                    <span>Download</span>
+                                  </a>
+                                )}
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(null);
+                                    onRename(row.raw);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#1f1f1f] hover:bg-[#f0f4f9] font-medium"
                                 >
-                                  <Download className="w-4 h-4 text-[#00639b]" />
-                                  <span>Download</span>
-                                </a>
-                              )}
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuId(null);
-                                  onToggleStar(row.raw);
-                                }}
-                                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-[#f0f4f9]"
-                              >
-                                <Star className="w-4 h-4 text-amber-500" />
-                                <span>Star</span>
-                              </button>
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuId(null);
-                                  onRename(row.raw);
-                                }}
-                                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-[#f0f4f9]"
-                              >
-                                <Edit2 className="w-4 h-4" />
-                                <span>Rename</span>
-                              </button>
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuId(null);
-                                  onMove(row.raw);
-                                }}
-                                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-[#f0f4f9]"
-                              >
-                                <FolderInput className="w-4 h-4" />
-                                <span>Move</span>
-                              </button>
-
-                              <div className="h-px bg-[#e1e3e1] my-1" />
-
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setActiveMenuId(null);
-                                  onTrash(row.raw);
-                                }}
-                                className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-red-50 text-red-600"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                                <span>Trash</span>
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
+                                  <Edit2 className="w-3.5 h-3.5 text-[#444746]" />
+                                  <span>Rename</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(null);
+                                    onMove(row.raw);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#1f1f1f] hover:bg-[#f0f4f9] font-medium"
+                                >
+                                  <FolderInput className="w-3.5 h-3.5 text-[#444746]" />
+                                  <span>Move</span>
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(null);
+                                    onToggleStar(row.raw);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#1f1f1f] hover:bg-[#f0f4f9] font-medium"
+                                >
+                                  <Star className="w-3.5 h-3.5 text-amber-500" />
+                                  <span>{row.raw.is_starred ? "Unstar" : "Star"}</span>
+                                </button>
+                                <div className="h-px bg-[#e1e3e1] my-1" />
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveMenuId(null);
+                                    onTrash(row.raw);
+                                  }}
+                                  className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-red-600 hover:bg-red-50 font-medium"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>Move to Bin</span>
+                                </button>
+                              </div>
+                            </>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           ) : (
-            /* Grid View */
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-              {fileRows.map((row) => (
-                <div
-                  key={row.id}
-                  onClick={() => onSelectDoc(row.raw)}
-                  className="group p-4 rounded-2xl bg-white border border-[#e1e3e1] hover:shadow-md transition-all cursor-pointer flex flex-col justify-between"
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    {getFileIcon(row.title)}
-                    <div className="flex items-center gap-1">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (onPreviewDoc) onPreviewDoc(row.raw);
-                          else onSelectDoc(row.raw);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 p-1 rounded-full text-[#444746] hover:text-[#0b57d0] hover:bg-[#edf2fc] transition-all"
-                        title="Preview"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {row.downloadUrl && (
-                        <a
-                          href={row.downloadUrl}
-                          download
-                          onClick={(e) => e.stopPropagation()}
-                          className="opacity-0 group-hover:opacity-100 p-1 rounded-full text-[#444746] hover:text-[#00639b] hover:bg-[#edf2fc] transition-all"
-                          title="Download"
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {fileRows.map((row) => {
+                const isSelected = selectedDocIds.has(row.id) || selectedDocId === row.id;
+                return (
+                  <div
+                    key={row.id}
+                    onClick={(e) => onSelectDoc(row.raw, e.ctrlKey || e.metaKey || e.shiftKey)}
+                    onDoubleClick={() => {
+                      if (onPreviewDoc) onPreviewDoc(row.raw);
+                    }}
+                    onContextMenu={(e) => {
+                      if (onContextMenu) onContextMenu(e, row.raw);
+                    }}
+                    className={`group rounded-2xl border transition-all cursor-pointer flex flex-col overflow-hidden select-none ${
+                      isSelected
+                        ? "bg-[#c2e7ff]/40 border-[#0b57d0] shadow-md font-semibold ring-1 ring-[#0b57d0]"
+                        : "bg-white border-[#e1e3e1] hover:shadow-md"
+                    }`}
+                  >
+                    <div className="relative">
+                      {renderGridThumbnail(row)}
+                      <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-md rounded-full p-1 shadow-xs border border-[#e1e3e1]">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (onPreviewDoc) onPreviewDoc(row.raw);
+                          }}
+                          className="p-1 rounded-full text-[#444746] hover:text-[#0b57d0] hover:bg-[#edf2fc] transition-all"
+                          title="Preview"
                         >
-                          <Download className="w-4 h-4" />
-                        </a>
-                      )}
-                      <span className="text-[10px] text-[#444746] font-medium">{row.location}</span>
+                          <Eye className="w-3.5 h-3.5" />
+                        </button>
+                        {row.downloadUrl && (
+                          <a
+                            href={row.downloadUrl}
+                            download
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-1 rounded-full text-[#444746] hover:text-[#00639b] hover:bg-[#edf2fc] transition-all"
+                            title="Download"
+                          >
+                            <Download className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-3.5 flex items-start gap-3 bg-white">
+                      <div className="flex-shrink-0 mt-0.5">{getFileIcon(row.title, row.downloadUrl)}</div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs font-semibold text-[#1f1f1f] truncate mb-0.5" title={row.title}>
+                          {row.title}
+                        </h4>
+                        <div className="flex items-center justify-between text-[11px] text-[#444746]">
+                          <span>{row.reason}</span>
+                          <span className="text-[10px] text-[#5f6368] font-medium">{row.location}</span>
+                        </div>
+                      </div>
                     </div>
                   </div>
-                  <div>
-                    <h4 className="text-xs font-semibold text-[#1f1f1f] truncate mb-1" title={row.title}>
-                      {row.title}
-                    </h4>
-                    <span className="text-[11px] text-[#444746] block">{row.reason}</span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>

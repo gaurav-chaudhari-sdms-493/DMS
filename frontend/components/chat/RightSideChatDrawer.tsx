@@ -38,7 +38,7 @@ export function RightSideChatDrawer({
   const [sending, setSending] = useState(false);
   const [sessionTitle, setSessionTitle] = useState("Persistent Chat");
   const [loadedDocs, setLoadedDocs] = useState<SearchResult[]>([]);
-  const [isDocsExpanded, setIsDocsExpanded] = useState(true);
+  const [isDocsExpanded, setIsDocsExpanded] = useState(false);
 
   // Extensible Resizable Width State
   const [drawerWidth, setDrawerWidth] = useState<number>(420);
@@ -350,7 +350,31 @@ export function RightSideChatDrawer({
               }`}
             >
               {m.role === "user" ? (
-                <div className="whitespace-pre-wrap">{m.content}</div>
+                (() => {
+                  const match = m.content.match(/\n\n\[Attached Context Files: (.*?)\]$/) || m.content.match(/\[Attached Context Files: (.*?)\]$/);
+                  const attachedNamesStr = match ? match[1] : null;
+                  const cleanText = match ? m.content.replace(match[0], "").trim() : m.content;
+                  const attachedFileNames = attachedNamesStr ? attachedNamesStr.split(",").map((s) => s.trim()).filter(Boolean) : [];
+
+                  return (
+                    <div className="space-y-2">
+                      {attachedFileNames.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 justify-end">
+                          {attachedFileNames.map((fileName, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0b57d0]/10 border border-[#0b57d0]/20 rounded-xl text-[11px] font-semibold text-[#001d35]"
+                            >
+                              <FileText className="w-3.5 h-3.5 text-[#0b57d0]" />
+                              <span className="truncate max-w-[150px]">{fileName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {cleanText && <div className="whitespace-pre-wrap">{cleanText}</div>}
+                    </div>
+                  );
+                })()
               ) : (
                 <MarkdownViewer content={m.content} />
               )}
@@ -393,6 +417,10 @@ export function RightSideChatDrawer({
             <Send className="w-3.5 h-3.5" />
           </button>
         </form>
+
+        <p className="text-[10px] text-[#747775] text-center mt-1.5 font-medium tracking-tight">
+          Stark AI can make mistakes. Verify important info.
+        </p>
       </div>
     </aside>
   );

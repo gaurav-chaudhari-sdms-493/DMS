@@ -142,7 +142,91 @@ def _is_explicit_search_intent(query: str) -> bool:
     """
     q = query.lower()
     triggers = ["search for ", "find ", "look for ", "search ", "load documents for ", "fetch documents "]
-    return any(q.startswith(t) or f" {t}" in q for t in ["search for ", "find ", "look for "])
+    return any(q.startswith(t) or f" {t}" in q for t in triggers)
+
+def _extract_attached_filenames(query: str) -> List[str]:
+    m = re.search(r"\[Attached Context Files:\s*(.*?)\]", query)
+    if m:
+        names = [n.strip() for n in m.group(1).split(",") if n.strip()]
+        return names
+    return []
+
+async def _fetch_attached_documents_results(
+    filenames: List[str],
+    tenant_id: UUID,
+    db: AsyncSession
+) -> List[SearchResult]:
+    if not filenames:
+        return []
+
+    import asyncio
+    from sqlalchemy import select, text
+    from app.models.document import Document
+    from app.services.storage_service import generate_presigned_url
+
+    results: List[SearchResult] = []
+    for name in filenames:
+        stmt = (
+            select(Document)
+            .where(Document.tenant_id == tenant_id, Document.title == name, Document.is_trashed == False)
+            .order_by(Document.created_at.desc())
+        )
+        res = await db.execute(stmt)
+        doc = res.scalars().first()
+        if not doc:
+            continue
+
+        chunk_sql = text("""
+            SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path
+            FROM chunks c
+            JOIN documents d ON c.document_id = d.id
+            LEFT JOIN document_versions v ON v.id = d.current_version_id
+            WHERE d.id = :doc_id AND d.tenant_id = :tenant_id AND d.is_trashed = false
+            ORDER BY c.page_number ASC, c.chunk_index ASC
+            LIMIT 10
+        """)
+
+        rows = []
+        for attempt in range(4):
+            chunk_res = await db.execute(chunk_sql, {"doc_id": str(doc.id), "tenant_id": str(tenant_id)})
+            rows = chunk_res.fetchall()
+            if rows:
+                break
+            await asyncio.sleep(1.5)
+
+        download_url = ""
+        if rows and rows[0].s3_path:
+            download_url = await generate_presigned_url(rows[0].s3_path)
+
+        if rows:
+            snippets = [r.content for r in rows[:4]]
+            combined_snippet = "\n\n".join(snippets)
+            if len(combined_snippet) > 1200:
+                combined_snippet = combined_snippet[:1200] + "..."
+
+            results.append(SearchResult(
+                document_id=str(doc.id),
+                document_name=doc.title,
+                download_url=download_url,
+                page_number=rows[0].page_number or 1,
+                snippet=combined_snippet,
+                score=1.0,
+                tags=["attached"],
+                metadata={"status": doc.status, "attached": True}
+            ))
+        else:
+            results.append(SearchResult(
+                document_id=str(doc.id),
+                document_name=doc.title,
+                download_url="",
+                page_number=1,
+                snippet=f"[Note: Extracted text for {doc.title} is currently being processed. Please ask again in a moment.]",
+                score=1.0,
+                tags=["attached"],
+                metadata={"status": doc.status, "attached": True}
+            ))
+
+    return results
 
 async def send_chat_message(
     session_id: UUID,
@@ -185,6 +269,12 @@ async def send_chat_message(
             new_title = new_title[:37] + "..."
         session.title = new_title
 
+    # Extract any explicitly attached files in query text
+    attached_filenames = _extract_attached_filenames(query)
+    attached_results: List[SearchResult] = []
+    if attached_filenames:
+        attached_results = await _fetch_attached_documents_results(attached_filenames, tenant_id, db)
+
     # 2. Determine processing mode
     score_threshold = _extract_score_threshold(query)
     is_search_intent = _is_explicit_search_intent(query) or len(active_results) == 0
@@ -192,7 +282,7 @@ async def send_chat_message(
     final_results: List[SearchResult] = []
     response_markdown = ""
 
-    if is_search_intent and not (score_threshold is not None and len(active_results) > 0):
+    if is_search_intent and not attached_results and not (score_threshold is not None and len(active_results) > 0):
         # Fresh multi-domain hybrid search
         search_res: SearchResponse = await do_search(
             query=query,
@@ -207,18 +297,30 @@ async def send_chat_message(
         response_markdown = search_res.ai_summary
 
     else:
-        # Operating on ALREADY LOADED LISTED FILES
-        filtered_list = list(active_results)
+        # Operating on ALREADY LOADED LISTED FILES + ATTACHED DOCUMENTS
+        existing_doc_ids = set()
+        merged_list: List[SearchResult] = []
+
+        # Attached files get highest priority at the top of loaded context
+        for r in attached_results:
+            merged_list.append(r)
+            existing_doc_ids.add(r.document_id)
+
+        # Include previously active session documents
+        for r in active_results:
+            if r.document_id not in existing_doc_ids:
+                merged_list.append(r)
+                existing_doc_ids.add(r.document_id)
 
         # Apply score filtering if requested
         if score_threshold is not None:
-            filtered_list = [r for r in filtered_list if r.score >= score_threshold]
+            merged_list = [r for r in merged_list if r.score >= score_threshold]
 
         # Apply dynamic sorting if requested
         if "sort by score" in query.lower() or "highest score" in query.lower() or "best match" in query.lower():
-            filtered_list = sorted(filtered_list, key=lambda x: x.score, reverse=True)
+            merged_list = sorted(merged_list, key=lambda x: x.score, reverse=True)
 
-        final_results = filtered_list
+        final_results = merged_list
 
         # Synthesize strictly grounded response strictly using listed files
         llm = get_llm_provider()
