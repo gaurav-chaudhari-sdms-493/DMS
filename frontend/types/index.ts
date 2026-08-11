@@ -108,6 +108,8 @@ export interface SearchResponse {
   results: SearchResult[];
   cached: boolean;
   took_ms: number;
+  search_mode?: string;
+  hyde_triggered?: boolean;
 }
 
 export interface ChatMessage {
@@ -117,6 +119,7 @@ export interface ChatMessage {
   content: string;
   results?: SearchResult[] | null;
   filters?: Record<string, any> | null;
+  search_mode?: string;
   created_at: string;
 }
 

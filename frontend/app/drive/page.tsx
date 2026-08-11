@@ -760,6 +760,24 @@ export default function DrivePage() {
                       {searchResponse.results.map((res, idx) => (
                         <ResultCard key={`${res.document_id}-${idx}`} result={res} onPreview={handlePreviewSearchResult} />
                       ))}
+
+                      {/* Small technology message at bottom of loaded docs if results > 1 */}
+                      {searchResponse.results.length > 1 && (
+                        <div className="p-3 bg-[#edf2fc]/60 border border-[#c4c7c5]/50 rounded-2xl flex items-center justify-between text-xs text-[#444746] mt-2 shadow-2xs">
+                          <div className="flex items-center gap-2 font-medium">
+                            <Sparkles className="w-4 h-4 text-[#0b57d0]" />
+                            <span>Search Technology Used:</span>
+                            <span className="font-bold text-[#0b57d0] px-2.5 py-0.5 rounded-full bg-white border border-[#0b57d0]/20 shadow-2xs">
+                              {searchResponse.search_mode === "HyDE"
+                                ? "HyDE"
+                                : searchResponse.search_mode || "vector+keyword"}
+                            </span>
+                          </div>
+                          <span className="text-[11px] text-[#747775] font-medium">
+                            Retrieved {searchResponse.results.length} documents in {searchResponse.took_ms}ms
+                          </span>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div className="text-center py-16 bg-[#f8f9fa] rounded-2xl border border-[#e1e3e1]">

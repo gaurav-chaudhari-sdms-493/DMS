@@ -634,6 +634,22 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                     </div>
                   );
                 })}
+
+                {/* Small technology message at the bottom of loaded docs if activeLoadedDocs > 1 */}
+                {activeLoadedDocs.length > 1 && (
+                  <div className="col-span-full p-2.5 bg-[#edf2fc]/60 border border-[#c4c7c5]/50 rounded-xl flex items-center justify-between text-[11px] text-[#444746] mt-1">
+                    <div className="flex items-center gap-1.5 font-medium">
+                      <Sparkles className="w-3.5 h-3.5 text-[#0b57d0]" />
+                      <span>Search Technology:</span>
+                      <span className="font-bold text-[#0b57d0] px-1.5 py-0.5 rounded-md bg-white border border-[#0b57d0]/20 shadow-2xs">
+                        {activeSession?.messages?.find((m) => m.role === "assistant" && m.search_mode)?.search_mode === "HyDE"
+                          ? "HyDE"
+                          : activeSession?.messages?.find((m) => m.role === "assistant" && m.search_mode)?.search_mode || "vector+keyword"}
+                      </span>
+                    </div>
+                    <span className="text-[10px] text-[#747775]">RAG Grounded</span>
+                  </div>
+                )}
               </div>
             )}
           </div>

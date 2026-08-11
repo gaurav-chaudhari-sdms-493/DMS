@@ -326,6 +326,22 @@ export function RightSideChatDrawer({
                   </div>
                 );
               })}
+
+              {/* Small technology message at the bottom of loaded docs if loadedDocs > 1 */}
+              {loadedDocs.length > 1 && (
+                <div className="p-2.5 mt-2 bg-[#edf2fc]/60 border border-[#c4c7c5]/50 rounded-xl flex items-center justify-between text-[11px] text-[#444746]">
+                  <div className="flex items-center gap-1.5 font-medium">
+                    <Sparkles className="w-3.5 h-3.5 text-[#0b57d0]" />
+                    <span>Search Technology:</span>
+                    <span className="font-bold text-[#0b57d0] px-1.5 py-0.5 rounded-md bg-white border border-[#0b57d0]/20 shadow-2xs">
+                      {messages.find((m) => m.role === "assistant" && m.search_mode)?.search_mode === "HyDE"
+                        ? "HyDE"
+                        : messages.find((m) => m.role === "assistant" && m.search_mode)?.search_mode || "vector+keyword"}
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-[#747775]">RAG Grounded</span>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -21,6 +21,27 @@ def _make_snippet(content: str, max_chars: int = 400) -> str:
     return content[:max_chars].rsplit(" ", 1)[0] + "…"
 
 
+async def _generate_hypothetical_document(query: str) -> str:
+    """Generate a realistic hypothetical document excerpt (HyDE) for asymmetric vector search."""
+    try:
+        llm = get_llm_provider()
+        sys_msg = (
+            "You are an AI document intelligence system. Generate a realistic, formal 1-2 sentence document excerpt "
+            "or record line that would directly contain the answer to the following user query.\n"
+            "Do NOT include conversational chatter, explanations, or quotes. Output ONLY the hypothetical document content."
+        )
+        resp = await llm.complete([
+            Message(role="system", content=sys_msg),
+            Message(role="user", content=f"Query: {query}")
+        ])
+        cleaned = resp.strip() if resp else query
+        logger.info("Generated HyDE snippet for query '%s': '%s'", query, cleaned)
+        return cleaned
+    except Exception as e:
+        logger.warning("HyDE snippet generation failed: %s", e)
+        return query
+
+
 async def search(
     query: str,
     tenant_id: UUID,
@@ -32,6 +53,11 @@ async def search(
 ) -> SearchResponse:
     start_time = time.time()
     
+    search_mode = "direct"
+    hyde_triggered = False
+    hyde_success = False
+    hypothetical_snippet = None
+    
     # 1. Enforce AI Input Guardrails
     from app.services.guardrail_service import validate_input_query, validate_output_summary
     is_safe, error_msg, scrubbed_query = validate_input_query(query)
@@ -42,7 +68,9 @@ async def search(
             ai_summary=f"Safety Block: {error_msg}",
             results=[],
             cached=False,
-            took_ms=took_ms
+            took_ms=took_ms,
+            search_mode="failed_all",
+            hyde_triggered=False
         )
     
     query = scrubbed_query
@@ -52,7 +80,7 @@ async def search(
     if cached:
         return cached
         
-    # 2. Embed
+    # 2. Embed direct query
     embed_provider = get_embed_provider()
     embeddings = await embed_provider.embed([query])
     q_emb = embeddings[0]
@@ -110,14 +138,17 @@ async def search(
     vec_res = await db.execute(vec_sql, vec_params)
     vec_rows = vec_res.fetchall()
     
-    # 4. Keyword search (dynamic tsvector full-text search)
+    # 4. Keyword search (flexible websearch & plainto_tsquery full-text search)
     kw_sql = text(f"""
         SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
                ts_rank(c.content_tsv, q) as keyword_score
         FROM chunks c
         JOIN documents d ON c.document_id = d.id
         LEFT JOIN document_versions v ON v.id = d.current_version_id,
-        plainto_tsquery('english', :query) q
+        COALESCE(
+          NULLIF(websearch_to_tsquery('english', :query), ''),
+          plainto_tsquery('english', :query)
+        ) q
         WHERE c.content_tsv @@ q AND d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
         ORDER BY keyword_score DESC
         LIMIT 20
@@ -147,10 +178,79 @@ async def search(
         reranker = get_rerank_provider()
         doc_texts = [docs_map[cid].content for cid, _ in merged]
         reranked = await reranker.rerank(query, doc_texts, top_n=limit * 2)
-        RELEVANCE_THRESHOLD = 0.15
+        RELEVANCE_THRESHOLD = 0.20
         relevant_ranks = [r for r in reranked if r.score >= RELEVANCE_THRESHOLD]
-    
+        if relevant_ranks:
+            vec_cids = {str(r.id) for r in vec_rows}
+            kw_cids = {str(r.id) for r in kw_rows}
+            matched_cids = {str(merged[rank_res.index][0]) for rank_res in relevant_ranks}
+            has_vec = bool(matched_cids & vec_cids)
+            has_kw = bool(matched_cids & kw_cids)
+            if has_vec and has_kw:
+                search_mode = "vector+keyword"
+            elif has_vec:
+                search_mode = "vector"
+            elif has_kw:
+                search_mode = "keyword"
+            else:
+                search_mode = "vector+keyword"
+
+    # --- Step 6: HYDE AUTOMATIC FALLBACK ---
+    # Trigger HyDE if direct search returned 0 relevant candidates above threshold
     if not merged or not relevant_ranks:
+        logger.info("Direct search returned 0 matches for query '%s'. Triggering HyDE Fallback...", query)
+        hyde_triggered = True
+        hypothetical_snippet = await _generate_hypothetical_document(query)
+        
+        if hypothetical_snippet and hypothetical_snippet != query:
+            try:
+                hyde_embeddings = await embed_provider.embed([hypothetical_snippet])
+                hyde_emb = hyde_embeddings[0]
+                hyde_emb_str = "[" + ",".join(str(f) for f in hyde_emb) + "]"
+                
+                hyde_vec_res = await db.execute(vec_sql, {**params, "query_embedding": hyde_emb_str})
+                hyde_vec_rows = hyde_vec_res.fetchall()
+                
+                if hyde_vec_rows:
+                    hyde_rrf_scores = {}
+                    hyde_docs_map = {}
+                    
+                    for rank, row in enumerate(hyde_vec_rows):
+                        cid = str(row.id)
+                        hyde_docs_map[cid] = row
+                        hyde_rrf_scores[cid] = 1.0 / (k + rank + 1)
+                    
+                    # Merge with existing kw_rows if any
+                    for rank, row in enumerate(kw_rows):
+                        cid = str(row.id)
+                        hyde_docs_map[cid] = row
+                        hyde_rrf_scores[cid] = hyde_rrf_scores.get(cid, 0) + 1.0 / (k + rank + 1)
+                    
+                    hyde_merged = sorted(hyde_rrf_scores.items(), key=lambda x: x[1], reverse=True)[:20]
+                    if hyde_merged:
+                        reranker = get_rerank_provider()
+                        doc_texts = [hyde_docs_map[cid].content for cid, _ in hyde_merged]
+                        reranked = await reranker.rerank(query, doc_texts, top_n=limit * 2)
+                        RELEVANCE_THRESHOLD = 0.12
+                        relevant_ranks = [r for r in reranked if r.score >= RELEVANCE_THRESHOLD]
+                        
+                        if relevant_ranks:
+                            merged = hyde_merged
+                            docs_map = hyde_docs_map
+                            search_mode = "HyDE"
+                            hyde_success = True
+                            logger.info("HyDE Fallback SUCCESS: Found %d matching candidate(s)", len(relevant_ranks))
+                        else:
+                            logger.info("HyDE Fallback candidates scored below relevance threshold (0.12). Yielding 0 results.")
+            except Exception as e:
+                logger.error("HyDE fallback vector search failed: %s", e)
+
+    # If still no matches after Direct + HyDE Fallback
+    if not merged or not relevant_ranks:
+        if hyde_triggered:
+            search_mode = "failed_all"
+            hyde_success = False
+            
         if filters and "document_id" in filters:
             doc_id_param = str(filters["document_id"])
             try:
@@ -218,9 +318,26 @@ async def search(
                         ai_summary=summary,
                         results=fallback_results,
                         cached=False,
-                        took_ms=took_ms
+                        took_ms=took_ms,
+                        search_mode=search_mode,
+                        hyde_triggered=hyde_triggered
                     )
-                    await log_action(db, user_id, tenant_id, "search.query", details={"query": query, "result_count": len(fallback_results), "took_ms": took_ms}, ip_address=ip_address)
+                    await log_action(
+                        db,
+                        user_id,
+                        tenant_id,
+                        "search.query",
+                        details={
+                            "query": query,
+                            "search_mode": search_mode,
+                            "hyde_triggered": hyde_triggered,
+                            "hyde_success": hyde_success,
+                            "hypothetical_snippet": hypothetical_snippet,
+                            "result_count": len(fallback_results),
+                            "took_ms": took_ms
+                        },
+                        ip_address=ip_address
+                    )
                     return resp
 
         took_ms = int((time.time() - start_time) * 1000)
@@ -244,9 +361,26 @@ async def search(
             ai_summary=summary_text,
             results=[],
             cached=False,
-            took_ms=took_ms
+            took_ms=took_ms,
+            search_mode=search_mode,
+            hyde_triggered=hyde_triggered
         )
-        await log_action(db, user_id, tenant_id, "search.query", details={"query": query, "result_count": 0, "took_ms": took_ms}, ip_address=ip_address)
+        await log_action(
+            db,
+            user_id,
+            tenant_id,
+            "search.query",
+            details={
+                "query": query,
+                "search_mode": search_mode,
+                "hyde_triggered": hyde_triggered,
+                "hyde_success": hyde_success,
+                "hypothetical_snippet": hypothetical_snippet,
+                "result_count": 0,
+                "took_ms": took_ms
+            },
+            ip_address=ip_address
+        )
         return resp
         
     final_results = []
@@ -342,11 +476,28 @@ async def search(
         ai_summary=summary,
         results=final_results,
         cached=False,
-        took_ms=took_ms
+        took_ms=took_ms,
+        search_mode=search_mode,
+        hyde_triggered=hyde_triggered
     )
     
     # Audit log & Cache
-    await log_action(db, user_id, tenant_id, "search.query", details={"query": query, "result_count": len(final_results), "took_ms": took_ms}, ip_address=ip_address)
+    await log_action(
+        db,
+        user_id,
+        tenant_id,
+        "search.query",
+        details={
+            "query": query,
+            "search_mode": search_mode,
+            "hyde_triggered": hyde_triggered,
+            "hyde_success": hyde_success,
+            "hypothetical_snippet": hypothetical_snippet,
+            "result_count": len(final_results),
+            "took_ms": took_ms
+        },
+        ip_address=ip_address
+    )
     await cache_search_result(cache_key, resp)
     
     return resp
