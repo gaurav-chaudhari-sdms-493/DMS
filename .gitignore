@@ -49,3 +49,4 @@ yarn-error.log*
 *.swp
 *.swo
 /frontend/package-lock.json
+tabular_data_in_csv_temp/*

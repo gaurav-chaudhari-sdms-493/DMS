@@ -52,6 +52,7 @@ The **Multi-Tenant AI Document Management & Search Platform (DMS)** is designed 
 - **Asynchronous Execution**: Native Python `asyncio` for non-blocking I/O operations (database queries, Redis operations, and S3 file signed link generation).
 - **Rate Limiting**: `SlowAPI` middleware enforcing rate limits per endpoint (login: `5/min`, search: `30/min`, standard: `60/min`).
 - **Audit Logging**: `ApiLoggingMiddleware` records all user access, document interactions, search queries, and administrative actions asynchronously using background tasks into the `api_logs` PostgreSQL table.
+- **System Observability & Health Diagnostics**: `/api/v1/health` endpoint verifies PostgreSQL database ping, Redis connectivity, vector search functionality, and tenant Row-Level Security (RLS) enforcement in real-time.
 
 ### 2.3 Task Queue & Background Workers (Celery + Redis)
 - **Message Broker**: Redis 7.0 database (Port `6379`).
@@ -133,7 +134,7 @@ sequenceDiagram
 
 ---
 
-## 5. End-to-End Retrieval Flow (Hybrid Search & RAG)
+## 5. End-to-End Retrieval Flow (Hybrid Search, HyDE & RAG)
 
 ```mermaid
 sequenceDiagram
@@ -142,9 +143,9 @@ sequenceDiagram
     participant Frontend as Next.js Frontend
     participant API as FastAPI Backend
     participant Cache as Redis Cache
-    participant DB as PostgreSQL (pgvector)
+    participant LLM as AI Provider (HyDE / LLM)
+    participant DB as PostgreSQL (pgvector + tsquery)
     participant Rerank as Cohere Rerank API
-    participant LLM as Generative LLM (Groq / OpenAI)
 
     User->>Frontend: Enter Natural Language Query
     Frontend->>API: POST /api/v1/search/
@@ -153,7 +154,11 @@ sequenceDiagram
     alt Cache Hit
         Cache-->>API: Return Cached Search Payload
     else Cache Miss
-        API->>DB: Layer 1: HNSW Vector Search (1024-dim) + Keyword Full-Text Search (Reciprocal Rank Fusion)
+        opt Query Expansion & HyDE Synthesis
+            API->>LLM: Expand Query (Multilingual) & Generate Hypothetical Document (HyDE)
+            LLM-->>API: Return Expanded Query & Synthetic Text Embedding
+        end
+        API->>DB: Layer 1: HNSW Vector Search (1024-dim) + websearch_to_tsquery Full-Text Search (RRF)
         DB-->>API: Return Candidate Chunks
         API->>Rerank: Layer 2: Optional Cohere Re-Ranking
         Rerank-->>API: Return Ranked Chunks

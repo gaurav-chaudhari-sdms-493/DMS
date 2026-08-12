@@ -11,8 +11,9 @@ This document outlines the current technical boundaries, operational assumptions
 
 ---
 
-## 2. Embedding & Vector Search
+## 2. Embedding, HyDE & Vector Search
 - **Embedding Provider**: Default local embedding provider uses BGE-M3 (`BAAI/bge-m3`, 1024 dimensions). It requires `sentence-transformers` installed locally. If missing, `EmbeddingUnavailableError` is raised unless `allow_fake=True` is explicitly passed in unit tests.
+- **HyDE & Multilingual Query Expansion**: Enabling HyDE (`hyde_enabled=true`) or multilingual query expansion introduces an initial LLM generation call before vector querying, adding ~200-400ms latency on cache-miss requests. Supported HyDE prompt templates cover English, Spanish, and French.
 - **Vector Search Engine**: PostgreSQL `pgvector` with HNSW cosine similarity index.
 
 ---

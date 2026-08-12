@@ -38,7 +38,7 @@ All backend Python packages are defined in `backend/requirements.txt`:
 | **`uvicorn[standard]`** | `0.30.6` | Lightning-fast ASGI server implementation hosting FastAPI applications. |
 | **`sqlalchemy[asyncio]`** | `2.0.35` | Modern Python ORM providing async database connectivity, session management, and model definitions. |
 | **`asyncpg`** | `0.29.0` | Asynchronous PostgreSQL database driver optimized for high-throughput async query performance. |
-| **`pgvector`** | `0.3.2` | Python bindings for PostgreSQL `pgvector` extension; handles vector embedding columns (`Vector(1536)`) and HNSW distance operators (`<->`, `<=>`). |
+| **`pgvector`** | `0.3.2` | Python bindings for PostgreSQL `pgvector` extension; handles vector embedding columns (`Vector(1024)`) and HNSW distance operators (`<->`, `<=>`). |
 | **`alembic`** | `1.13.2` | Database migration framework for schema evolution, column alterations, and index creation. |
 | **`pydantic`** | `2.9.2` | Data validation, serialisation, and request/response schema enforcement. |
 | **`pydantic-settings`** | `2.5.2` | Type-safe environment variable parser parsing `.env` files into application settings. |

@@ -167,6 +167,9 @@ Authorization: Bearer <access_token>
 {
   "query": "Find citizen complaints regarding pothole repairs on Main Street",
   "limit": 5,
+  "hyde_enabled": true,
+  "expand_query": true,
+  "language": "en",
   "filters": {
     "urgency": "high"
   }
@@ -213,3 +216,22 @@ Authorization: Bearer <access_token>
 - `POST /api/v1/admin/tenants`: Creates new organization tenant (Admin only).
 - `GET /api/v1/admin/audit-logs`: Retrieves security access logs and IP activity history.
 - `GET /api/v1/admin/system-stats`: Returns system telemetry, vector count, and Celery task performance metrics.
+
+---
+
+### 3.6 Health & System Observability (`/api/v1/health`)
+
+#### `GET /api/v1/health`
+- **Description**: Verifies operational readiness across all platform components (PostgreSQL database connection, Redis broker ping, vector search indexing health, and Row-Level Security tenant policy validation).
+- **Auth Required**: No
+- **Response `200 OK`**:
+```json
+{
+  "status": "healthy",
+  "database": "connected",
+  "redis": "connected",
+  "rls_status": "enforced",
+  "vector_index": "ready",
+  "timestamp": "2026-08-11T19:00:00Z"
+}
+```

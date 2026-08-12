@@ -6,13 +6,16 @@ The DMS AI engine combines multi-format document extraction, dynamic schema-less
 
 All AI integrations are modularized using provider adapters, allowing seamless hot-swapping between OpenAI, Anthropic, Groq, Cohere, and Google Gemini via `.env` configuration without code changes.
 
+### 1.1 Global AI Provider Singleton Caching
+To eliminate model initialization overhead, API client instantiation latency, and memory bloat, provider instances (`LLMProvider`, `EmbeddingProvider`) are cached thread-safely via a global provider singleton factory (`get_ai_provider_factory()`). Provider instances are instantiated once per configuration key and reused across all concurrent requests.
+
 ---
 
 ## 2. Ingestion Pipeline (Upload & Indexing)
 
 ```
 [ Raw File ] ──► [ Text & Table Extractor ] ──► [ Ingestion Brain LLM ] ──► [ Text Chunker ] ──► [ Embedding Generator ] ──► [ PostgreSQL ]
-(PDF, DOCX,      (pdfplumber / LlamaParse /       (Extracts JSON metadata:    (500 tokens,         (1536-dim vectors)       (pgvector HNSW +
+(PDF, DOCX,      (pdfplumber / LlamaParse /       (Extracts JSON metadata:    (500 tokens,         (1024-dim BGE-M3 vectors) (pgvector HNSW +
  XLSX, PPTX)     python-docx / openpyxl)          category, urgency, dates)   50 token overlap)                            JSONB Metadata)
 ```
 
@@ -68,10 +71,13 @@ Layer 3: Generative LLM RAG Synthesis (GPT-4o / Claude 3.5 Sonnet) ────�
 - **Mechanism**: Hashes incoming query strings + tenant ID into Redis cache keys with 1-hour TTL.
 - **Benefit**: Bypasses vector DB search and LLM synthesis entirely for frequent or identical queries, reducing response time to `< 10ms` and lowering API costs by 35-50%.
 
-### Layer 1: Hybrid Search (HNSW Vector + JSONB Metadata Filter)
+### Layer 1: Hybrid Search (HNSW Vector + Full-Text Search + Metadata Filtering)
 - **Vector Search**: Computes cosine distance between query embedding and stored chunk embeddings using PostgreSQL `pgvector` with HNSW indexes (`m=16`, `ef_construction=64`).
+- **HyDE (Hypothetical Document Embeddings) Fallback**: When `hyde_enabled=true` (or when standard search yields low relevance), an LLM generates a synthetic answer/hypothetical passage in the target language (English, Spanish, or French). The synthetic passage is embedded to perform dense semantic retrieval, significantly improving recall for abstract or short queries.
+- **Multilingual Query Expansion**: Parses and expands input queries across supported languages (English, Spanish, French, German, Japanese, Chinese, Hindi) into expanded synonym/translation sets.
+- **Full-Text Search (`websearch_to_tsquery`)**: Converts user queries into PostgreSQL `tsquery` objects with full operator support (`AND`, `OR`, `"phrase quotes"`, `-exclusion`).
 - **Metadata Filtering**: Dynamically parses natural language queries into JSONB SQL expressions (e.g., `metadata->>'urgency' = 'high' AND metadata->>'document_type' = 'complaint'`).
-- **Candidate Pool**: Retrieves top 20 candidate chunks.
+- **Candidate Pool**: Merges vector and full-text candidates using Reciprocal Rank Fusion (RRF) to select the top 20 candidate chunks.
 
 ### Layer 2: Cross-Encoder Re-Ranking (Cohere Rerank)
 - **Model**: `rerank-english-v3.0` (or `rerank-multilingual-v3.0`).

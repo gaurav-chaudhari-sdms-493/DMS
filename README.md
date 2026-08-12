@@ -82,11 +82,12 @@ For more detailed instructions on the Docker setup, see the [Docker README](./do
 
 | Method | Path | Auth Required | Description |
 |--------|------|---------------|-------------|
-| POST   | `/api/auth/login` | No | Authenticate and get JWT token |
-| GET    | `/api/documents` | Yes | List documents for current tenant |
-| POST   | `/api/documents` | Yes | Upload and initiate processing |
-| GET    | `/api/search` | Yes | Perform hybrid vector search |
-| GET    | `/api/admin/tenants` | Yes (Admin) | List tenants |
+| GET    | `/api/v1/health` | No | System health, DB/Redis ping, and RLS verification |
+| POST   | `/api/v1/auth/login` | No | Authenticate and get JWT token |
+| GET    | `/api/v1/documents` | Yes | List documents for current tenant |
+| POST   | `/api/v1/documents` | Yes | Upload and initiate processing |
+| POST   | `/api/v1/search/` | Yes | Perform hybrid search with HyDE fallback & query expansion |
+| GET    | `/api/v1/admin/tenants` | Yes (Admin) | List tenants |
 
 ## Default Credentials
 
@@ -128,5 +129,8 @@ To run services locally outside of Docker:
 ## Phase 2 Roadmap
 
 - **Celery Workers**: Shift background document processing and embedding to Celery workers for scalability. **(Done)**
+- **Row-Level Security (RLS)**: PostgreSQL native tenant isolation across all tables. **(Done)**
+- **HyDE & Multilingual Search**: Trilingual HyDE retrieval fallback & multilingual query expansion. **(Done)**
+- **Global AI Singleton Caching**: Thread-safe provider factory singleton caching. **(Done)**
 - **Compliance Dashboard**: Add UI components to monitor audit logs and ensure SOC2/GDPR compliance.
 - **RBAC UI**: Build interfaces to intuitively manage roles and granular resource permissions.
