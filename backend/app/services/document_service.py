@@ -425,6 +425,7 @@ async def get_drive_stats(db: AsyncSession, tenant_id: UUID) -> DriveStatsRespon
         total_folders=total_folders,
         total_starred=total_starred,
         total_trashed=total_trashed,
+        total_size_bytes=total_bytes,
         total_bytes=total_bytes
     )
 

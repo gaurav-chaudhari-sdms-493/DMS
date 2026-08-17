@@ -30,14 +30,14 @@ async def _expand_trilingual_query(query: str) -> dict:
             "You are a multilingual AI query normalization assistant for enterprise document search in India.\n"
             "Analyze the user query (which could be in English, Hindi, Marathi, or Hinglish) and output a JSON object with 4 keys:\n"
             '- "detected_lang": detected query language (e.g. "English", "Hindi", "Marathi", "Hinglish")\n'
-            '- "english": normalized search query in English\n'
-            '- "hindi": normalized search query in Hindi (Devanagari script)\n'
-            '- "marathi": normalized search query in Marathi (Devanagari script)\n'
+            '- "english": concise normalized search query in English stripping away conversational filler words (e.g. "kunal deshmukh che aadhar card ahe ka aaplya files madhe?" -> "Kunal Deshmukh Aadhar Card")\n'
+            '- "hindi": concise search keywords in Hindi (Devanagari script)\n'
+            '- "marathi": concise search keywords in Marathi (Devanagari script)\n'
             "Output ONLY valid JSON. No markdown formatting."
         )
         resp = await llm.complete([
             Message(role="system", content=sys_msg),
-            Message(role="user", content=f"Query: {query}")
+            Message(role="user", content=f"Query: {query};")
         ])
         clean_json = resp.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         data = json.loads(clean_json)
@@ -192,9 +192,10 @@ async def search(
         JOIN documents d ON c.document_id = d.id
         LEFT JOIN document_versions v ON v.id = d.current_version_id,
         COALESCE(
+          NULLIF(plainto_tsquery('english', :query_en), ''),
           NULLIF(websearch_to_tsquery('english', :query_en), ''),
-          NULLIF(websearch_to_tsquery('simple', :query_mr), ''),
-          plainto_tsquery('simple', :query_mr)
+          NULLIF(plainto_tsquery('simple', :query_mr), ''),
+          plainto_tsquery('simple', :query_en)
         ) q
         WHERE c.content_tsv @@ q AND d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
         ORDER BY keyword_score DESC
@@ -237,12 +238,13 @@ async def search(
             except Exception as ex:
                 logger.warning("Secondary translation rerank skipped: %s", ex)
 
-        RELEVANCE_THRESHOLD = 0.30
+        RELEVANCE_THRESHOLD = 0.15
         relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
+
         if relevant_ranks:
             vec_cids = {str(r.id) for r in all_vec_rows}
             kw_cids = {str(r.id) for r in kw_rows}
-            matched_cids = {str(merged[rank_res.index][0]) for rank_res in relevant_ranks}
+            matched_cids = {str(merged[rank_res.index][0]) for rank_res in relevant_ranks if rank_res.index < len(merged)}
             has_vec = bool(matched_cids & vec_cids)
             has_kw = bool(matched_cids & kw_cids)
             if has_vec and has_kw:
@@ -301,7 +303,7 @@ async def search(
                             except Exception as ex:
                                 logger.warning("Secondary translation HyDE rerank skipped: %s", ex)
 
-                        RELEVANCE_THRESHOLD = 0.25
+                        RELEVANCE_THRESHOLD = 0.15
                         relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
                         
                         if relevant_ranks:
@@ -311,7 +313,7 @@ async def search(
                             hyde_success = True
                             logger.info("Tri-Lingual HyDE Fallback SUCCESS: Found %d matching candidate(s)", len(relevant_ranks))
                         else:
-                            logger.info("HyDE candidates scored below relevance threshold (0.25). Yielding 0 results.")
+                            logger.info("HyDE candidates scored below relevance threshold (0.15). Yielding 0 results.")
             except Exception as e:
                 logger.error("Tri-Lingual HyDE fallback vector search failed: %s", e)
 

@@ -63,6 +63,8 @@ class DocumentDetailResponse(BaseModel):
 class DriveStatsResponse(BaseModel):
     total_files: int
     total_folders: int
-    total_size_bytes: int
+    total_size_bytes: int = 0
+    total_bytes: int = 0
     total_starred: int
     total_trashed: int
+

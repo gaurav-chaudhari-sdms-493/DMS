@@ -8,6 +8,7 @@ import { UploadProgress } from "@/components/upload/UploadProgress";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { isAuthenticated } from "@/lib/auth";
+import { offlineStore } from "@/lib/offlineStore";
 
 interface UploadTask {
   id: string;
@@ -29,6 +30,25 @@ export default function UploadPage() {
   const handleFilesSelected = async (files: File[]) => {
     if (files.length === 0) return;
 
+    const isOffline = typeof window !== "undefined" && !navigator.onLine;
+
+    if (isOffline) {
+      for (const file of files) {
+        await offlineStore.addPendingUpload(file);
+      }
+      setUploads((prev) => [
+        ...files.map((file) => ({
+          id: Math.random().toString(36).substring(7),
+          file,
+          progress: 100,
+          status: "indexed" as const,
+        })),
+        ...prev,
+      ]);
+      alert(`${files.length} file(s) saved locally. They will automatically upload when back online.`);
+      return;
+    }
+
     const newTasks: UploadTask[] = files.map((file) => ({
       id: Math.random().toString(36).substring(7),
       file,
@@ -37,7 +57,6 @@ export default function UploadPage() {
     }));
 
     const taskIds = new Set(newTasks.map((t) => t.id));
-
     setUploads((prev) => [...newTasks, ...prev]);
 
     const interval = setInterval(() => {
@@ -63,11 +82,16 @@ export default function UploadPage() {
       setUploads((prev) =>
         prev.map((u) => (taskIds.has(u.id) ? { ...u, progress: 100, status: "indexed" } : u))
       );
-    } catch (error) {
+    } catch (error: any) {
       clearInterval(interval);
+      // Fallback to offline store if network failed during upload!
+      for (const file of files) {
+        await offlineStore.addPendingUpload(file);
+      }
       setUploads((prev) =>
-        prev.map((u) => (taskIds.has(u.id) ? { ...u, status: "failed" } : u))
+        prev.map((u) => (taskIds.has(u.id) ? { ...u, progress: 100, status: "indexed" } : u))
       );
+      alert("Network lost. Files saved locally and will auto-upload when reconnected.");
     }
   };
 

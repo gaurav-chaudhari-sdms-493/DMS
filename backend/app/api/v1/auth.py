@@ -6,7 +6,7 @@ import uuid
 from ...schemas.auth import (
     LoginRequest, TokenResponse, TokenPayload, SignUpRequest, SignUpResponse,
     ForgotPasswordRequest, ForgotPasswordResponse, ResetPasswordRequest,
-    UserProfileResponse, FileTypeCount
+    UserProfileResponse, FileTypeCount, RefreshTokenRequest
 )
 from ...models.user import User
 from ...models.tenant import Tenant
@@ -161,9 +161,16 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     )
 
 @router.post('/refresh', response_model=TokenResponse)
-async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
+async def refresh_token(
+    body: RefreshTokenRequest | None = None,
+    refresh_token: str | None = None,
+    db: AsyncSession = Depends(get_db)
+):
+    token = (body.refresh_token if body and body.refresh_token else None) or refresh_token
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing refresh token")
     from ...services.auth_service import verify_token
-    payload = verify_token(refresh_token)
+    payload = verify_token(token)
     if payload.type != "refresh":
         raise HTTPException(status_code=401, detail="Not a refresh token")
     

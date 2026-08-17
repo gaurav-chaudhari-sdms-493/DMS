@@ -86,7 +86,8 @@ export interface DocumentDetailResponse {
 export interface DriveStats {
   total_files: number;
   total_folders: number;
-  total_size_bytes: number;
+  total_bytes?: number;
+  total_size_bytes?: number;
   total_starred: number;
   total_trashed: number;
 }

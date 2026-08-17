@@ -328,16 +328,12 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
     });
 
     try {
-      const reply = await api.chat.sendMessage(sId, textToSend);
+      await api.chat.sendMessage(sId, textToSend);
 
-      setActiveSession((prev) => {
-        if (!prev) return null;
-        const existingMsgs = prev.messages.filter((m) => !m.id.startsWith("temp-"));
-        return {
-          ...prev,
-          messages: [...existingMsgs, tempUserMsg, reply]
-        };
-      });
+      const refreshed = await api.chat.getSession(sId);
+      if (refreshed) {
+        setActiveSession(refreshed);
+      }
 
       const updatedList = await api.chat.listSessions();
       setSessions(updatedList);

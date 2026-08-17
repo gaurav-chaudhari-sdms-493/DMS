@@ -49,11 +49,32 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedExt, setSelectedExt] = useState<string | null>(null);
+  const [extDocs, setExtDocs] = useState<any[]>([]);
+  const [loadingExtDocs, setLoadingExtDocs] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
 
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  const handleSelectExtension = async (ext: string) => {
+    const extClean = ext.toLowerCase().replace(".", "");
+    setSelectedExt(extClean);
+    setLoadingExtDocs(true);
+    try {
+      const allDocs = await api.documents.list({ is_trashed: false });
+      const filtered = allDocs.filter((d: any) => {
+        const dExt = (d.title.split(".").pop() || "").toLowerCase();
+        return dExt === extClean;
+      });
+      setExtDocs(filtered);
+    } catch (err) {
+      console.error("Failed to load documents for extension:", err);
+    } finally {
+      setLoadingExtDocs(false);
+    }
+  };
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -229,11 +250,11 @@ export default function ProfilePage() {
                   <PieChart className="w-5 h-5 text-primary" />
                   <span>File Formats Distribution</span>
                 </h3>
-                <span className="text-xs text-textMuted">Supported: PDF, Word, Excel, CSV, PPT, TXT, JSON, MD, RTF</span>
+                <span className="text-xs text-textMuted">Click any format to view all matching files</span>
               </div>
 
               {profile.file_types_breakdown && profile.file_types_breakdown.length > 0 ? (
-                <div className="space-y-4">
+                <div className="max-h-[360px] overflow-y-auto pr-2 space-y-4 custom-scrollbar">
                   {profile.file_types_breakdown.map((item, idx) => {
                     const pct = profile.total_files > 0 ? Math.round((item.count / profile.total_files) * 100) : 0;
                     const extUpper = (item.extension || "OTHER").toUpperCase();
@@ -251,19 +272,27 @@ export default function ProfilePage() {
                       JSON: "bg-cyan-500 text-cyan-400",
                       MD: "bg-indigo-500 text-indigo-400",
                       RTF: "bg-pink-500 text-pink-400",
+                      PNG: "bg-sky-500 text-sky-400",
+                      JPG: "bg-indigo-500 text-indigo-400",
+                      JPEG: "bg-indigo-500 text-indigo-400",
                     };
 
                     const badgeColor = colorMap[extUpper] || "bg-gray-500 text-gray-400";
                     const bgColorClass = badgeColor.split(" ")[0];
 
                     return (
-                      <div key={idx} className="space-y-1.5">
+                      <div
+                        key={idx}
+                        onClick={() => handleSelectExtension(item.extension)}
+                        className="space-y-1.5 p-2 rounded-xl hover:bg-surface/80 transition-all cursor-pointer group border border-transparent hover:border-primary/20"
+                        title={`Click to view all .${item.extension} files`}
+                      >
                         <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2.5">
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${bgColorClass}`}>
+                            <span className={`px-2.5 py-0.5 rounded text-xs font-bold text-white shadow-xs group-hover:scale-105 transition-transform ${bgColorClass}`}>
                               {extUpper}
                             </span>
-                            <span className="font-medium text-textMain">{item.count} files</span>
+                            <span className="font-semibold text-textMain group-hover:text-primary transition-colors">{item.count} files</span>
                           </div>
                           <span className="text-xs text-textMuted font-mono">
                             {formatSize(item.size_bytes)} ({pct}%)
@@ -285,6 +314,64 @@ export default function ProfilePage() {
                 </div>
               )}
             </Card>
+
+            {/* Filtered Files Modal */}
+            {selectedExt && (
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                <Card glow className="p-6 max-w-2xl w-full space-y-4 max-h-[85vh] flex flex-col">
+                  <div className="flex items-center justify-between border-b border-borderDark/60 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="px-3 py-1 rounded-lg bg-primary/20 text-primary font-bold text-xs uppercase tracking-wider border border-primary/30">
+                        .{selectedExt}
+                      </div>
+                      <h4 className="text-lg font-bold text-textMain">
+                        All .{selectedExt.toUpperCase()} Files ({extDocs.length})
+                      </h4>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => setSelectedExt(null)}>
+                      Close
+                    </Button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    {loadingExtDocs ? (
+                      <div className="flex items-center justify-center py-12 gap-2 text-textMuted text-sm">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        <span>Fetching .{selectedExt} documents...</span>
+                      </div>
+                    ) : extDocs.length === 0 ? (
+                      <div className="text-center py-12 text-sm text-textMuted">
+                        No .{selectedExt} documents found.
+                      </div>
+                    ) : (
+                      extDocs.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="p-3.5 rounded-xl bg-surface/50 border border-borderDark/60 hover:border-primary/40 flex items-center justify-between gap-4 transition-all"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <FileText className="w-5 h-5 text-primary shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-textMain truncate">{doc.title}</p>
+                              <p className="text-xs text-textMuted">
+                                {formatSize(doc.file_size_bytes || 0)} • Created {new Date(doc.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+
+                          <Link
+                            href="/drive"
+                            className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold rounded-lg border border-primary/20 transition-all shrink-0"
+                          >
+                            Open in Drive
+                          </Link>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Card>
+              </div>
+            )}
 
             {/* Logout Modal Confirmation */}
             {showLogoutConfirm && (

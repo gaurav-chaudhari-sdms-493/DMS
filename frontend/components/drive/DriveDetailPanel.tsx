@@ -137,7 +137,7 @@ export function DriveDetailPanel({
               activeTab === "metadata" ? "border-[#0b57d0] text-[#0b57d0] font-bold" : "border-transparent hover:text-[#1f1f1f]"
             }`}
           >
-            AI Metadata ({docDetail?.metadata.length || 0})
+            AI Metadata ({docDetail?.metadata?.length || 0})
           </button>
           <button
             onClick={() => setActiveTab("versions")}
@@ -145,7 +145,7 @@ export function DriveDetailPanel({
               activeTab === "versions" ? "border-[#0b57d0] text-[#0b57d0] font-bold" : "border-transparent hover:text-[#1f1f1f]"
             }`}
           >
-            Versions ({docDetail?.versions.length || 1})
+            Versions ({docDetail?.versions?.length || 1})
           </button>
         </div>
       )}
@@ -196,19 +196,26 @@ export function DriveDetailPanel({
           <div className="space-y-2">
             {loading ? (
               <div className="text-[#444746] text-center py-6">Loading AI metadata...</div>
-            ) : docDetail?.metadata && docDetail.metadata.length > 0 ? (
-              docDetail.metadata.map((item, idx) => (
-                <div key={idx} className="p-3 bg-[#f8f9fa] rounded-xl border border-[#e1e3e1] space-y-1">
-                  <div className="flex items-center justify-between text-[#444746]">
-                    <span className="font-semibold text-[#1f1f1f] capitalize">{item.key}</span>
-                    <span className="flex items-center gap-1 text-[10px] text-[#0b57d0] font-semibold">
-                      <Sparkles className="w-3 h-3" />
-                      {Math.round((item.confidence_score || 0.9) * 100)}%
-                    </span>
+            ) : docDetail?.metadata && Array.isArray(docDetail.metadata) && docDetail.metadata.length > 0 ? (
+              docDetail.metadata.map((item: any, idx: number) => {
+                const keyStr = typeof item === "string" ? "Metadata" : String(item?.key || item?.name || "Key");
+                const rawVal = typeof item === "string" ? item : (item?.value ?? item?.content ?? "");
+                const valStr = typeof rawVal === "object" ? JSON.stringify(rawVal) : String(rawVal);
+                const score = typeof item?.confidence_score === "number" ? Math.round(item.confidence_score * 100) : 95;
+
+                return (
+                  <div key={idx} className="p-3 bg-[#f8f9fa] rounded-xl border border-[#e1e3e1] space-y-1 select-text">
+                    <div className="flex items-center justify-between text-[#444746]">
+                      <span className="font-semibold text-[#1f1f1f] capitalize">{keyStr}</span>
+                      <span className="flex items-center gap-1 text-[10px] text-[#0b57d0] font-semibold">
+                        <Sparkles className="w-3 h-3 text-[#0b57d0]" />
+                        {score}%
+                      </span>
+                    </div>
+                    <p className="text-[#1f1f1f] font-medium break-words text-xs">{valStr}</p>
                   </div>
-                  <p className="text-[#1f1f1f] font-medium break-words">{item.value}</p>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-center py-6 text-[#444746]">
                 <Sparkles className="w-8 h-8 text-[#444746] mx-auto mb-2 opacity-50" />

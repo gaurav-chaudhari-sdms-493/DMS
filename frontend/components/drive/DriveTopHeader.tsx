@@ -11,6 +11,7 @@ interface DriveTopHeaderProps {
   onClearSearch: () => void;
   onToggleInfoPanel: () => void;
   showInfoPanel: boolean;
+  onNavigateHome?: () => void;
 }
 
 export function DriveTopHeader({
@@ -19,6 +20,7 @@ export function DriveTopHeader({
   onClearSearch,
   onToggleInfoPanel,
   showInfoPanel,
+  onNavigateHome,
 }: DriveTopHeaderProps) {
   const router = useRouter();
   const [query, setQuery] = useState(searchQuery);
@@ -65,13 +67,18 @@ export function DriveTopHeader({
     <header className="h-16 px-4 flex items-center justify-between gap-4 bg-gdriveBg select-none border-b border-[#e1e3e1]/40 relative z-30">
       {/* Left: Brand Logo */}
       <div className="flex items-center flex-shrink-0 pl-1">
-        <Link href="/drive" className="flex items-center hover:opacity-90 transition-opacity">
+        <div
+          onClick={() => {
+            if (onNavigateHome) onNavigateHome();
+          }}
+          className="flex items-center cursor-pointer group hover:opacity-95 transition-all"
+        >
           <img
-            src="/stark_drive_logo.png"
+            src="/stark-drive.svg"
             alt="Stark Drive Logo"
-            className="h-12 md:h-[58px] w-auto object-contain origin-left scale-110"
+            className="h-12 md:h-14 lg:h-16 w-auto object-contain transition-transform group-hover:scale-105"
           />
-        </Link>
+        </div>
       </div>
 
       {/* Center: Search Bar ("Search anything with Stark AI...") */}

@@ -7,6 +7,7 @@ import { api } from "@/lib/api";
 import { storeTokens } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import BackendUrlConfig from "@/components/BackendUrlConfig";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,8 +37,8 @@ export default function LoginPage() {
     <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
       <div className="w-full max-w-md animate-fadeIn">
         <div className="text-center mb-8">
-          <div className="bg-[#1e1e24] px-5 py-3 rounded-2xl mx-auto mb-4 shadow-[0_0_30px_rgba(253,82,0,0.3)] border border-primary/30 inline-flex items-center justify-center">
-            <img src="/stark-logo-white.avif" alt="Stark Logo" className="h-9 w-auto object-contain" />
+          <div className="flex justify-center mx-auto mb-6">
+            <img src="/stark-drive.svg" alt="Stark Drive Logo" className="h-20 md:h-24 lg:h-28 w-auto object-contain drop-shadow-md" />
           </div>
           <h1 className="text-2xl font-bold text-textMain">Welcome Back</h1>
           <p className="text-textMuted mt-2">Sign in to your DocSearch AI account</p>
@@ -112,6 +113,10 @@ export default function LoginPage() {
 
           </form>
         </Card>
+
+        <div className="mt-6">
+          <BackendUrlConfig compact />
+        </div>
       </div>
     </div>
   );

@@ -26,6 +26,9 @@ class TokenResponse(BaseModel):
     token_type: str = 'bearer'
     expires_in: int
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
 class TokenPayload(BaseModel):
     sub: str  # user_id
     tenant_id: str

@@ -16,7 +16,10 @@ import { ResultCard } from "@/components/search/ResultCard";
 import { PersistentChatPanel } from "@/components/chat/PersistentChatPanel";
 import { RightSideChatDrawer } from "@/components/chat/RightSideChatDrawer";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-
+import OfflineBanner from "@/components/OfflineBanner";
+import OnlineWarningModal from "@/components/OnlineWarningModal";
+import { useOnlineStatus } from "@/hooks/useOnlineStatus";
+import { offlineStore } from "@/lib/offlineStore";
 
 import { isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
@@ -44,6 +47,9 @@ const getDaysRemainingInBin = (trashedAtStr?: string | null): { text: string; da
 
 export default function DrivePage() {
   const router = useRouter();
+  const { isOnline } = useOnlineStatus();
+  const [showAIWarningModal, setShowAIWarningModal] = useState(false);
+  const [aiWarningFeature, setAiWarningFeature] = useState("AI Assistant");
 
   // Navigation View & Hierarchy State
   const [currentView, setCurrentView] = useState<"home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat">("home");
@@ -274,7 +280,11 @@ export default function DrivePage() {
         setDocuments(dList);
       }
     } catch (err) {
-      console.warn("Could not fetch backend drive items:", err);
+      console.warn("Could not fetch backend drive items, falling back to local offline store:", err);
+      const validParentId = isUUID(currentFolderId) ? currentFolderId : null;
+      setDriveStats(offlineStore.getStats());
+      setFolderTree(offlineStore.getFolderTree());
+      setDocuments(offlineStore.getDocuments(validParentId));
     } finally {
       setLoading(false);
     }
@@ -337,6 +347,11 @@ export default function DrivePage() {
 
   // Handlers
   const handleSearch = async (query: string, useAi: boolean) => {
+    if (!isOnline) {
+      setAiWarningFeature("Global AI Search & RAG");
+      setShowAIWarningModal(true);
+      return;
+    }
     setSearchQuery(query);
     setSearching(true);
     try {
@@ -355,6 +370,7 @@ export default function DrivePage() {
   const handleClearSearch = () => {
     setSearchQuery("");
     setSearchResponse(null);
+    setShowRightChatDrawer(false);
     loadContents();
   };
 
@@ -473,33 +489,62 @@ export default function DrivePage() {
     setSelectedDoc(null);
     setSelectedFolderIds(new Set());
     setSelectedDocIds(new Set());
+    setShowRightChatDrawer(false);
   };
 
   const handleCreateFolder = async (name: string, color: string) => {
+    const validParentId = isUUID(currentFolderId) ? currentFolderId : null;
     try {
-      const validParentId = isUUID(currentFolderId) ? currentFolderId : null;
-      await api.folders.create(name, validParentId, color);
-      loadContents();
+      if (isOnline) {
+        await api.folders.create(name, validParentId, color);
+      } else {
+        throw new Error("Offline Mode");
+      }
     } catch (err: any) {
-      alert(err.message || "Failed to create folder");
+      offlineStore.addAction({
+        type: "create_folder",
+        payload: { name, parent_id: validParentId, color },
+      });
+      const mockFolder: Folder = {
+        id: `off_f_${Date.now()}`,
+        name,
+        color,
+        parent_id: validParentId,
+        tenant_id: "local",
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        is_starred: false,
+        is_trashed: false,
+      };
+      setFolders((prev) => [mockFolder, ...prev]);
     }
+    setIsNewFolderOpen(false);
+    loadContents();
   };
 
   const handlePerformRename = async (newName: string) => {
     if (!itemToRename) return;
     try {
-      if (isUUID(itemToRename.item.id)) {
+      if (isOnline && isUUID(itemToRename.item.id)) {
         if (itemToRename.type === "folder") {
           await api.folders.update(itemToRename.item.id, { name: newName });
         } else {
           await api.documents.update(itemToRename.item.id, { title: newName });
         }
+      } else {
+        throw new Error("Offline or local item");
       }
-      setItemToRename(null);
-      loadContents();
     } catch (err: any) {
-      console.warn("Rename ignored for non-persistent item:", err);
+      if (itemToRename.type === "folder") {
+        offlineStore.addAction({
+          type: "rename_folder",
+          payload: { folder_id: itemToRename.item.id, new_name: newName },
+        });
+        setFolders((prev) => prev.map((f) => (f.id === itemToRename.item.id ? { ...f, name: newName } : f)));
+      }
     }
+    setItemToRename(null);
+    loadContents();
   };
 
   const handlePerformMove = async (targetFolderId: string | null) => {
@@ -545,18 +590,27 @@ export default function DrivePage() {
   };
 
   const handlePermanentDelete = async (type: "folder" | "doc", id: string) => {
-    if (!isUUID(id)) return;
     if (!confirm("Are you sure you want to permanently delete this item?")) return;
     try {
-      if (type === "folder") {
-        await api.folders.deletePermanent(id);
+      if (isOnline && isUUID(id)) {
+        if (type === "folder") {
+          await api.folders.deletePermanent(id);
+        } else {
+          await api.documents.deletePermanent(id);
+        }
       } else {
-        await api.documents.deletePermanent(id);
+        throw new Error("Offline");
       }
-      loadContents();
     } catch (err) {
-      console.warn("Permanent delete failed:", err);
+      if (type === "folder") {
+        offlineStore.addAction({ type: "delete_folder", payload: { folder_id: id } });
+        setFolders((prev) => prev.filter((f) => f.id !== id));
+      } else {
+        offlineStore.addAction({ type: "delete_document", payload: { doc_id: id } });
+        setDocuments((prev) => prev.filter((d) => d.id !== id));
+      }
     }
+    loadContents();
   };
 
   const processFilesForUpload = async (files: File[]) => {
@@ -651,6 +705,9 @@ export default function DrivePage() {
         {...({ webkitdirectory: "", directory: "" } as any)}
       />
 
+      {/* Offline Status & Sync Banner */}
+      <OfflineBanner />
+
       {/* Top Header */}
       <DriveTopHeader
         onSearch={handleSearch}
@@ -658,6 +715,15 @@ export default function DrivePage() {
         onClearSearch={handleClearSearch}
         showInfoPanel={showDetailPanel}
         onToggleInfoPanel={() => setShowDetailPanel(!showDetailPanel)}
+        onNavigateHome={() => {
+          setSearchQuery("");
+          setSearchResponse(null);
+          setShowRightChatDrawer(false);
+          setCurrentView("home");
+          setCurrentFolderId(null);
+          setSelectedFolder(null);
+          setSelectedDoc(null);
+        }}
       />
 
       {/* Body Area */}
@@ -666,7 +732,13 @@ export default function DrivePage() {
         <DriveSidebar
           currentView={currentView}
           onSelectView={(v) => {
+            if (v === "chat" && !isOnline) {
+              setAiWarningFeature("AI Assistant Chat");
+              setShowAIWarningModal(true);
+              return;
+            }
             setSearchQuery("");
+            setShowRightChatDrawer(false);
             setCurrentView(v);
             setCurrentFolderId(null);
             setSelectedFolder(null);
@@ -678,6 +750,8 @@ export default function DrivePage() {
           folderTree={folderTree}
           activeFolderId={currentFolderId}
           onSelectFolder={handleSelectFolderId}
+          onSelectDoc={(d) => handleSelectDoc(d)}
+          onPreviewDoc={(d) => setPreviewDoc(d)}
         />
 
         {/* Center Main Dashboard Canvas */}
@@ -839,29 +913,18 @@ export default function DrivePage() {
                           isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
                         }`}
                       >
-                        <div className="min-w-0 flex-1 pr-2 flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleSelectFolder(f, true);
-                            }}
-                            className="w-3.5 h-3.5 rounded text-[#0b57d0] focus:ring-[#0b57d0] cursor-pointer"
-                          />
-                          <div>
-                            <span className="font-semibold text-sm text-[#1f1f1f] truncate block">{f.name}</span>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] text-[#747775] font-medium">Folder</span>
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                                daysLeft <= 5 
-                                  ? "bg-red-50 text-red-700 border-red-200" 
-                                  : "bg-amber-50 text-amber-700 border-amber-200/80"
-                              }`}>
-                                <Clock className="w-3 h-3" />
-                                {daysText}
-                              </span>
-                            </div>
+                        <div className="min-w-0 flex-1 pr-2">
+                          <span className="font-semibold text-sm text-[#1f1f1f] truncate block">{f.name}</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-[#747775] font-medium">Folder</span>
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                              daysLeft <= 5 
+                                ? "bg-red-50 text-red-700 border-red-200" 
+                                : "bg-amber-50 text-amber-700 border-amber-200/80"
+                            }`}>
+                              <Clock className="w-3 h-3" />
+                              {daysText}
+                            </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -902,29 +965,18 @@ export default function DrivePage() {
                           isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
                         }`}
                       >
-                        <div className="min-w-0 flex-1 pr-2 flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            checked={isSelected}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              handleSelectDoc(d, true);
-                            }}
-                            className="w-3.5 h-3.5 rounded text-[#0b57d0] focus:ring-[#0b57d0] cursor-pointer"
-                          />
-                          <div>
-                            <span className="font-semibold text-sm text-[#1f1f1f] truncate block">{d.title}</span>
-                            <div className="flex items-center gap-2 mt-1">
-                              <span className="text-[10px] text-[#747775] font-medium">Document</span>
-                              <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
-                                daysLeft <= 5 
-                                  ? "bg-red-50 text-red-700 border-red-200" 
-                                  : "bg-amber-50 text-amber-700 border-amber-200/80"
-                              }`}>
-                                <Clock className="w-3 h-3" />
-                                {daysText}
-                              </span>
-                            </div>
+                        <div className="min-w-0 flex-1 pr-2">
+                          <span className="font-semibold text-sm text-[#1f1f1f] truncate block">{d.title}</span>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] text-[#747775] font-medium">Document</span>
+                            <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full border ${
+                              daysLeft <= 5 
+                                ? "bg-red-50 text-red-700 border-red-200" 
+                                : "bg-amber-50 text-amber-700 border-amber-200/80"
+                            }`}>
+                              <Clock className="w-3 h-3" />
+                              {daysText}
+                            </span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1 flex-shrink-0">
@@ -1009,9 +1061,9 @@ export default function DrivePage() {
                 }}
               />
 
-              {/* Suggested Files Detailed Table */}
               <SuggestedFilesTable
                 documents={documents}
+                emptyType={currentView === "starred" ? "starred" : "default"}
                 onSelectDoc={handleSelectDoc}
                 onPreviewDoc={(d) => setPreviewDoc(d)}
                 onContextMenu={(e, d) => handleItemContextMenu(e, "doc", d)}
@@ -1097,6 +1149,13 @@ export default function DrivePage() {
         isOpen={!!itemToMove}
         onClose={() => setItemToMove(null)}
         onMove={handlePerformMove}
+      />
+
+      {/* Online-Only AI Feature Warning Modal */}
+      <OnlineWarningModal
+        isOpen={showAIWarningModal}
+        featureName={aiWarningFeature}
+        onClose={() => setShowAIWarningModal(false)}
       />
 
       {/* Upload Tracker Widget */}

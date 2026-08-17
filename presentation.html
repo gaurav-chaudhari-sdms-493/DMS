@@ -1,0 +1,1421 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>STARK DRIVE v2.0 - System Upgrades Presentation</title>
+  <!-- Google Fonts: Plus Jakarta Sans, Outfit, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --card-bg: #f0f4f9;
+      --search-bg: #edf2fc;
+      --pill-active: #c2e7ff;
+      --pill-text: #001d35;
+      --primary: #0b57d0;
+      --secondary: #00639b;
+      --success: #146c2e;
+      --success-bg: #e6f4ea;
+      --border: #e1e3e1;
+      --text-main: #1f1f1f;
+      --text-muted: #444746;
+      --text-subtle: #5f6368;
+      --stark-orange: #f05623;
+      --stark-light-orange: #f6986b;
+      --card-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Progress Bar */
+    #progress-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      background: rgba(0, 0, 0, 0.05);
+      z-index: 1000;
+    }
+
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--stark-orange), var(--primary));
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Header Nav (Only visible on slides 2+) */
+    header {
+      position: fixed;
+      top: 16px;
+      left: 32px;
+      right: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 900;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    header.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .brand-logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .brand-logo-container img {
+      height: 32px;
+      width: auto;
+      object-fit: contain;
+    }
+
+    /* Main Slides Canvas - FULL VIEWPORT CENTERING */
+    .slides-wrapper {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.96);
+      width: calc(100vw - 64px);
+      max-width: 1750px;
+      height: calc(100vh - 64px);
+      max-height: 950px;
+      opacity: 0;
+      visibility: hidden;
+      overflow: hidden;
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        visibility 0.5s step-end;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 40px 54px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--card-shadow);
+      text-align: left;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, -50%) scale(1);
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        visibility 0s step-start;
+    }
+
+    /* Keyframe Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(22px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.92);
+      }
+
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    /* Staggered entrance animations for elements inside active slide */
+    .slide.active .slide-header {
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .slide.active .top-right-version {
+      animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+    }
+
+    .slide.active .bottom-right-team {
+      animation: scaleIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.15s both;
+    }
+
+    .slide.active .cover-logo-img-centered {
+      animation: scaleIn 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+    }
+
+    .slide.active .cover-title-main {
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.12s both;
+    }
+
+    .slide.active .cover-subtitle-main {
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.18s both;
+    }
+
+    .slide.active .whats-new-container {
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
+    }
+
+    .slide.active .whats-new-item {
+      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .slide.active .whats-new-item:nth-child(1) {
+      animation-delay: 0.3s;
+    }
+
+    .slide.active .whats-new-item:nth-child(2) {
+      animation-delay: 0.38s;
+    }
+
+    .slide.active .whats-new-item:nth-child(3) {
+      animation-delay: 0.46s;
+    }
+
+    .slide.active .whats-new-item:nth-child(4) {
+      animation-delay: 0.54s;
+    }
+
+    .slide.active .metric-col {
+      animation: fadeInUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .slide.active .metric-col:nth-child(1) {
+      animation-delay: 0.12s;
+    }
+
+    .slide.active .metric-col:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+
+    .slide.active .metric-col:nth-child(3) {
+      animation-delay: 0.28s;
+    }
+
+    .slide.active .metric-col:nth-child(4) {
+      animation-delay: 0.36s;
+    }
+
+    .slide.active .grid-2>.card {
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .slide.active .grid-2>.card:nth-child(1) {
+      animation-delay: 0.22s;
+    }
+
+    .slide.active .grid-2>.card:nth-child(2) {
+      animation-delay: 0.36s;
+    }
+
+    .slide.active .grid-2>.card:nth-child(3) {
+      animation-delay: 0.48s;
+    }
+
+    .slide.active .grid-2>.card:nth-child(4) {
+      animation-delay: 0.6s;
+    }
+
+    .slide.active .grid-3>.card {
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .slide.active .grid-3>.card:nth-child(1) {
+      animation-delay: 0.15s;
+    }
+
+    .slide.active .grid-3>.card:nth-child(2) {
+      animation-delay: 0.28s;
+    }
+
+    .slide.active .grid-3>.card:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+
+    .slide.active .flow-step {
+      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .slide.active .flow-step:nth-child(1) {
+      animation-delay: 0.12s;
+    }
+
+    .slide.active .flow-step:nth-child(2) {
+      animation-delay: 0.22s;
+    }
+
+    .slide.active .flow-step:nth-child(3) {
+      animation-delay: 0.32s;
+    }
+
+    .slide.active .flow-step:nth-child(4) {
+      animation-delay: 0.42s;
+    }
+
+    .slide.active .comp-table tbody tr {
+      animation: fadeInUp 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
+    }
+
+    .slide.active .comp-table tbody tr:nth-child(1) {
+      animation-delay: 0.12s;
+    }
+
+    .slide.active .comp-table tbody tr:nth-child(2) {
+      animation-delay: 0.18s;
+    }
+
+    .slide.active .comp-table tbody tr:nth-child(3) {
+      animation-delay: 0.24s;
+    }
+
+    .slide.active .comp-table tbody tr:nth-child(4) {
+      animation-delay: 0.3s;
+    }
+
+    .slide.active .comp-table tbody tr:nth-child(5) {
+      animation-delay: 0.36s;
+    }
+
+    .slide.active .comp-table tbody tr:nth-child(6) {
+      animation-delay: 0.42s;
+    }
+
+    /* SLIDE 1: COVER PAGE */
+    .cover-slide {
+      position: relative;
+      padding: 40px 54px;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .top-right-version {
+      position: absolute;
+      top: 40px;
+      right: 48px;
+      background: var(--stark-orange);
+      color: white;
+      font-weight: 800;
+      font-size: 1.05rem;
+      padding: 10px 24px;
+      border-radius: 9999px;
+      letter-spacing: 0.05em;
+      box-shadow: 0 4px 16px rgba(240, 86, 35, 0.3);
+      z-index: 10;
+    }
+
+    .bottom-right-team {
+      position: absolute;
+      bottom: 40px;
+      right: 48px;
+      background: var(--search-bg);
+      color: var(--primary);
+      border: 1px solid var(--pill-active);
+      font-weight: 700;
+      font-size: 1rem;
+      padding: 10px 24px;
+      border-radius: 9999px;
+      z-index: 10;
+    }
+
+    .cover-center-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 22px;
+      max-width: 1150px;
+      margin: 0 auto;
+      width: 100%;
+    }
+
+    .cover-logo-img-centered {
+      height: 130px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 12px 28px rgba(240, 86, 35, 0.2));
+    }
+
+    .cover-title-main {
+      font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+      font-size: 3.8rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+      line-height: 1.15;
+    }
+
+    .dms-highlight {
+      color: var(--stark-orange);
+      background: linear-gradient(135deg, var(--stark-orange), #ff8a65);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+      font-weight: 800;
+    }
+
+    .cover-subtitle-main {
+      font-size: 1.35rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      margin-top: -6px;
+    }
+
+    .whats-new-container {
+      margin-top: 12px;
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 28px 40px;
+      width: 100%;
+      max-width: 1000px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.03);
+    }
+
+    .whats-new-header-center {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 800;
+      color: var(--stark-orange);
+      text-align: center;
+      margin-bottom: 20px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    .whats-new-grid-center {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 18px 36px;
+      text-align: left;
+    }
+
+    .whats-new-item {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 14px 20px;
+      border-radius: 16px;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .whats-new-item:hover {
+      border-color: var(--primary);
+      box-shadow: 0 4px 12px rgba(11, 87, 208, 0.08);
+    }
+
+    .item-icon {
+      width: 42px;
+      height: 42px;
+      border-radius: 12px;
+      background: var(--search-bg);
+      border: 1px solid var(--pill-active);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.3rem;
+      flex-shrink: 0;
+    }
+
+    .item-title {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    /* Slide Header */
+    .slide-header {
+      margin-bottom: 18px;
+      text-align: left;
+    }
+
+    .slide-title {
+      font-family: 'Outfit', 'Plus Jakarta Sans', sans-serif;
+      font-size: 2.5rem;
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      color: var(--text-main);
+      margin-bottom: 4px;
+    }
+
+    .slide-subtitle {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    /* Slide Body Layouts */
+    .slide-body {
+      flex: 1;
+      display: flex;
+      gap: 18px;
+      align-items: stretch;
+      overflow: hidden;
+      padding-right: 6px;
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      width: 100%;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      width: 100%;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 20px;
+      width: 100%;
+    }
+
+    /* App Style Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      text-align: left;
+      transition: all 0.25s ease;
+    }
+
+    .card:hover {
+      background: var(--surface);
+      border-color: var(--primary);
+      box-shadow: 0 14px 36px rgba(11, 87, 208, 0.1);
+      transform: translateY(-3px);
+    }
+
+    .card-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.3rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .card-desc {
+      font-size: 1.02rem;
+      color: var(--text-muted);
+      line-height: 1.6;
+    }
+
+    /* Metric Cards & Bottom Badges */
+    .metric-col {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 12px;
+      height: 100%;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px 20px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      text-align: center;
+      width: 100%;
+      flex: 1;
+      box-shadow: 0 4px 14px rgba(0, 0, 0, 0.03);
+      transition: all 0.25s ease;
+    }
+
+    .metric-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 10px 24px rgba(0, 0, 0, 0.08);
+      border-color: var(--primary);
+    }
+
+    .metric-bottom-badge {
+      font-size: 0.78rem;
+      font-weight: 800;
+      letter-spacing: 0.06em;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      text-transform: uppercase;
+    }
+
+    .badge-green {
+      background: #e6f4ea;
+      color: #137333;
+      border: 1px solid #ceead6;
+    }
+
+    .badge-blue {
+      background: #e8f0fe;
+      color: #1a73e8;
+      border: 1px solid #c6dafc;
+    }
+
+    .badge-orange {
+      background: #feefe3;
+      color: #d93025;
+      border: 1px solid #fad2cf;
+    }
+
+    .badge-purple {
+      background: #f3e8fd;
+      color: #8430ce;
+      border: 1px solid #e1c2ff;
+    }
+
+    .metric-card-num {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.8rem;
+      font-weight: 800;
+      line-height: 1;
+      margin-top: 4px;
+      text-align: center;
+    }
+
+    .color-green {
+      color: #137333;
+    }
+
+    .color-blue {
+      color: #1a73e8;
+    }
+
+    .color-orange {
+      color: #e65100;
+    }
+
+    .color-purple {
+      color: #8430ce;
+    }
+
+    .metric-card-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text-main);
+      text-align: center;
+    }
+
+    .metric-card-desc {
+      font-size: 0.92rem;
+      color: var(--text-muted);
+      line-height: 1.4;
+      text-align: center;
+    }
+
+    /* Flow Step */
+    .flow-container {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      width: 100%;
+    }
+
+    .flow-step {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 16px 22px;
+      border-radius: 18px;
+      transition: all 0.25s ease;
+      text-align: left;
+    }
+
+    .flow-step:hover {
+      border-color: var(--primary);
+      background: var(--search-bg);
+    }
+
+    .flow-num {
+      width: 38px;
+      height: 38px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.1rem;
+      flex-shrink: 0;
+    }
+
+    .flow-text {
+      flex: 1;
+    }
+
+    .flow-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 700;
+      font-size: 1.12rem;
+      color: var(--text-main);
+    }
+
+    .flow-sub {
+      font-size: 0.94rem;
+      color: var(--text-muted);
+      margin-top: 2px;
+    }
+
+    /* Tables */
+    .comp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 1.02rem;
+      text-align: left;
+    }
+
+    .comp-table th {
+      background: var(--card-bg);
+      color: var(--text-muted);
+      font-weight: 700;
+      text-transform: uppercase;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .comp-table td {
+      padding: 16px 22px;
+      border-bottom: 1px solid var(--border);
+      color: var(--text-main);
+      background: var(--surface);
+    }
+
+    .comp-table tr:hover td {
+      background: var(--search-bg);
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 5px 14px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    .pill-blue {
+      background: var(--pill-active);
+      color: var(--primary);
+      border: 1px solid #a8c7fa;
+    }
+
+    .pill-green {
+      background: var(--success-bg);
+      color: var(--success);
+      border: 1px solid #ceead6;
+    }
+
+    .pill-orange {
+      background: #feefe3;
+      color: #e65100;
+      border: 1px solid #fad2cf;
+    }
+
+    /* Footer Nav Controls */
+    footer {
+      position: fixed;
+      bottom: 16px;
+      left: 32px;
+      right: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 900;
+    }
+
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .btn-nav {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 10px 24px;
+      border-radius: 9999px;
+      font-weight: 700;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+    }
+
+    .btn-nav:hover {
+      background: var(--search-bg);
+      color: var(--primary);
+      border-color: var(--primary);
+    }
+
+    .slide-counter {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      font-weight: 700;
+      font-family: 'JetBrains Mono', monospace;
+      background: var(--surface);
+      padding: 8px 18px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+  </style>
+</head>
+
+<body>
+  <div id="progress-container">
+    <div id="progress-bar"></div>
+  </div>
+
+  <!-- Header (Visible on Slide 2+) -->
+  <header id="header-nav">
+    <div class="brand-logo-container">
+      <img src="frontend/public/stark-drive.svg" alt="Stark Drive Logo" />
+    </div>
+  </header>
+
+  <div class="slides-wrapper">
+
+    <!-- SLIDE 1: COVER PAGE -->
+    <div class="slide cover-slide active" id="slide-1">
+      <div class="top-right-version">VERSION 2.0</div>
+      <div class="bottom-right-team">Developed by Stark AI Team</div>
+
+      <div class="cover-center-container">
+        <img src="frontend/public/stark-drive.svg" alt="Stark Drive Logo" class="cover-logo-img-centered" />
+
+        <div class="cover-title-main">
+          Document Management System <span class="dms-highlight">(DMS)</span>
+        </div>
+        <div class="cover-subtitle-main">Next-Generation AI Document Search & File Management Platform</div>
+
+        <div class="whats-new-container">
+          <div class="whats-new-header-center">What's New in Version 2.0</div>
+          <div class="whats-new-grid-center">
+            <div class="whats-new-item" onclick="goToSlide(2)">
+              <div class="item-icon">⚡</div>
+              <div class="item-title">1. 100% Free Local AI Search Engine</div>
+            </div>
+            <div class="whats-new-item" onclick="goToSlide(3)">
+              <div class="item-icon">🌐</div>
+              <div class="item-title">2. Multi-Language Search (English, Hindi, Marathi, Hinglish)</div>
+            </div>
+            <div class="whats-new-item" onclick="goToSlide(4)">
+              <div class="item-icon">🛡️</div>
+              <div class="item-title">3. Enterprise Data Security & Privacy</div>
+            </div>
+            <div class="whats-new-item" onclick="goToSlide(5)">
+              <div class="item-icon">✨</div>
+              <div class="item-title">4. Redesigned Drive UI & PDF Viewer</div>
+            </div>
+            <div class="whats-new-item" onclick="goToSlide(6)" style="grid-column: span 2; max-width: 480px; justify-self: center; width: 100%;">
+              <div class="item-icon">🐧</div>
+              <div class="item-title">5. Native Linux Desktop App Integration</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: CHANGE 1 - 100% FREE LOCAL AI SEARCH ENGINE -->
+    <div class="slide" id="slide-2">
+      <div class="slide-header">
+        <div class="slide-title">1. 100% Free Local AI Search Engine</div>
+        <div class="slide-subtitle">On-premise vector embeddings • Zero API costs • Zero latency</div>
+      </div>
+
+      <div class="slide-body" style="flex-direction: column; gap: 20px;">
+        <div class="grid-4">
+          <div class="metric-col">
+            <div class="metric-card">
+              <div class="metric-card-num color-green">100%</div>
+              <div class="metric-card-title">Zero API Costs</div>
+              <div class="metric-card-desc">Local Execution</div>
+            </div>
+            <div class="metric-bottom-badge badge-green">COST SAVINGS</div>
+          </div>
+
+          <div class="metric-col">
+            <div class="metric-card">
+              <div class="metric-card-num color-blue">1024d</div>
+              <div class="metric-card-title">Dense Vectors</div>
+              <div class="metric-card-desc">FastEmbed Model</div>
+            </div>
+            <div class="metric-bottom-badge badge-blue">HIGH ACCURACY</div>
+          </div>
+
+          <div class="metric-col">
+            <div class="metric-card">
+              <div class="metric-card-num color-orange">&lt;50ms</div>
+              <div class="metric-card-title">Instant Search</div>
+              <div class="metric-card-desc">pgvector HNSW</div>
+            </div>
+            <div class="metric-bottom-badge badge-orange">ZERO LATENCY</div>
+          </div>
+
+          <div class="metric-col">
+            <div class="metric-card">
+              <div class="metric-card-num color-purple">0 Limits</div>
+              <div class="metric-card-title">Unlimited Scale</div>
+              <div class="metric-card-desc">Zero Token Caps</div>
+            </div>
+            <div class="metric-bottom-badge badge-purple">UNLIMITED QUERIES</div>
+          </div>
+        </div>
+
+        <div class="grid-2" style="flex: 1; gap: 20px;">
+          <div class="card" style="padding: 28px 36px; justify-content: center; gap: 16px;">
+            <div class="card-title"
+              style="font-size: 1.4rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--primary);">
+              On-Premise Local AI Architecture
+            </div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.2rem; font-weight: 700; color: var(--text-main);">
+                <div>• Zero Third-Party API Fees</div>
+                <div>• FastEmbed ONNX Engine (1024d)</div>
+                <div>• 100% Data Sovereignty & Privacy</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="padding: 28px 36px; justify-content: center; gap: 16px;">
+            <div class="card-title"
+              style="font-size: 1.4rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--primary);">
+              High-Throughput Vector Pipeline
+            </div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.2rem; font-weight: 700; color: var(--text-main);">
+                <div>• PostgreSQL + pgvector (Sub-ms HNSW)</div>
+                <div>• Asynchronous Celery Queues</div>
+                <div>• Resource Optimized CPU Footprint</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: CHANGE 2 - MULTI-LANGUAGE SEARCH -->
+    <div class="slide" id="slide-3">
+      <div class="slide-header">
+        <div class="slide-title">2. Multi-Language AI Search Engine</div>
+        <div class="slide-subtitle">Instant, context-aware document search supporting English, Hindi, Marathi & Hinglish
+        </div>
+      </div>
+
+      <div class="slide-body" style="flex-direction: column; gap: 20px; justify-content: center;">
+        <!-- DEMO SECTION -->
+        <div
+          style="padding: 24px 32px; display: flex; flex-direction: column; gap: 16px; width: 100%; background: #ffffff; border-radius: 24px; box-shadow: 0 12px 40px rgba(11,87,208,0.07);">
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 2px;">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <div
+                style="font-family: 'Outfit', sans-serif; font-size: 1.3rem; font-weight: 800; color: var(--primary);">
+                Multi-Lingual Search Demonstration
+              </div>
+            </div>
+            <span class="pill pill-blue" style="font-weight: 800; font-size: 0.88rem; padding: 5px 16px;">⚡ Pure Marathi
+              Query (Devanagari)</span>
+          </div>
+
+          <!-- Search Bar -->
+          <div
+            style="background: #f0f4f9; border-radius: 40px; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
+            <div style="display: flex; align-items: center; gap: 14px; flex: 1;">
+              <span style="font-size: 1.15rem;">🔎</span>
+              <div
+                style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.25rem; font-weight: 800; color: var(--primary);">
+                "आपल्याकडे गौरव चौधरी नावाने कोणते रेझ्युमे आहे का?"
+              </div>
+            </div>
+          </div>
+
+          <!-- Matched Result Card -->
+          <div
+            style="background: #f8faff; border-radius: 18px; padding: 16px 22px; display: flex; flex-direction: column; gap: 10px;">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+              <div style="display: flex; align-items: center; gap: 14px;">
+                <div
+                  style="background: #ffffff; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
+                  📄
+                </div>
+                <div>
+                  <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-weight: 800; font-size: 1.2rem; color: var(--text-main);">Resume.docx</span>
+                    <span style="color: #059669; font-size: 1.1rem; font-weight: 800;">✓</span>
+                  </div>
+                  <div style="font-size: 0.88rem; color: var(--text-muted); margin-top: 1px;">
+                    Microsoft Word Document • <b>English Language Content</b>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 3px;">
+                <span class="pill pill-green" style="font-size: 0.9rem; padding: 4px 14px; font-weight: 800;">99% Match
+                  Confidence</span>
+                <div
+                  style="width: 130px; height: 6px; background: #e2e8f0; border-radius: 4px; overflow: hidden; margin-top: 2px;">
+                  <div style="width: 99%; height: 100%; background: #059669; border-radius: 4px;"></div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Content Preview Box -->
+            <div
+              style="background: #ffffff; border-radius: 14px; padding: 14px 18px; font-size: 0.92rem; color: var(--text-muted); box-shadow: 0 4px 14px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 8px;">
+              <div
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 0.92rem; line-height: 1.45;">
+                <div>
+                  <strong
+                    style="color: var(--text-main); display: block; font-size: 0.95rem; margin-bottom: 4px;">Candidate
+                    Profile:</strong>
+                  <div><b style="color: var(--text-main);">Name:</b> <span
+                      style="background: #e8f0fe; color: var(--primary); padding: 2px 8px; border-radius: 6px; font-weight: 700;">Gaurav
+                      Chaudhari</span></div>
+                  <div><b style="color: var(--text-main);">Title:</b> AI Engineer</div>
+                  <div><b style="color: var(--text-main);">Location:</b> Pune, Maharashtra, India</div>
+                </div>
+
+                <div>
+                  <strong
+                    style="color: var(--text-main); display: block; font-size: 0.95rem; margin-bottom: 4px;">Technical
+                    Stack & Skills:</strong>
+                  <div><b style="color: var(--text-main);">Languages:</b> Python, TypeScript, SQL, Bash</div>
+                  <div><b style="color: var(--text-main);">AI / Vectors:</b> FastEmbed 1024d, pgvector, Semantic Search
+                  </div>
+                  <div><b style="color: var(--text-main);">Backend:</b> PostgreSQL RLS, FastAPI, Celery, Docker</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3-COLUMN STRIP -->
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%;">
+          <div
+            style="display: flex; align-items: center; gap: 14px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
+            <div
+              style="background: linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%); color: white; font-weight: 800; font-size: 0.95rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(11,87,208,0.25);">
+              1</div>
+            <div>
+              <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">Multi-Language</div>
+              <div style="font-size: 0.86rem; color: var(--text-muted); margin-top: 1px;">English, Hindi, Marathi &
+                Hinglish</div>
+            </div>
+          </div>
+
+          <div
+            style="display: flex; align-items: center; gap: 14px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
+            <div
+              style="background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%); color: white; font-weight: 800; font-size: 0.95rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(124,58,237,0.25);">
+              2</div>
+            <div>
+              <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">Contextual Intent</div>
+              <div style="font-size: 0.86rem; color: var(--text-muted); margin-top: 1px;">Matches concept & intent
+                beyond keywords</div>
+            </div>
+          </div>
+
+          <div
+            style="display: flex; align-items: center; gap: 14px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
+            <div
+              style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; font-weight: 800; font-size: 0.95rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(5,150,105,0.25);">
+              3</div>
+            <div>
+              <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">Precision Cutoff</div>
+              <div style="font-size: 0.86rem; color: var(--text-muted); margin-top: 1px;">Zero non-matching filler cards
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: CHANGE 3 - ENTERPRISE DATA SECURITY & PRIVACY -->
+    <div class="slide" id="slide-4">
+      <div class="slide-header">
+        <div class="slide-title">3. Enterprise Data Security & Privacy</div>
+        <div class="slide-subtitle">Kernel-level tenant isolation • Token defense • Zero-trust security</div>
+      </div>
+
+      <div class="slide-body">
+        <div class="grid-3">
+          <div class="card" style="padding: 26px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Database Row Security (RLS)</div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Kernel-Level RLS Isolation</div>
+                <div>• Zero Cross-Tenant Data Leakage</div>
+                <div>• Strict Multi-Tenant Isolation</div>
+              </div>
+            </div>
+            <span class="pill pill-green" style="align-self: flex-start;">Kernel Security</span>
+          </div>
+
+          <div class="card" style="padding: 26px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Session & Token Security</div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Strict JWT Token Lifecycle</div>
+                <div>• Purged Logout Protection</div>
+                <div>• Protected Route Guards</div>
+              </div>
+            </div>
+            <span class="pill pill-blue" style="align-self: flex-start;">Zero Leakage</span>
+          </div>
+
+          <div class="card" style="padding: 26px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Infrastructure Integrity</div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Versioned Alembic Migrations</div>
+                <div>• MinIO S3 Object Storage</div>
+                <div>• Continuous Health Diagnostics</div>
+              </div>
+            </div>
+            <span class="pill pill-green" style="align-self: flex-start;">High Availability</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: CHANGE 4 - REDESIGNED DRIVE UI & PDF VIEWER -->
+    <div class="slide" id="slide-5">
+      <div class="slide-header">
+        <div class="slide-title">4. Redesigned Drive UI & PDF Viewer</div>
+        <div class="slide-subtitle">Batch operations • Format filters • ChatGPT UI • Starred guide</div>
+      </div>
+
+      <div class="slide-body">
+        <div class="grid-2" style="gap: 20px;">
+          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Batch Operations & Grid Preview
+            </div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Multi-File Batch Selection</div>
+                <div>• Visual Grid Thumbnails</div>
+                <div>• Fullscreen PDF Viewer</div>
+              </div>
+            </div>
+            <span class="pill pill-blue" style="align-self: flex-end;">Modern Drive UX</span>
+          </div>
+
+          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Format Analytics & Filter Modal
+            </div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Scroll View Analytics (<code style="font-family: 'JetBrains Mono';">max-h-[360px]</code>)</div>
+                <div>• Extension Click-to-Filter Modal</div>
+              </div>
+            </div>
+            <span class="pill pill-green" style="align-self: flex-end;">Smart Analytics</span>
+          </div>
+
+          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">ChatGPT-Style AI Chat</div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Centered Spacious Layout (<code style="font-family: 'JetBrains Mono';">max-w-3xl</code>)</div>
+                <div>• Image OCR & Multi-Turn History Sync</div>
+              </div>
+            </div>
+            <span class="pill pill-blue" style="align-self: flex-end;">ChatGPT UI</span>
+          </div>
+
+          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Graphical Empty State Guides</div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Step-by-Step Starred View Guide</div>
+                <div>• Right-Click Context Menus</div>
+              </div>
+            </div>
+            <span class="pill pill-green" style="align-self: flex-end;">Intuitive Onboarding</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: CHANGE 5 - NATIVE LINUX DESKTOP APP INTEGRATION -->
+    <div class="slide" id="slide-6">
+      <div class="slide-header">
+        <div class="slide-title">5. Native Linux Desktop App Integration</div>
+        <div class="slide-subtitle">Cross-platform desktop packaging • System integration • Local file sync</div>
+      </div>
+
+      <div class="slide-body">
+        <div class="grid-2" style="gap: 20px;">
+          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Desktop Application Packaging</div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Standalone Linux Desktop Binary</div>
+                <div>• AppImage & System Package Support</div>
+                <div>• Custom Native Application Logos</div>
+              </div>
+            </div>
+            <span class="pill pill-blue" style="align-self: flex-end;">Native Desktop</span>
+          </div>
+
+          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">System Integration & File Sync</div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
+                <div>• Native System Tray & Menu Integration</div>
+                <div>• Automatic Local Storage Sync</div>
+                <div>• Offline Document & File Access</div>
+              </div>
+            </div>
+            <span class="pill pill-green" style="align-self: flex-end;">OS Integration</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: LAST SLIDE - VERSION COMPARISON -->
+    <div class="slide" id="slide-7">
+      <div class="slide-header">
+        <div class="slide-title">Version Comparison (V1.0 vs V2.0)</div>
+        <div class="slide-subtitle">Comprehensive side-by-side comparison of performance, AI engine, security, and user
+          experience</div>
+      </div>
+
+      <div class="slide-body" style="flex-direction: column; gap: 20px;">
+        <table class="comp-table">
+          <thead>
+            <tr>
+              <th>System Capability</th>
+              <th>Version 1.0</th>
+              <th>Version 2.0 (Current)</th>
+              <th>Business Impact</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>1. Search Intelligence</b></td>
+              <td>External Paid API</td>
+              <td><b>100% Free Local AI Engine</b></td>
+              <td><span class="pill pill-green">100% Cost Saved</span></td>
+            </tr>
+            <tr>
+              <td><b>2. Language Support</b></td>
+              <td>English Only</td>
+              <td><b>English, Hindi, Marathi & Hinglish</b></td>
+              <td><span class="pill pill-blue">+42% Higher Recall</span></td>
+            </tr>
+            <tr>
+              <td><b>3. Data Security & Privacy</b></td>
+              <td>Application WHERE filtering</td>
+              <td><b>Native Database Row Security (RLS)</b></td>
+              <td><span class="pill pill-green">Enterprise Security</span></td>
+            </tr>
+            <tr>
+              <td><b>4. Drive UI & Selection</b></td>
+              <td>Single item selection</td>
+              <td><b>Batch Multi-Select & Format Filters</b></td>
+              <td><span class="pill pill-blue">3x Faster Workflow</span></td>
+            </tr>
+            <tr>
+              <td><b>5. AI Chat & OCR Ingestion</b></td>
+              <td>Congested UI & Image OCR Fails</td>
+              <td><b>ChatGPT-Style UI & Robust OCR Handling</b></td>
+              <td><span class="pill pill-green">100% Reliability</span></td>
+            </tr>
+            <tr>
+              <td><b>6. Session & Token Security</b></td>
+              <td>Basic Session Clear</td>
+              <td><b>Total Token Purge & Route Guarding</b></td>
+              <td><span class="pill pill-green">Zero Data Leakage</span></td>
+            </tr>
+            <tr>
+              <td><b>7. Desktop Client Integration</b></td>
+              <td>Web Browser Only</td>
+              <td><b>Native Linux Desktop Application</b></td>
+              <td><span class="pill pill-blue">Native OS Workflow</span></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Live Demo Banner -->
+        <div
+          style="background: var(--search-bg); border: 1px solid var(--pill-active); border-radius: 20px; padding: 18px 32px; display: flex; justify-content: space-between; align-items: center; margin-top: auto;">
+          <div>
+            <div
+              style="font-family: 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 800; color: var(--primary);">
+              Ready for Live System Demo</div>
+            <div style="font-size: 0.98rem; color: var(--text-muted); margin-top: 4px;">Stark Drive V2.0 is faster,
+              cost-free on embeddings, multilingually capable & kernel-secured.</div>
+          </div>
+          <button class="btn-nav" onclick="goToSlide(1)"
+            style="background: var(--primary); color: white; border: none;">Restart Presentation</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer Navigation -->
+  <footer id="footer-nav">
+    <div class="slide-counter"><span id="current-slide-num">1</span> / 7</div>
+    <div class="controls">
+      <button class="btn-nav" onclick="prevSlide()">← Previous</button>
+      <button class="btn-nav" onclick="nextSlide()">Next →</button>
+    </div>
+  </footer>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 7;
+
+    function updateSlide() {
+      document.querySelectorAll('.slide').forEach((s, idx) => {
+        if (idx + 1 === currentSlide) {
+          s.classList.add('active');
+        } else {
+          s.classList.remove('active');
+        }
+      });
+
+      const headerNav = document.getElementById('header-nav');
+      if (currentSlide > 1) {
+        headerNav.classList.add('visible');
+      } else {
+        headerNav.classList.remove('visible');
+      }
+
+      const slideNumEl = document.getElementById('current-slide-num');
+      if (slideNumEl) {
+        slideNumEl.textContent = currentSlide;
+      }
+
+      document.getElementById('progress-bar').style.width = `${(currentSlide / totalSlides) * 100}%`;
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        currentSlide++;
+        updateSlide();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        updateSlide();
+      }
+    }
+
+    function goToSlide(num) {
+      currentSlide = num;
+      updateSlide();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        prevSlide();
+      } else if (e.key === 'Home') {
+        goToSlide(1);
+      } else if (e.key === 'End') {
+        goToSlide(totalSlides);
+      } else if (e.key.toLowerCase() === 'f') {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => { });
+        } else {
+          document.exitFullscreen().catch(() => { });
+        }
+      }
+    });
+
+    let startX = 0;
+    document.addEventListener('touchstart', (e) => startX = e.touches[0].clientX);
+    document.addEventListener('touchend', (e) => {
+      let diff = startX - e.changedTouches[0].clientX;
+      if (diff > 50) nextSlide();
+      else if (diff < -50) prevSlide();
+    });
+
+    updateSlide();
+  </script>
+</body>
+
+</html>

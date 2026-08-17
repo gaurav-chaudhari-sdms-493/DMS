@@ -13,7 +13,7 @@ import {
   Upload,
   Sparkles,
 } from "lucide-react";
-import type { DriveStats, FolderTreeNode } from "@/types";
+import type { DriveStats, FolderTreeNode, DocumentListItem } from "@/types";
 import { FolderTreeSidebar } from "./FolderTreeSidebar";
 
 interface DriveSidebarProps {
@@ -25,6 +25,8 @@ interface DriveSidebarProps {
   folderTree?: FolderTreeNode[];
   activeFolderId?: string | null;
   onSelectFolder?: (folderId: string) => void;
+  onSelectDoc?: (doc: DocumentListItem) => void;
+  onPreviewDoc?: (doc: DocumentListItem) => void;
 }
 
 export function DriveSidebar({
@@ -36,6 +38,8 @@ export function DriveSidebar({
   folderTree = [],
   activeFolderId = null,
   onSelectFolder,
+  onSelectDoc,
+  onPreviewDoc,
 }: DriveSidebarProps) {
   const [showNewMenu, setShowNewMenu] = useState(false);
   const [expandDriveTree, setExpandDriveTree] = useState(true);
@@ -48,7 +52,7 @@ export function DriveSidebar({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  const usedBytes = stats?.total_size_bytes || 0;
+  const usedBytes = stats?.total_bytes ?? stats?.total_size_bytes ?? 0;
 
   return (
     <aside className="w-60 flex-shrink-0 flex flex-col justify-between py-2 pr-2 select-none bg-gdriveBg overflow-y-auto">
@@ -157,6 +161,8 @@ export function DriveSidebar({
                 tree={folderTree}
                 activeFolderId={activeFolderId}
                 onSelectFolder={onSelectFolder}
+                onSelectDoc={onSelectDoc}
+                onPreviewDoc={onPreviewDoc}
               />
             )}
           </div>
