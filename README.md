@@ -2,15 +2,13 @@
 
 A production-ready platform for multi-tenant document ingestion, processing, and vector search with row-level security.
 
-This repo is the **backend** — a FastAPI service plus the Postgres/Redis/MinIO/Celery stack it depends on. The Next.js frontend lives in its own repo: [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend).
-
 ## Architecture
 
 ```text
        [ User / API ]
              │
              ▼
-    [ Next.js Frontend ]  (DMS-frontend repo, Port 3000)
+    [ Next.js Frontend ] (Port 3000)
              │
              ▼
     [ FastAPI Backend ]  (Port 8000)
@@ -53,23 +51,19 @@ The system includes comprehensive documentation for technical evaluation, setup,
    ```bash
    docker compose up --build
    ```
-   This brings up the backend stack only (API, Postgres, Redis, MinIO, Celery worker/Flower). Check the container logs to monitor progress.
-5. **Run the frontend**: clone [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend) separately and point `NEXT_PUBLIC_API_URL` at this backend (`http://localhost:8000` by default) — see that repo's README for setup.
+   The system will be available after a few moments. Check the container logs to monitor progress.
 
 For more detailed instructions on the Docker setup, see the [Docker README](./docker/README.md).
 
 ## Services Reference
 
-| Service   | Description                              | Port |
-|-----------|-------------------------------------------|------|
-| Backend   | FastAPI Python server                    | 8000 |
-| Postgres  | pgvector database                        | 5432 |
-| Redis     | Caching & task queue store               | 6379 |
-| MinIO     | S3-compatible object storage (+ console) | 9000 / 9001 |
-| Worker    | Celery background worker                 | N/A  |
-| Flower    | Celery dashboard                         | 5555 |
-
-Frontend (Next.js web app, port 3000) lives in the separate [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend) repo.
+| Service   | Description                | Port |
+|-----------|----------------------------|------|
+| Frontend  | Next.js web application    | 3000 |
+| Backend   | FastAPI Python server      | 8000 |
+| Postgres  | pgvector database          | 5432 |
+| Redis     | Caching & task queue store | 6379 |
+| Worker    | Celery background worker   | N/A  |
 
 ## Environment Variables Reference
 
@@ -125,8 +119,12 @@ To run services locally outside of Docker:
   cd backend
   celery -A app.tasks.worker.celery_app worker --loglevel=info
   ```
-
-For frontend development, see [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend).
+- **Frontend**:
+  ```bash
+  cd frontend
+  npm install
+  npm run dev
+  ```
 
 ## Phase 2 Roadmap
 

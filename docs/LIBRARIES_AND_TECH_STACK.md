@@ -69,7 +69,20 @@ All backend Python packages are defined in `backend/requirements.txt`:
 
 ## 3. Frontend Dependencies (TypeScript / JavaScript)
 
-The frontend now lives in a separate repo: [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend). See its `package.json` for the current dependency list (Next.js 14, React 18, TypeScript, Tailwind CSS, plus Electron/Tauri for desktop packaging).
+All frontend dependencies are defined in `frontend/package.json`:
+
+| Package | Version | Purpose & Usage in DMS |
+|---------|---------|------------------------|
+| **`next`** | `14.0.0` | React Framework for production providing App Router, Server Side Rendering (SSR), API route proxying, and asset optimization. |
+| **`react`** | `^18.0.0` | UI component library powering client interactivity. |
+| **`react-dom`** | `^18.0.0` | DOM bindings for React rendering engine. |
+| **`typescript`** | `^5.0.0` | Static type system ensuring type safety across component props, API payloads, and state models. |
+| **`tailwindcss`** | `^3.3.0` | Utility-first CSS framework used to build custom dark-mode glassmorphic interface components. |
+| **`lucide-react`** | `^0.300.0` | Icon set for UI actions (file types, search buttons, folder tree, download links, action feedback). |
+| **`mammoth`** | `^1.8.0` | Client-side Word (`.docx`) file renderer converting Word files directly to clean HTML in document preview modals. |
+| **`xlsx`** | `^0.18.5` | Client-side spreadsheet renderer rendering Excel files into interactive HTML data tables in preview modals. |
+| **`autoprefixer`** | `^10.0.1` | PostCSS plugin parsing CSS and adding vendor prefixes. |
+| **`postcss`** | `^8.0.0` | CSS transformation tool processing Tailwind directives into production CSS bundles. |
 
 ---
 
@@ -83,5 +96,4 @@ The frontend now lives in a separate repo: [DMS-frontend](https://github.com/gau
 | **FastAPI App** | Custom (Python 3.11 Dockerfile) | `8000` | Application API server running Uvicorn. |
 | **Celery Worker** | Custom (Python 3.11 Dockerfile) | N/A | Background task processing node. |
 | **Flower Dashboard** | Custom (Python 3.11 Dockerfile) | `5555` | Task monitor web UI. |
-
-Frontend container (Next.js, port `3000`) is defined in the separate [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend) repo.
+| **Next.js Web** | Custom (Node.js 18 Dockerfile) | `3000` | Next.js web application frontend. |
