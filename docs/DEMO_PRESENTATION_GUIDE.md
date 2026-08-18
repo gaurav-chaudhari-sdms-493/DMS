@@ -6,10 +6,10 @@ This guide provides a step-by-step presentation script, setup checklist, and liv
 
 ## 1. Pre-Demo Preparation Checklist
 
-Ensure all 6 containerized services are up and verified 10 minutes before starting the presentation:
+Ensure all backend containerized services are up, and the frontend (run separately from [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend)) is verified, 10 minutes before starting the presentation:
 
-- [ ] **Docker Containers Running**: `docker compose ps` shows `postgres`, `redis`, `minio`, `backend`, `worker`, `flower`, and `frontend` in `healthy` or `running` state.
-- [ ] **Web Frontend Loaded**: Navigate to `http://localhost:3000` and verify login screen is responsive.
+- [ ] **Docker Containers Running**: `docker compose ps` shows `postgres`, `redis`, `minio`, `backend`, `worker`, and `flower` in `healthy` or `running` state.
+- [ ] **Web Frontend Loaded**: With `DMS-frontend` running separately, navigate to `http://localhost:3000` and verify login screen is responsive.
 - [ ] **Flower Telemetry UI Open**: Open `http://localhost:5555` in a separate browser tab to show live worker task activity.
 - [ ] **Swagger API Docs Open**: Open `http://localhost:8000/api/docs` to demonstrate backend endpoints if asked technical questions.
 - [ ] **Sample Test Documents Ready**: Prepare 3 sample files on desktop:

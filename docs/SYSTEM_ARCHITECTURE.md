@@ -42,10 +42,7 @@ The **Multi-Tenant AI Document Management & Search Platform (DMS)** is designed 
 ## 2. Core Architectural Components
 
 ### 2.1 Web Frontend (Next.js 14)
-- **Framework**: Next.js 14 (App Router) with React 18 & TypeScript.
-- **Styling**: Tailwind CSS with custom dark mode glassmorphism UI components.
-- **Client Processing**: Browser-side document previews (`mammoth.js` for `.docx`, `xlsx` for spreadsheets, native PDF viewer).
-- **Communication**: REST API over HTTPS with JWT bearer token authentication.
+Lives in the separate [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend) repo. Communicates with this backend via REST over HTTPS with JWT bearer token authentication — see `docs/BACKEND_ENDPOINTS.md` for the API surface it consumes.
 
 ### 2.2 Application Server (FastAPI)
 - **Framework**: FastAPI with Uvicorn worker process.

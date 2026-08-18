@@ -1,6 +1,6 @@
 # Full Project Setup & Installation Guide
 
-This guide provides complete instructions for deploying the Multi-Tenant AI Document Management & Search Platform using either **Docker Compose (One-Click Deployment)** or **Local Native Development Setup**.
+This guide provides complete instructions for deploying the Multi-Tenant AI Document Management & Search Platform's **backend** using either **Docker Compose (One-Click Deployment)** or **Local Native Development Setup**. The frontend lives in a separate repo — [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend) — see its README for frontend-specific setup.
 
 ---
 
@@ -20,7 +20,7 @@ Before installing, ensure your machine has the following tools installed:
 
 ## 2. Option 1: One-Click Docker Setup (Recommended)
 
-The easiest way to launch all 6 system containers (PostgreSQL + pgvector, Redis, MinIO, FastAPI Backend, Celery Worker, Flower, and Next.js Frontend) is using Docker Compose.
+The easiest way to launch all 6 backend containers (PostgreSQL + pgvector, Redis, MinIO, FastAPI Backend, Celery Worker, Flower) is using Docker Compose. Run [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend) separately against this backend.
 
 ```bash
 # 1. Clone the repository
@@ -43,10 +43,11 @@ Once containers are healthy, access the interfaces:
 
 | Service | Interface | URL | Default Credentials |
 |---------|-----------|-----|---------------------|
-| **Web Frontend** | Next.js App UI | `http://localhost:3000` | User: `admin@example.com` / `changeme` |
 | **FastAPI Backend** | Swagger API Docs | `http://localhost:8000/api/docs` | N/A |
 | **Flower Dashboard** | Celery Worker Telemetry | `http://localhost:5555` | N/A |
 | **MinIO Console** | S3 Administration | `http://localhost:9001` | User: `minioadmin` / `minioadmin` |
+
+A default tenant/admin user is seeded: `admin@example.com` / `changeme` — used to log into the API (or [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend) once it's running).
 
 ---
 
@@ -142,15 +143,9 @@ source .venv/bin/activate
 celery -A app.tasks.worker.celery_app flower --port=5555
 ```
 
-### Step 3.8: Start Next.js Frontend Application
-```bash
-# Terminal 4: Next.js Frontend
-cd frontend
-npm install
-npm run dev
-```
+### Step 3.8: Start the Frontend
 
-The application will be live at `http://localhost:3000`.
+The frontend is a separate repo — clone [DMS-frontend](https://github.com/gaurav-chaudhari-sdms-493/DMS-frontend) and follow its README (`npm install && npm run dev`), pointing `NEXT_PUBLIC_API_URL` at this backend (`http://localhost:8000` by default). It will be live at `http://localhost:3000`.
 
 ---
 

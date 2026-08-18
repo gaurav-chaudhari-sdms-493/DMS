@@ -143,29 +143,6 @@ services:
     networks:
       - default
 
-
-  frontend:
-    build: ./frontend
-    ports:
-      - "3000:3000"
-    depends_on:
-      - backend
-    environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
-      - /app/.next
-    command: >
-      sh -c "echo 'Frontend Application: http://localhost:3000' && rm -rf .next/* out && npm run build && npm start"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    networks:
-      - default
-
 volumes:
   postgres_data:
   redis_data:
