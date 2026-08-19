@@ -46,6 +46,7 @@ yarn-error.log*
 # IDE
 .idea/
 .vscode/
+.claude/
 *.swp
 *.swo
 /frontend/package-lock.json
@@ -122,6 +123,7 @@ tabular_data_in_csv_temp/*
 /frontend/dist-desktop/linux-unpacked/locales/lt.pak
 /frontend/dist-desktop/linux-unpacked/locales/lv.pak
 /frontend/main.js
+CLAUDE.md
 /frontend/src-tauri/src/main.rs
 /frontend/dist-desktop/linux-unpacked/locales/ml.pak
 /frontend/dist-desktop/linux-unpacked/locales/mr.pak
