@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DMS Platform - Developer Onboarding & Architecture Orientation</title>
+  <!-- Google Fonts: Plus Jakarta Sans, Outfit, JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Outfit:wght@500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+
+  <style>
+    :root {
+      --bg: #f8f9fa;
+      --surface: #ffffff;
+      --card-bg: #f0f4f9;
+      --search-bg: #edf2fc;
+      --pill-active: #c2e7ff;
+      --pill-text: #001d35;
+      --primary: #0b57d0;
+      --primary-dark: #0842a0;
+      --secondary: #00639b;
+      --success: #146c2e;
+      --success-bg: #e6f4ea;
+      --warning: #b06000;
+      --warning-bg: #fef7e0;
+      --purple: #681da8;
+      --purple-bg: #f3e8fd;
+      --border: #e1e3e1;
+      --text-main: #1f1f1f;
+      --text-muted: #444746;
+      --text-subtle: #5f6368;
+      --stark-orange: #f05623;
+      --stark-light-orange: #f6986b;
+      --card-shadow: 0 16px 40px rgba(0, 0, 0, 0.06);
+      --code-bg: #1e1e1e;
+      --code-text: #d4d4d4;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text-main);
+      overflow: hidden;
+      height: 100vh;
+      width: 100vw;
+      user-select: none;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Progress Bar */
+    #progress-container {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 5px;
+      background: rgba(0, 0, 0, 0.05);
+      z-index: 1000;
+    }
+
+    #progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, var(--stark-orange), var(--primary));
+      transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    /* Header Nav (Only visible on slides 2+) */
+    header {
+      position: fixed;
+      top: 16px;
+      left: 32px;
+      right: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 900;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    header.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .brand-logo-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: var(--surface);
+      padding: 6px 18px;
+      border-radius: 9999px;
+      border: 1px solid var(--border);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .brand-title {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 1.15rem;
+      color: var(--primary);
+      letter-spacing: -0.02em;
+    }
+
+    .brand-badge {
+      background: var(--stark-orange);
+      color: white;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 8px;
+      border-radius: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .btn-header {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      padding: 6px 14px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-header:hover {
+      background: var(--search-bg);
+      color: var(--primary);
+      border-color: var(--pill-active);
+    }
+
+    /* Main Slides Canvas */
+    .slides-wrapper {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    .slide {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%) scale(0.96);
+      width: calc(100vw - 64px);
+      max-width: 1750px;
+      height: calc(100vh - 64px);
+      max-height: 950px;
+      opacity: 0;
+      visibility: hidden;
+      overflow: hidden;
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        visibility 0.5s step-end;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 36px 48px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 28px;
+      box-shadow: var(--card-shadow);
+      text-align: left;
+    }
+
+    .slide.active {
+      opacity: 1;
+      visibility: visible;
+      transform: translate(-50%, -50%) scale(1);
+      transition: opacity 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        transform 0.5s cubic-bezier(0.16, 1, 0.3, 1),
+        visibility 0s step-start;
+    }
+
+    /* Keyframe Animations */
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(20px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes scaleIn {
+      from {
+        opacity: 0;
+        transform: scale(0.94);
+      }
+      to {
+        opacity: 1;
+        transform: scale(1);
+      }
+    }
+
+    .slide.active .slide-header {
+      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+
+    .slide.active .slide-body {
+      animation: fadeInUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+    }
+
+    /* Slide Header Elements */
+    .slide-header {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 20px;
+    }
+
+    .slide-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--text-main);
+      letter-spacing: -0.02em;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .slide-subtitle {
+      font-size: 1.05rem;
+      color: var(--text-subtle);
+      font-weight: 500;
+    }
+
+    /* Slide Body Layouts */
+    .slide-body {
+      flex: 1;
+      display: flex;
+      gap: 20px;
+      overflow: hidden;
+    }
+
+    /* Grids & Cards */
+    .grid-2 {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 20px;
+      width: 100%;
+    }
+
+    .grid-3 {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px;
+      width: 100%;
+    }
+
+    .grid-4 {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      width: 100%;
+    }
+
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card:hover {
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.05);
+      border-color: var(--pill-active);
+    }
+
+    .card-icon {
+      font-size: 1.8rem;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      background: var(--surface);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+    }
+
+    .card-title {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text-main);
+    }
+
+    .card-desc {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      line-height: 1.5;
+    }
+
+    /* Metrics & Badges */
+    .metric-col {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .metric-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 20px;
+      text-align: center;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+
+    .metric-card-num {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.2rem;
+      font-weight: 800;
+      line-height: 1.1;
+    }
+
+    .metric-card-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-top: 6px;
+    }
+
+    .metric-card-desc {
+      font-size: 0.8rem;
+      color: var(--text-subtle);
+    }
+
+    .metric-bottom-badge {
+      text-align: center;
+      padding: 6px 12px;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 800;
+      letter-spacing: 0.05em;
+    }
+
+    .badge-orange { background: #ffece5; color: var(--stark-orange); }
+    .badge-blue { background: #e8f0fe; color: var(--primary); }
+    .badge-green { background: var(--success-bg); color: var(--success); }
+    .badge-purple { background: var(--purple-bg); color: var(--purple); }
+
+    .color-orange { color: var(--stark-orange); }
+    .color-blue { color: var(--primary); }
+    .color-green { color: var(--success); }
+    .color-purple { color: var(--purple); }
+
+    /* Code Blocks */
+    .code-container {
+      background: var(--code-bg);
+      color: var(--code-text);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.88rem;
+      padding: 18px 22px;
+      border-radius: 16px;
+      overflow-x: auto;
+      line-height: 1.5;
+      border: 1px solid #333;
+      flex: 1;
+    }
+
+    .code-header {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888;
+      margin-bottom: 8px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #333;
+      display: flex;
+      justify-content: space-between;
+    }
+
+    .kw { color: #569cd6; font-weight: bold; }
+    .str { color: #ce9178; }
+    .cm { color: #6a9955; font-style: italic; }
+    .fn { color: #dcdcaa; }
+    .num { color: #b5cea8; }
+
+    /* Flow Diagrams */
+    .flow-step {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      position: relative;
+    }
+
+    .flow-step-num {
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: var(--primary);
+      color: white;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+
+    .flow-arrow {
+      text-align: center;
+      font-size: 1.2rem;
+      color: var(--stark-orange);
+      font-weight: 800;
+    }
+
+    /* Tables */
+    .styled-table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: var(--surface);
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+
+    .styled-table th {
+      background: var(--card-bg);
+      padding: 12px 18px;
+      text-align: left;
+      font-family: 'Outfit', sans-serif;
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: var(--text-main);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .styled-table td {
+      padding: 12px 18px;
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .styled-table tr:last-child td {
+      border-bottom: none;
+    }
+
+    .pill {
+      display: inline-block;
+      padding: 4px 10px;
+      border-radius: 9999px;
+      font-size: 0.78rem;
+      font-weight: 700;
+    }
+
+    .pill-blue { background: var(--search-bg); color: var(--primary); }
+    .pill-green { background: var(--success-bg); color: var(--success); }
+    .pill-orange { background: #ffece5; color: var(--stark-orange); }
+
+    /* Cover Page Styles */
+    .cover-slide {
+      background: linear-gradient(135deg, #ffffff 0%, #f4f7fc 100%);
+    }
+
+    .top-right-version {
+      position: absolute;
+      top: 36px;
+      right: 48px;
+      background: var(--stark-orange);
+      color: white;
+      font-weight: 800;
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 0.85rem;
+      letter-spacing: 0.05em;
+    }
+
+    .bottom-right-team {
+      position: absolute;
+      bottom: 24px;
+      right: 48px;
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--text-subtle);
+    }
+
+    .cover-center-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      gap: 20px;
+      text-align: center;
+      padding: 20px 40px;
+    }
+
+    .cover-logo-img-centered {
+      height: 110px;
+      width: auto;
+      object-fit: contain;
+      filter: drop-shadow(0 12px 28px rgba(240, 86, 35, 0.22));
+    }
+
+    .cover-title-main {
+      font-family: 'Outfit', sans-serif;
+      font-size: 3.2rem;
+      font-weight: 800;
+      color: var(--text-main);
+      line-height: 1.1;
+      letter-spacing: -0.03em;
+    }
+
+    .dms-highlight {
+      color: var(--stark-orange);
+    }
+
+    .cover-subtitle-main {
+      font-size: 1.25rem;
+      color: var(--text-muted);
+      max-width: 800px;
+      font-weight: 500;
+    }
+
+    .nav-grid-cover {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+      width: 100%;
+      max-width: 1200px;
+      margin-top: 10px;
+    }
+
+    .nav-item-cover {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 16px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.03);
+    }
+
+    .nav-item-cover:hover {
+      transform: translateY(-3px);
+      border-color: var(--stark-orange);
+      box-shadow: 0 8px 20px rgba(240, 86, 35, 0.12);
+    }
+
+    .nav-item-cover .item-icon {
+      font-size: 1.5rem;
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      background: var(--search-bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .nav-item-cover .item-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-main);
+      text-align: left;
+    }
+
+    /* Footer Navigation */
+    #footer-nav {
+      position: fixed;
+      bottom: 16px;
+      left: 32px;
+      right: 32px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      z-index: 900;
+    }
+
+    .slide-counter {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 6px 16px;
+      border-radius: 9999px;
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+    }
+
+    .btn-nav {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text-main);
+      padding: 8px 20px;
+      border-radius: 9999px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+    }
+
+    .btn-nav:hover {
+      background: var(--primary);
+      color: white;
+      border-color: var(--primary);
+    }
+
+    /* Checklist Items */
+    .checklist-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px 18px;
+    }
+
+    .checkbox-icon {
+      width: 22px;
+      height: 22px;
+      border-radius: 6px;
+      background: var(--success-bg);
+      color: var(--success);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 0.85rem;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .checkbox-pending {
+      background: var(--warning-bg);
+      color: var(--warning);
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- Top Progress Bar -->
+  <div id="progress-container">
+    <div id="progress-bar"></div>
+  </div>
+
+  <!-- Header Branding -->
+  <header id="header-nav">
+    <div class="brand-logo-container">
+      <img src="../../frontend/public/stark-drive.svg" alt="Stark Drive Logo" style="height: 28px; width: auto; object-fit: contain;" />
+      <span class="brand-title">STARK DMS</span>
+      <span class="brand-badge">Developer Onboarding</span>
+    </div>
+    <div class="header-actions">
+      <button class="btn-header" onclick="goToSlide(1)">Cover</button>
+      <button class="btn-header" onclick="goToSlide(2)">Architecture</button>
+      <button class="btn-header" onclick="goToSlide(3)">Security (RLS)</button>
+      <button class="btn-header" onclick="goToSlide(4)">4-Layer Search</button>
+      <button class="btn-header" onclick="goToSlide(5)">AI Pipeline</button>
+      <button class="btn-header" onclick="goToSlide(7)">Code Walkthrough</button>
+      <button class="btn-header" onclick="goToSlide(8)">Setup Guide</button>
+    </div>
+  </header>
+
+  <!-- Slides Container -->
+  <div class="slides-wrapper">
+
+    <!-- SLIDE 1: COVER PAGE -->
+    <div class="slide cover-slide active" id="slide-1">
+      <div class="top-right-version">ONBOARDING v1.0</div>
+      <div class="bottom-right-team">DMS Platform Core Team</div>
+
+      <div class="cover-center-container">
+        <img src="../../frontend/public/stark-drive.svg" alt="Stark Drive Logo" class="cover-logo-img-centered" />
+        <div class="cover-title-main">
+          Document Management System <span class="dms-highlight">(DMS)</span>
+        </div>
+        <div class="cover-subtitle-main">
+          Welcome to the Team! Complete Architectural Blueprint, Security Model & Developer Quick-Start Guide
+        </div>
+
+        <div style="display: flex; gap: 10px; margin-top: 4px;">
+          <span class="pill pill-blue">Multi-Tenant RAG</span>
+          <span class="pill pill-green">FastAPI + Next.js 14</span>
+          <span class="pill pill-orange">PostgreSQL pgvector</span>
+          <span class="pill pill-blue">Celery + Redis Worker</span>
+          <span class="pill pill-green">Hot-Swappable AI</span>
+        </div>
+
+        <div style="font-size: 0.95rem; font-weight: 700; color: var(--text-subtle); margin-top: 10px;">
+          Click any topic below to jump directly to that module:
+        </div>
+
+        <div class="nav-grid-cover">
+          <div class="nav-item-cover" onclick="goToSlide(2)">
+            <div class="item-icon">🏗️</div>
+            <div class="item-title">1. System Architecture & Tech Stack</div>
+          </div>
+          <div class="nav-item-cover" onclick="goToSlide(3)">
+            <div class="item-icon">🛡️</div>
+            <div class="item-title">2. Multi-Tenant Security & RLS</div>
+          </div>
+          <div class="nav-item-cover" onclick="goToSlide(4)">
+            <div class="item-icon">⚡</div>
+            <div class="item-title">3. 4-Layer Hybrid Retrieval Engine</div>
+          </div>
+          <div class="nav-item-cover" onclick="goToSlide(5)">
+            <div class="item-icon">🧠</div>
+            <div class="item-title">4. AI Ingestion & Provider Hot-Swap</div>
+          </div>
+          <div class="nav-item-cover" onclick="goToSlide(6)">
+            <div class="item-icon">🔒</div>
+            <div class="item-title">5. Defense-in-Depth Guardrails</div>
+          </div>
+          <div class="nav-item-cover" onclick="goToSlide(7)">
+            <div class="item-icon">📁</div>
+            <div class="item-title">6. Codebase Directory Walkthrough</div>
+          </div>
+          <div class="nav-item-cover" onclick="goToSlide(8)">
+            <div class="item-icon">💻</div>
+            <div class="item-title">7. Developer Setup & Health Checks</div>
+          </div>
+          <div class="nav-item-cover" onclick="goToSlide(9)">
+            <div class="item-icon">📋</div>
+            <div class="item-title">8. Day 1 Onboarding & First Tasks</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 2: ARCHITECTURE & TECH STACK -->
+    <div class="slide" id="slide-2">
+      <div class="slide-header">
+        <div class="slide-title">🏗️ System Architecture & Technology Stack</div>
+        <div class="slide-subtitle">High-throughput, asynchronous multi-tenant microservices architecture</div>
+      </div>
+
+      <div class="slide-body" style="flex-direction: column; gap: 16px;">
+        <!-- Top Visual Blueprint -->
+        <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 18px; padding: 18px 24px; display: flex; align-items: center; justify-content: space-between;">
+          <div style="text-align: center; flex: 1;">
+            <div style="font-size: 1.5rem;">💻</div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--primary);">Next.js 14 Frontend</div>
+            <div style="font-size: 0.78rem; color: var(--text-subtle);">Port 3000 • React 18 • Tailwind</div>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div style="text-align: center; flex: 1;">
+            <div style="font-size: 1.5rem;">⚙️</div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--primary);">FastAPI Backend</div>
+            <div style="font-size: 0.78rem; color: var(--text-subtle);">Port 8000 • AsyncIO • SQLAlchemy</div>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div style="text-align: center; flex: 1;">
+            <div style="font-size: 1.5rem;">🔄</div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--purple);">Celery & Redis</div>
+            <div style="font-size: 0.78rem; color: var(--text-subtle);">Broker & Layer-0 Cache • Flower :5555</div>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div style="text-align: center; flex: 1;">
+            <div style="font-size: 1.5rem;">🗄️</div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--success);">PostgreSQL pgvector</div>
+            <div style="font-size: 0.78rem; color: var(--text-subtle);">Port 5432 • HNSW 1024d • Native RLS</div>
+          </div>
+          <div class="flow-arrow">➔</div>
+          <div style="text-align: center; flex: 1;">
+            <div style="font-size: 1.5rem;">📦</div>
+            <div style="font-weight: 800; font-size: 0.95rem; color: var(--stark-orange);">MinIO / S3</div>
+            <div style="font-size: 0.78rem; color: var(--text-subtle);">Port 9001 • Pre-signed URLs</div>
+          </div>
+        </div>
+
+        <!-- 4 Technology Stack Cards -->
+        <div class="grid-4" style="flex: 1;">
+          <div class="card">
+            <div class="card-icon" style="color: var(--primary);">🌐</div>
+            <div class="card-title">Frontend Stack</div>
+            <div class="card-desc">
+              • <b>Next.js 14 App Router</b> + React 18<br>
+              • <b>Mammoth.js</b> for docx previewing<br>
+              • <b>XLSX</b> client-side table rendering<br>
+              • Lucide icons & Tailwind CSS<br>
+              • Interactive ChatGPT-style RAG UI
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon" style="color: var(--success);">⚡</div>
+            <div class="card-title">FastAPI Server</div>
+            <div class="card-desc">
+              • Python 3.11/3.12 non-blocking ASGI<br>
+              • <b>AsyncPG + SQLAlchemy 2.0</b> ORM<br>
+              • <b>SlowAPI</b> rate limiting middleware<br>
+              • Async audit logger to `api_logs`<br>
+              • Dynamic Swagger docs (`/api/docs`)
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon" style="color: var(--purple);">⚙️</div>
+            <div class="card-title">Task Workers & Cache</div>
+            <div class="card-desc">
+              • <b>Redis 7.0</b> in-memory broker & cache<br>
+              • <b>Celery 5.4</b> async parsing workers<br>
+              • <b>Flower Dashboard</b> live monitoring<br>
+              • Async token chunking & embedding<br>
+              • Retries & error dead-letter queues
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-icon" style="color: var(--stark-orange);">📊</div>
+            <div class="card-title">Vector & Storage</div>
+            <div class="card-desc">
+              • <b>PostgreSQL 16 + pgvector</b> (HNSW)<br>
+              • BGE-M3 1024-dim dense vectors<br>
+              • Native <b>Row-Level Security (RLS)</b><br>
+              • <b>MinIO / AWS S3</b> object storage<br>
+              • 900s pre-signed URL expiry
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 3: MULTI-TENANT SECURITY & RLS -->
+    <div class="slide" id="slide-3">
+      <div class="slide-header">
+        <div class="slide-title">🛡️ Multi-Tenant Row-Level Security (RLS)</div>
+        <div class="slide-subtitle">Kernel-level PostgreSQL isolation preventing cross-tenant data leaks</div>
+      </div>
+
+      <div class="slide-body" style="gap: 20px;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="background: var(--surface);">
+            <div class="card-title" style="color: var(--primary);">Zero-Trust Security Model</div>
+            <div class="card-desc">
+              Every database query and storage access is explicitly scoped to the user's authenticated <code>tenant_id</code>. Even if a developer forgets a <code>WHERE tenant_id = ...</code> clause in SQL, PostgreSQL RLS rejects unauthorized access at the database engine level.
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="card">
+              <div class="card-icon" style="color: var(--purple);">🔑</div>
+              <div class="card-title">JWT Claims</div>
+              <div class="card-desc">
+                FastAPI validates Bearer JWT tokens. Each payload carries <code>tenant_id</code>, <code>user_id</code>, and <code>role</code>. Dual-token model: Access (15m) & Refresh (7d).
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-icon" style="color: var(--stark-orange);">🗄️</div>
+              <div class="card-title">8 RLS Protected Tables</div>
+              <div class="card-desc">
+                <code>tenants</code>, <code>users</code>, <code>folders</code>, <code>documents</code>, <code>document_versions</code>, <code>document_chunks</code>, <code>metadata_items</code>, <code>api_logs</code>.
+              </div>
+            </div>
+          </div>
+
+          <div class="card" style="background: var(--success-bg); border-color: var(--success);">
+            <div style="font-weight: 800; color: var(--success); font-size: 1rem;">🔒 Storage Layer Isolation</div>
+            <div style="font-size: 0.9rem; color: var(--text-main); margin-top: 4px;">
+              S3 Keys are prefixed by tenant: <code>s3://bucket/{tenant_id}/{document_id}/{filename}</code>. Pre-signed URLs are only emitted after checking DB tenant ownership.
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Exact Code Implementation -->
+        <div class="code-container" style="flex: 1.2;">
+          <div class="code-header">
+            <span>backend/app/deps.py — Session Context Injection</span>
+            <span>Async SQLAlchemy</span>
+          </div>
+<span class="kw">async def</span> <span class="fn">get_db_session</span>(
+    current_user: User = Depends(get_current_user)
+) -> AsyncGenerator[AsyncSession, <span class="kw">None</span>]:
+    <span class="cm">"""
+    Yields DB session with app.current_tenant_id set for PostgreSQL RLS.
+    """</span>
+    <span class="kw">async with</span> AsyncSessionLocal() <span class="kw">as</span> session:
+        <span class="kw">try</span>:
+            <span class="cm"># Execute session-level context for Postgres RLS policy</span>
+            <span class="kw">await</span> session.execute(
+                text(<span class="str">"SET LOCAL app.current_tenant_id = :tenant_id"</span>),
+                {<span class="str">"tenant_id"</span>: str(current_user.tenant_id)}
+            )
+            <span class="kw">yield</span> session
+            <span class="kw">await</span> session.commit()
+        <span class="kw">except</span> Exception:
+            <span class="kw">await</span> session.rollback()
+            <span class="kw">raise</span>
+        <span class="kw">finally</span>:
+            <span class="kw">await</span> session.close()
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 4: 4-LAYER RETRIEVAL ENGINE -->
+    <div class="slide" id="slide-4">
+      <div class="slide-header">
+        <div class="slide-title">⚡ 4-Layer Hybrid Retrieval Engine & HyDE</div>
+        <div class="slide-subtitle">Sub-millisecond retrieval with semantic caching, HNSW vectors, reranking & synthesis</div>
+      </div>
+
+      <div class="slide-body" style="flex-direction: column; gap: 16px;">
+        <div class="grid-4">
+          <div class="metric-col">
+            <div class="metric-card">
+              <div class="metric-card-num color-green">&lt;10ms</div>
+              <div class="metric-card-title">Layer 0 Cache</div>
+              <div class="metric-card-desc">Redis Semantic Cache</div>
+            </div>
+            <div class="metric-bottom-badge badge-green">35-50% COST SAVINGS</div>
+          </div>
+
+          <div class="metric-col">
+            <div class="metric-card">
+              <div class="metric-card-num color-blue">Top 20</div>
+              <div class="metric-card-title">Layer 1 Hybrid</div>
+              <div class="metric-card-desc">HNSW Vector + Full-Text</div>
+            </div>
+            <div class="metric-bottom-badge badge-blue">RRF RANK FUSION</div>
+          </div>
+
+          <div class="metric-col">
+            <div class="metric-card">
+              <div class="metric-card-num color-purple">Top 3</div>
+              <div class="metric-card-title">Layer 2 Reranker</div>
+              <div class="metric-card-desc">Cohere Cross-Encoder</div>
+            </div>
+            <div class="metric-bottom-badge badge-purple">ZERO FALSE POSITIVES</div>
+          </div>
+
+          <div class="metric-col">
+            <div class="metric-card">
+              <div class="metric-card-num color-orange">100%</div>
+              <div class="metric-card-title">Layer 3 RAG</div>
+              <div class="metric-card-desc">Strict Page Citations</div>
+            </div>
+            <div class="metric-bottom-badge badge-orange">ZERO HALLUCINATIONS</div>
+          </div>
+        </div>
+
+        <!-- Retrieval Flow Architecture -->
+        <div style="background: var(--card-bg); border: 1px solid var(--border); border-radius: 20px; padding: 20px 28px; display: flex; flex-direction: column; gap: 12px; flex: 1;">
+          <div style="font-family: 'Outfit', sans-serif; font-weight: 800; font-size: 1.1rem; color: var(--primary);">
+            Waterfall Search Flow Blueprint
+          </div>
+
+          <div class="grid-2" style="gap: 16px;">
+            <div class="flow-step">
+              <div class="flow-step-num">0</div>
+              <div>
+                <div style="font-weight: 800; font-size: 0.95rem;">Redis Semantic Cache Lookup</div>
+                <div style="font-size: 0.85rem; color: var(--text-subtle);">Hashes query string + tenant ID. If hit, returns synthetic answer instantly.</div>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="flow-step-num">1</div>
+              <div>
+                <div style="font-weight: 800; font-size: 0.95rem;">PostgreSQL Hybrid + HyDE Fallback</div>
+                <div style="font-size: 0.85rem; color: var(--text-subtle);">Executes pgvector HNSW search + full-text <code>tsquery</code> + synthetic HyDE expansion.</div>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="flow-step-num">2</div>
+              <div>
+                <div style="font-weight: 800; font-size: 0.95rem;">Cohere Cross-Encoder Re-Ranking</div>
+                <div style="font-size: 0.85rem; color: var(--text-subtle);">Evaluates top 20 candidate chunks against user query intent; trims to top 3 best chunks.</div>
+              </div>
+            </div>
+
+            <div class="flow-step">
+              <div class="flow-step-num">3</div>
+              <div>
+                <div style="font-weight: 800; font-size: 0.95rem;">Generative LLM RAG Synthesis</div>
+                <div style="font-size: 0.85rem; color: var(--text-subtle);">Generates final answer using strictly top 3 chunks with document title & page number citations.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 5: AI INGESTION & HOT-SWAPPING -->
+    <div class="slide" id="slide-5">
+      <div class="slide-header">
+        <div class="slide-title">🧠 AI Ingestion Engine & Hot-Swapping</div>
+        <div class="slide-subtitle">Multi-format document processing with 0-code-change provider adaptability</div>
+      </div>
+
+      <div class="slide-body" style="gap: 20px;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 14px;">
+          <div class="card" style="background: var(--surface);">
+            <div class="card-title" style="color: var(--primary);">Document Parsing Pipeline</div>
+            <div class="card-desc">
+              Extracts raw text, table structures, and slide notes using specialized native parsers:
+              <b>pdfplumber</b> (PDF), <b>python-docx</b> (Word), <b>openpyxl</b> (Excel), <b>python-pptx</b> (PowerPoint), and <b>LlamaParse OCR</b> (Scanned PDFs).
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-title" style="color: var(--stark-orange);">Ingestion Brain (Dynamic Metadata)</div>
+            <div class="card-desc">
+              An LLM parses raw text into dynamic JSON metadata without fixed database schemas:
+              extracts <code>document_type</code>, <code>category</code>, <code>urgency</code>, <code>key_entities</code>, and <code>dates</code> into PostgreSQL <b>JSONB</b> columns.
+            </div>
+          </div>
+
+          <div class="card" style="background: var(--purple-bg); border-color: var(--purple);">
+            <div style="font-weight: 800; color: var(--purple); font-size: 0.95rem;">⚡ Thread-Safe Provider Singleton Caching</div>
+            <div style="font-size: 0.85rem; color: var(--text-main); margin-top: 4px;">
+              Provider instances are cached via <code>get_ai_provider_factory()</code>. Eliminates model setup overhead and memory leaks across async requests.
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: Hot Swap Configuration -->
+        <div style="flex: 1.1; display: flex; flex-direction: column; gap: 14px;">
+          <div class="code-container">
+            <div class="code-header">
+              <span>backend/.env — Provider Hot-Swapping Examples</span>
+              <span>Zero Code Edit</span>
+            </div>
+<span class="cm"># Example 1: OpenAI (Default)</span>
+<span class="kw">AI_LLM_PROVIDER</span>=<span class="str">openai</span>
+<span class="kw">OPENAI_API_KEY</span>=<span class="str">sk-proj-...</span>
+<span class="kw">OPENAI_LLM_MODEL</span>=<span class="str">gpt-4o-mini</span>
+
+<span class="cm"># Example 2: Switch to Anthropic Claude 3.5</span>
+<span class="kw">AI_LLM_PROVIDER</span>=<span class="str">anthropic</span>
+<span class="kw">ANTHROPIC_API_KEY</span>=<span class="str">sk-ant-...</span>
+<span class="kw">ANTHROPIC_LLM_MODEL</span>=<span class="str">claude-3-5-sonnet-20241022</span>
+
+<span class="cm"># Example 3: Switch to Groq (Llama 3.3 70B)</span>
+<span class="kw">AI_LLM_PROVIDER</span>=<span class="str">groq</span>
+<span class="kw">GROQ_API_KEY</span>=<span class="str">gsk_key...</span>
+<span class="kw">GROQ_LLM_MODEL</span>=<span class="str">llama-3.3-70b-versatile</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 6: DEFENSE-IN-DEPTH AI GUARDRAILS -->
+    <div class="slide" id="slide-6">
+      <div class="slide-header">
+        <div class="slide-title">🔒 Defense-in-Depth AI Guardrails & Privacy</div>
+        <div class="slide-subtitle">Intercepting adversarial prompt injections and redacting sensitive PII data</div>
+      </div>
+
+      <div class="slide-body" style="gap: 20px;">
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="background: var(--surface);">
+            <div class="card-icon" style="color: var(--stark-orange);">🛡️</div>
+            <div class="card-title">Input Guardrails (Pre-Retrieval)</div>
+            <div class="card-desc">
+              Interprets input queries before vector lookups or LLM calls.<br>
+              • <b>Jailbreak Pattern Detection</b>: Scans for phrases like <i>"ignore previous instructions"</i> or <i>"override system prompt"</i>.<br>
+              • <b>Immediate Abort</b>: Returns <code>took_ms: 0</code> with <code>Safety Block</code> response detail.<br>
+              • <b>Input PII Scrubbing</b>: Redacts sensitive parameters before sending queries to external API endpoints.
+            </div>
+          </div>
+
+          <div class="card" style="background: var(--surface);">
+            <div class="card-icon" style="color: var(--primary);">🧹</div>
+            <div class="card-title">Output Guardrails (Post-Synthesis)</div>
+            <div class="card-desc">
+              Sanitizes generated RAG summaries before sending them to the client interface.<br>
+              • Scans synthesized summaries using regular expression patterns.<br>
+              • Automatically redacts confidential user data found in document snippets.
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Side: PII Regex Table & Code Link -->
+        <div style="flex: 1.1; display: flex; flex-direction: column; gap: 14px;">
+          <table class="styled-table">
+            <thead>
+              <tr>
+                <th>Data Category</th>
+                <th>Matched Format</th>
+                <th>Redacted Output</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><b>Email Address</b></td>
+                <td><code>user@example.com</code></td>
+                <td><span class="pill pill-orange">[REDACTED_EMAIL]</span></td>
+              </tr>
+              <tr>
+                <td><b>Phone Number</b></td>
+                <td><code>+1 (555) 019-2834</code></td>
+                <td><span class="pill pill-orange">[REDACTED_PHONE]</span></td>
+              </tr>
+              <tr>
+                <td><b>Credit Card</b></td>
+                <td><code>4532-XXXX-XXXX-8921</code></td>
+                <td><span class="pill pill-orange">[REDACTED_CREDIT_CARD]</span></td>
+              </tr>
+              <tr>
+                <td><b>Social Security</b></td>
+                <td><code>987-65-4321</code></td>
+                <td><span class="pill pill-orange">[REDACTED_SSN]</span></td>
+              </tr>
+            </tbody>
+          </table>
+
+          <div class="code-container" style="max-height: 240px;">
+            <div class="code-header">
+              <span>backend/app/services/guardrail_service.py</span>
+            </div>
+<span class="kw">def</span> <span class="fn">validate_input_query</span>(query: str) -> tuple[bool, str, str]:
+    <span class="kw">for</span> pattern <span class="kw">in</span> ADVERSARIAL_PATTERNS:
+        <span class="kw">if</span> pattern <span class="kw">in</span> query.lower():
+            <span class="kw">return</span> <span class="kw">False</span>, <span class="str">"Prompt injection pattern detected"</span>, query
+    scrubbed = scrub_pii_text(query)
+    <span class="kw">return</span> <span class="kw">True</span>, <span class="str">""</span>, scrubbed
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 7: CODEBASE DIRECTORY WALKTHROUGH -->
+    <div class="slide" id="slide-7">
+      <div class="slide-header">
+        <div class="slide-title">📁 Codebase Directory Walkthrough</div>
+        <div class="slide-subtitle">Structured module layout for backend services and frontend components</div>
+      </div>
+
+      <div class="slide-body" style="gap: 20px;">
+        <!-- Left: Backend Layout -->
+        <div class="card" style="flex: 1; background: var(--surface);">
+          <div class="card-title" style="color: var(--primary);">🐍 Backend Structure (FastAPI)</div>
+          <div class="card-desc" style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; line-height: 1.6;">
+            <b>backend/app/</b><br>
+            ├── <b>api/v1/</b> <span style="color: var(--text-subtle);">(REST Endpoints: auth, docs, search, chat, admin)</span><br>
+            ├── <b>core/</b> <span style="color: var(--text-subtle);">(config.py pydantic-settings, database.py, security.py)</span><br>
+            ├── <b>db/</b> <span style="color: var(--text-subtle);">(SQLAlchemy models: document.py, user.py, chunk.py)</span><br>
+            ├── <b>deps.py</b> <span style="color: var(--text-subtle);">(Auth dependencies & SET LOCAL tenant_id RLS)</span><br>
+            ├── <b>services/</b> <span style="color: var(--text-subtle);">(search_service.py, guardrail_service.py, ai/)</span><br>
+            ├── <b>tasks/</b> <span style="color: var(--text-subtle);">(worker.py Celery document processing task)</span><br>
+            └── <b>main.py</b> <span style="color: var(--text-subtle);">(FastAPI app initialization & SlowAPI rate limit)</span>
+          </div>
+        </div>
+
+        <!-- Right: Frontend Layout & Docs -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 16px;">
+          <div class="card" style="background: var(--surface);">
+            <div class="card-title" style="color: var(--stark-orange);">⚛️ Frontend Structure (Next.js 14)</div>
+            <div class="card-desc" style="font-family: 'JetBrains Mono', monospace; font-size: 0.85rem; line-height: 1.6;">
+              <b>frontend/app/</b><br>
+              ├── <b>(auth)/</b> <span style="color: var(--text-subtle);">(login & registration pages)</span><br>
+              ├── <b>dashboard/</b> <span style="color: var(--text-subtle);">(document drive file explorer & folder view)</span><br>
+              ├── <b>chat/</b> <span style="color: var(--text-subtle);">(ChatGPT-style interactive RAG interface)</span><br>
+              └── <b>components/</b> <span style="color: var(--text-subtle);">(PDF viewer modal, XLSX preview, search bar)</span>
+            </div>
+          </div>
+
+          <div class="card" style="background: var(--search-bg); border-color: var(--pill-active);">
+            <div style="font-weight: 800; color: var(--primary); font-size: 0.95rem;">📚 Documentation Suite (/docs)</div>
+            <div style="font-size: 0.88rem; color: var(--text-main); margin-top: 4px;">
+              • <code>SYSTEM_ARCHITECTURE.md</code> • <code>AI_PIPELINE_AND_MODELS.md</code><br>
+              • <code>LIBRARIES_AND_TECH_STACK.md</code> • <code>BACKEND_ENDPOINTS.md</code><br>
+              • <code>SETUP_GUIDE.md</code> • <code>COSTING_AND_ESTIMATION.md</code>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 8: DEVELOPER SETUP & HEALTH CHECKS -->
+    <div class="slide" id="slide-8">
+      <div class="slide-header">
+        <div class="slide-title">💻 Developer Quick-Start & Health Verification</div>
+        <div class="slide-subtitle">Spinning up containers, running migrations, seeding DB & health diagnostics</div>
+      </div>
+
+      <div class="slide-body" style="flex-direction: column; gap: 16px;">
+        <div class="grid-2">
+          <!-- Option A -->
+          <div class="card">
+            <div class="card-title" style="color: var(--success);">Option 1: One-Click Docker Setup (Recommended)</div>
+            <div class="card-desc">
+              <div class="code-container" style="padding: 10px 14px;">
+<span class="cm"># 1. Clone & copy environment settings</span>
+git clone &lt;repo-url&gt; && cd DMS
+cp backend/.env.example backend/.env
+
+<span class="cm"># 2. Spin up all 6 Docker containers</span>
+docker compose up --build -d
+              </div>
+            </div>
+          </div>
+
+          <!-- Option B -->
+          <div class="card">
+            <div class="card-title" style="color: var(--primary);">Option 2: Native Development Setup</div>
+            <div class="card-desc">
+              <div class="code-container" style="padding: 10px 14px;">
+<span class="cm"># 1. Run migrations & seed default tenant</span>
+cd backend && alembic upgrade head
+python -m app.init_db
+
+<span class="cm"># 2. Run backend API & Celery worker</span>
+uvicorn app.main:app --reload --port 8000
+celery -A app.tasks.worker.celery_app worker
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Ports Table -->
+        <table class="styled-table">
+          <thead>
+            <tr>
+              <th>Service</th>
+              <th>Port / Endpoint</th>
+              <th>Role</th>
+              <th>Default Credentials</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><b>Web Frontend</b></td>
+              <td><code>http://localhost:3000</code></td>
+              <td>Next.js 14 Web Interface</td>
+              <td><code>admin@example.com</code> / <code>changeme</code></td>
+            </tr>
+            <tr>
+              <td><b>FastAPI Server</b></td>
+              <td><code>http://localhost:8000/api/docs</code></td>
+              <td>REST API & Swagger Docs</td>
+              <td>JWT Authentication</td>
+            </tr>
+            <tr>
+              <td><b>Flower Telemetry</b></td>
+              <td><code>http://localhost:5555</code></td>
+              <td>Celery Worker Monitor</td>
+              <td>N/A</td>
+            </tr>
+            <tr>
+              <td><b>MinIO Console</b></td>
+              <td><code>http://localhost:9001</code></td>
+              <td>S3 Storage Management</td>
+              <td><code>minioadmin</code> / <code>minioadmin</code></td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Health Check Banner -->
+        <div style="background: var(--success-bg); border: 1px solid var(--success); border-radius: 14px; padding: 12px 20px; display: flex; justify-content: space-between; align-items: center;">
+          <div>
+            <span style="font-weight: 800; color: var(--success);">GET /api/v1/health Diagnostic:</span>
+            <span style="font-size: 0.88rem; color: var(--text-main); margin-left: 8px;">Verifies DB ping, Redis status, pgvector index state, and tenant RLS enforcement.</span>
+          </div>
+          <span class="pill pill-green">System Healthy</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- SLIDE 9: DAY 1 ONBOARDING CHECKLIST & FIRST TASKS -->
+    <div class="slide" id="slide-9">
+      <div class="slide-header">
+        <div class="slide-title">📋 Day 1 Teammate Onboarding Checklist</div>
+        <div class="slide-subtitle">Step-by-step onboarding plan, team coding standards & first sprint tasks</div>
+      </div>
+
+      <div class="slide-body" style="gap: 20px;">
+        <!-- Left: Checklist -->
+        <div style="flex: 1.1; display: flex; flex-direction: column; gap: 10px;">
+          <div class="checklist-item">
+            <div class="checkbox-icon">✓</div>
+            <div>
+              <div style="font-weight: 700; font-size: 0.95rem;">1. Clone Repository & Setup Docker</div>
+              <div style="font-size: 0.82rem; color: var(--text-subtle);">Run <code>docker compose up --build -d</code> and confirm containers are running.</div>
+            </div>
+          </div>
+
+          <div class="checklist-item">
+            <div class="checkbox-icon">✓</div>
+            <div>
+              <div style="font-weight: 700; font-size: 0.95rem;">2. Database Migration & Default Seed</div>
+              <div style="font-size: 0.82rem; color: var(--text-subtle);">Verify default tenant and super-admin <code>admin@example.com</code> account created.</div>
+            </div>
+          </div>
+
+          <div class="checklist-item">
+            <div class="checkbox-icon">✓</div>
+            <div>
+              <div style="font-weight: 700; font-size: 0.95rem;">3. Verify System Health Endpoint</div>
+              <div style="font-size: 0.82rem; color: var(--text-subtle);">Test <code>GET /api/v1/health</code> to validate DB, Redis, and pgvector RLS.</div>
+            </div>
+          </div>
+
+          <div class="checklist-item">
+            <div class="checkbox-icon">✓</div>
+            <div>
+              <div style="font-weight: 700; font-size: 0.95rem;">4. Test Document Upload & RAG Search</div>
+              <div style="font-size: 0.82rem; color: var(--text-subtle);">Upload a test PDF/DOCX via Next.js UI or Swagger API and run a search query.</div>
+            </div>
+          </div>
+
+          <div class="checklist-item">
+            <div class="checkbox-icon checkbox-pending">➔</div>
+            <div>
+              <div style="font-weight: 700; font-size: 0.95rem;">5. Pick Up First Starter Task</div>
+              <div style="font-size: 0.82rem; color: var(--text-subtle);">Choose a task from Phase 2 roadmap (Compliance Dashboard UI, Custom Provider, or RBAC).</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Team Guidelines -->
+        <div style="flex: 1; display: flex; flex-direction: column; gap: 14px;">
+          <div class="card" style="background: var(--surface);">
+            <div class="card-title" style="color: var(--primary);">🛡️ Team Coding Guardrails</div>
+            <div class="card-desc">
+              • <b>Always use Async Python</b>: Use <code>async def</code> and non-blocking I/O.<br>
+              • <b>Enforce Pydantic Schemas</b>: Validate all incoming payloads.<br>
+              • <b>Never Bypass RLS</b>: Always inject <code>SET LOCAL app.current_tenant_id</code>.<br>
+              • <b>Inspect Logs First</b>: Check full stack trace before diagnosing errors.<br>
+              • <b>Verify Tests</b>: Run tests before pushing code.
+            </div>
+          </div>
+
+          <div style="background: var(--search-bg); border: 1px solid var(--pill-active); border-radius: 18px; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; margin-top: auto;">
+            <div>
+              <div style="font-family: 'Outfit', sans-serif; font-size: 1.15rem; font-weight: 800; color: var(--primary);">
+                Welcome to the DMS Team!
+              </div>
+              <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;">
+                Reach out to the lead engineer if you have any questions during setup.
+              </div>
+            </div>
+            <button class="btn-nav" onclick="goToSlide(1)" style="background: var(--primary); color: white; border: none;">Restart Presentation</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Footer Navigation -->
+  <footer id="footer-nav">
+    <div class="slide-counter"><span id="current-slide-num">1</span> / 9</div>
+    <div class="controls">
+      <button class="btn-nav" onclick="prevSlide()">← Previous</button>
+      <button class="btn-nav" onclick="nextSlide()">Next →</button>
+    </div>
+  </footer>
+
+  <script>
+    let currentSlide = 1;
+    const totalSlides = 9;
+
+    function updateSlide() {
+      document.querySelectorAll('.slide').forEach((s, idx) => {
+        if (idx + 1 === currentSlide) {
+          s.classList.add('active');
+        } else {
+          s.classList.remove('active');
+        }
+      });
+
+      const headerNav = document.getElementById('header-nav');
+      if (currentSlide > 1) {
+        headerNav.classList.add('visible');
+      } else {
+        headerNav.classList.remove('visible');
+      }
+
+      const slideNumEl = document.getElementById('current-slide-num');
+      if (slideNumEl) {
+        slideNumEl.textContent = currentSlide;
+      }
+
+      document.getElementById('progress-bar').style.width = `${(currentSlide / totalSlides) * 100}%`;
+    }
+
+    function nextSlide() {
+      if (currentSlide < totalSlides) {
+        currentSlide++;
+        updateSlide();
+      }
+    }
+
+    function prevSlide() {
+      if (currentSlide > 1) {
+        currentSlide--;
+        updateSlide();
+      }
+    }
+
+    function goToSlide(num) {
+      currentSlide = num;
+      updateSlide();
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+        nextSlide();
+      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+        prevSlide();
+      } else if (e.key === 'Home') {
+        goToSlide(1);
+      } else if (e.key === 'End') {
+        goToSlide(totalSlides);
+      } else if (e.key.toLowerCase() === 'f') {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen().catch(() => { });
+        } else {
+          document.exitFullscreen().catch(() => { });
+        }
+      }
+    });
+
+    let startX = 0;
+    document.addEventListener('touchstart', (e) => startX = e.touches[0].clientX);
+    document.addEventListener('touchend', (e) => {
+      let diff = startX - e.changedTouches[0].clientX;
+      if (diff > 50) nextSlide();
+      else if (diff < -50) prevSlide();
+    });
+
+    updateSlide();
+  </script>
+</body>
+
+</html>
