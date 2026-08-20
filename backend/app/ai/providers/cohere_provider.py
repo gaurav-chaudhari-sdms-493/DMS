@@ -55,8 +55,5 @@ class CohereRerankerProvider(RerankerProvider):
                 ))
             return results
         except Exception as e:
-            logger.warning("Cohere rerank failed or rate limited: %s. Falling back to default RRF rank ordering.", e)
-            return [
-                RankedResult(index=i, score=0.85 - (i * 0.05), text=doc)
-                for i, doc in enumerate(documents[:top_n])
-            ]
+            logger.error("Cohere rerank failed: %s", e)
+            raise

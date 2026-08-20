@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 _llm_provider: LLMProvider | None = None
 _embed_provider: EmbeddingProvider | None = None
-_rerank_provider: RerankerProvider | None = None
+_rerank_providers_by_name: dict[str, RerankerProvider] = {}
 
 class FallbackEmbeddingProvider(EmbeddingProvider):
     def __init__(self, primary: EmbeddingProvider, fallback: EmbeddingProvider):
@@ -122,19 +122,32 @@ def get_embed_provider() -> EmbeddingProvider:
     return _embed_provider
 
 
-def get_rerank_provider() -> RerankerProvider:
-    global _rerank_provider
-    if _rerank_provider is not None:
-        return _rerank_provider
-
-    if settings.ai_rerank_provider == 'cohere':
+def _build_rerank_provider(name: str) -> RerankerProvider:
+    if name == 'cohere':
         from app.ai.providers.cohere_provider import CohereRerankerProvider
-        _rerank_provider = CohereRerankerProvider(api_key=settings.cohere_api_key, model=settings.cohere_rerank_model)
+        return CohereRerankerProvider(api_key=settings.cohere_api_key, model=settings.cohere_rerank_model)
+    elif name == 'bgem3':
+        from app.ai.providers.bge_reranker_provider import BGEM3RerankerProvider
+        return BGEM3RerankerProvider(model_name=settings.bgem3_rerank_model)
     else:
         class DummyReranker(RerankerProvider):
             async def rerank(self, query: str, documents: list[str], top_n: int = 5):
                 from app.ai.base import RankedResult
                 return [RankedResult(index=i, score=1.0, text=d) for i, d in enumerate(documents[:top_n])]
-        _rerank_provider = DummyReranker()
+        return DummyReranker()
 
-    return _rerank_provider
+
+def get_rerank_provider(override: str | None = None) -> RerankerProvider:
+    """Return the configured reranker, or a specific one via `override` (e.g. per-request choice).
+
+    Providers are cached by name so switching between them per-request never re-triggers
+    an expensive model reload (notably the local BGE cross-encoder).
+    """
+    name = override or settings.ai_rerank_provider
+    # Ensure local BGE cross-encoder is never loaded when Cohere API key is configured
+    if (name == 'bgem3' or not name) and settings.cohere_api_key:
+        name = 'cohere'
+
+    if name not in _rerank_providers_by_name:
+        _rerank_providers_by_name[name] = _build_rerank_provider(name)
+    return _rerank_providers_by_name[name]

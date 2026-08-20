@@ -82,6 +82,10 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env
+    environment:
+      OMP_NUM_THREADS: "2"
+      OMP_WAIT_POLICY: "PASSIVE"
+      MKL_NUM_THREADS: "2"
     volumes:
       - ./backend:/app
       - hf_cache:/root/.cache/huggingface
@@ -107,6 +111,10 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env
+    environment:
+      OMP_NUM_THREADS: "2"
+      OMP_WAIT_POLICY: "PASSIVE"
+      MKL_NUM_THREADS: "2"
     volumes:
       - ./backend:/app
       - hf_cache:/root/.cache/huggingface

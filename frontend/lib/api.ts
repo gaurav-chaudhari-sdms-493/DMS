@@ -217,10 +217,22 @@ export const api = {
 
 
   search: {
-    query: async (query: string, limit: number = 5, filters: any = null): Promise<SearchResponse> => {
+    query: async (
+      query: string,
+      limit: number = 5,
+      filters: any = null,
+      rerankProvider: "cohere" | "bgem3" | null = null,
+      generateSummary: boolean = true
+    ): Promise<SearchResponse> => {
       return await request("/api/v1/search/", {
         method: "POST",
-        body: JSON.stringify({ query, limit, filters }),
+        body: JSON.stringify({
+          query,
+          limit,
+          filters,
+          rerank_provider: rerankProvider,
+          generate_summary: generateSummary,
+        }),
       });
     },
   },
