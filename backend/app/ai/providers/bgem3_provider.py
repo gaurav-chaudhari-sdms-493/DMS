@@ -38,8 +38,13 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
         if not texts:
             return []
 
+        import asyncio
+        from functools import partial
+
+        loop = asyncio.get_running_loop()
+
         try:
-            self._load_model()
+            await loop.run_in_executor(None, self._load_model)
         except Exception as e:
             if self._allow_fake:
                 logger.warning("Using FAKE deterministic vectors — test mode only")
@@ -49,10 +54,6 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
                 "Install sentence-transformers, or set AI_EMBED_PROVIDER to a configured API provider."
             ) from e
 
-        import asyncio
-        from functools import partial
-
-        loop = asyncio.get_running_loop()
         func = partial(self._model.encode, texts, convert_to_numpy=True, show_progress_bar=False)
         embeddings_np = await loop.run_in_executor(None, func)
         return embeddings_np.tolist()

@@ -12,7 +12,12 @@ class Settings(BaseSettings):
     max_upload_size_mb: int = 50
     allowed_upload_extensions: List[str] = [
         "pdf", "docx", "doc", "xlsx", "xls", "pptx", "ppt",
-        "csv", "txt", "md", "rtf", "json", "jpg", "jpeg", "png", "webp", "bmp"
+        "csv", "txt", "md", "rtf", "json", "jpg", "jpeg", "png", "webp", "bmp",
+        # Code / config / plain-text formats — all handled by the same
+        # plain-text extraction fallback as .txt/.md, so no new parser needed.
+        "py", "js", "jsx", "ts", "tsx", "java", "c", "cpp", "h", "hpp", "cs",
+        "go", "rb", "php", "sh", "bash", "sql", "yaml", "yml", "xml",
+        "html", "css", "scss", "log", "ini", "toml", "conf",
     ]
     
     # Database
@@ -83,6 +88,14 @@ class Settings(BaseSettings):
     # Rate limiting
     rate_limit_per_user: str = '60/minute'
     rate_limit_per_tenant: str = '1000/minute'
+
+    # SFTP connector (demo scope: single fixed server/credentials/remote dir)
+    sftp_enabled: bool = False
+    sftp_host: str = 'sftp'
+    sftp_port: int = 22
+    sftp_username: str = 'connector'
+    sftp_password: str = ''
+    sftp_remote_dir: str = '/upload'
     
     @field_validator('cors_origins', mode='before')
     @classmethod

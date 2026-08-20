@@ -12,7 +12,7 @@ interface UploadZoneProps {
 export const UploadZone: React.FC<UploadZoneProps> = ({
   onFilesSelected,
   onFileSelected,
-  accept = ".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.md,.csv,.rtf,.json,.txt,.png,.jpg,.jpeg,.webp",
+  accept = ".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.md,.csv,.rtf,.json,.txt,.png,.jpg,.jpeg,.webp,.bmp,.py,.js,.jsx,.ts,.tsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rb,.php,.sh,.bash,.sql,.yaml,.yml,.xml,.html,.css,.scss,.log,.ini,.toml,.conf",
 
   maxSizeMB = 10,
 }) => {

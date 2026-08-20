@@ -24,6 +24,7 @@ class Document(Base):
     folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("folders.id", ondelete="SET NULL"), index=True, nullable=True)
     title: Mapped[str] = mapped_column()
     doc_type: Mapped[Optional[str]] = mapped_column()
+    mime_type: Mapped[Optional[str]] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(default="pending")
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     

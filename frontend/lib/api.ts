@@ -110,6 +110,7 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
 
   if (response.status === 401 && !path.includes("/auth/login") && !path.includes("/auth/refresh")) {
     const refreshToken = typeof window !== "undefined" ? localStorage.getItem("refresh_token") : null;
+    let refreshed = false;
     if (refreshToken) {
       try {
         const refreshRes = await fetch(`${baseUrl}/api/v1/auth/refresh`, {
@@ -132,14 +133,27 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
               ...options,
               headers,
             });
+            refreshed = true;
           }
         }
       } catch (e) {
         console.error("Auto-refresh token failed", e);
       }
     }
+    // Both the access token and the refresh token are invalid (expired,
+    // corrupted, or from a stale session). Without this, the app would
+    // keep retrying a dead refresh token on every request forever, with
+    // every screen silently failing and no way for the user to recover
+    // short of manually clearing browser storage.
+    if (!refreshed) {
+      clearTokens();
+      if (typeof window !== "undefined") {
+        window.location.href = "/login";
+      }
+      throw new Error("Session expired. Please log in again.");
+    }
   }
-  
+
   if (!response.ok) {
     let errorDetail = "Request failed";
     try {

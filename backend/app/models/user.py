@@ -23,8 +23,8 @@ class User(Base):
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)
     email: Mapped[str] = mapped_column(index=True)
     full_name: Mapped[str] = mapped_column(default="")
-    hashed_password: Mapped[str] = mapped_column()
-    role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.user)
+    hashed_password: Mapped[str] = mapped_column("password_hash")
+    role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), default=UserRole.user)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="users")

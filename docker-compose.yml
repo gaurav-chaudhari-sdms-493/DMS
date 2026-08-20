@@ -69,6 +69,28 @@ services:
     networks:
       - default
 
+  sftp:
+    image: atmoz/sftp:latest
+    ports:
+      - "2222:22"
+    # The named volume below is created root-owned on first use, which leaves
+    # the connector user (uid 1001) able to list/read but not write into its
+    # own upload dir. Chown it (and pre-create the processed/failed subdirs)
+    # before handing off to the image's real entrypoint.
+    entrypoint: >
+      sh -c "mkdir -p /home/connector/upload/processed /home/connector/upload/failed &&
+             chown -R 1001:1001 /home/connector/upload &&
+             exec /entrypoint connector:${SFTP_PASSWORD:-connector123}:1001:1001:upload"
+    volumes:
+      - sftp_data:/home/connector/upload
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - default
+
   backend:
     build: ./backend
     ports:
@@ -89,6 +111,7 @@ services:
     volumes:
       - ./backend:/app
       - hf_cache:/root/.cache/huggingface
+      - ./connector_inbox/watched_folder:/app/watched_inbox
     working_dir: /app
     command: >
       sh -c "alembic upgrade head && echo 'Backend API Docs: http://localhost:8000/api/docs' && uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -179,6 +202,7 @@ volumes:
   redis_data:
   minio_data:
   hf_cache:
+  sftp_data:
 
 networks:
   default:
