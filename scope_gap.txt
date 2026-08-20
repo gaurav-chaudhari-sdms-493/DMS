@@ -1,0 +1,351 @@
+VeritasDocs Scope Gap
+Scope baseline v0.3 · CR-001 · 05-Aug-2026
+VeritasDocs v1 — scope versus what is built
+The DMS repository read module by module against the Scope of Work. Two of ten modules have meaningful work in them. The four hostile-format handlers the SoW calls “the product’s core IP — highest engineering priority” have not been started.
+Baseline
+SoW VeritasDocs v1, v0.3
+Code assessed
+branch
+dev
+@
+5d8e1cb
+Assessed
+17-Aug-2026
+Method
+Source read, no test run
+Where v1 stands
+Milestone-wise the repository sits at a partial
+M0
+plus a slice of
+M4
+search. Nothing from M1, M2, M3 or M5 exists.
+2/10
+Modules with meaningful work. Six are at zero.
+0/4
+Hostile-format handlers built — §3.2, named highest engineering priority
+0/3
+§11 hard rules implemented or testable
+0/6
+§6 engineering standards currently met
+Module status
+§3.1 – §3.10
+Percentages are an engineering judgement from reading the source, not a measured figure. They express how much of each module’s v1 (P0) scope is present.
+(a)
+Ingestion & Connectors
+§3.1
+~20%
+2 of 9 connectors; no abstraction layer
+(b)
+Processing Pipeline
+§3.2
+~10%
+Core IP absent; OCR is English-only
+(c)
+Verification Workbench
+§3.3
+0%
+Not started; no source coordinates stored
+(d)
+Entity & Knowledge
+§3.4
+0%
+No graph schema; container model conflicts
+(e)
+Search & Q&A
+§3.5
+~60%
+Strongest module; citation rule unenforced
+(f)
+Records & Versioning
+§3.6
+0%
+File revisions only, no amendment chains
+(g)
+Reports & Analytics
+§3.7
+0%
+Usage counters exist, not gap scoring
+(h)
+Governance & Audit
+§3.8
+~15%
+2 roles of 6; audit not tamper-evident
+(i)
+Data Operations
+§3.9
+0%
+No dedup, bulk edit, or export
+(j)
+Admin & Deployment
+§3.10
+~25%
+Air-gapped profile currently unreachable
+Module detail
+What exists, what is missing, and where the evidence sits in the tree.
+(a) Ingestion & Connector Framework
+§3.1
+~20%
+Built
+Manual upload (UI) and a REST upload endpoint, single and bulk
+SHA-256 computed at capture —
+document_service.py:52
+Object storage write plus async Celery hand-off
+Missing
+Connector abstraction layer — the SoW’s designated extension point
+Watched folders, FTP/SFTP, email-in, scanner (TWAIN)
+Google Drive, SharePoint, NIC e-Office (CR-001, in v1)
+PDF/A-2b conversion with original preserved alongside
+Provenance record: source, connector identity, operator/system
+Idempotent retry and failure alerting.
+reindex_failed.py
+is a manual bulk re-queue, not retry
+(b) Document Processing Pipeline
+§3.2
+~10%
+Built
+Text extraction across PDF, Office, image and text formats
+Tesseract fallback when a PDF page yields no text
+Token chunker, 512/64, with page numbers retained
+One generic LLM metadata pass: title, author, date, type, topics, summary
+Missing
+All four hostile-format handlers
+: multi-page spread join, ditto-chain expansion, continuation-row merge, blob-cell second-stage parse with unit normalisation
+Template registry keyed by statutory form and era, with per-template validation
+Classification stage and unclassified queue
+Marathi / Devanagari OCR — Tesseract is called with no
+lang
+argument, so it runs English-only (
+extractor.py:43,73
+)
+VLM extraction path of any kind
+Per-field confidence — the value is hardcoded
+0.9
+for every field (
+worker.py:150
+)
+Handwritten / degraded content policy and marginalia routing
+(c) Human Verification Workbench
+§3.3
+Not started
+Nothing in this module exists. No two-lane model, no
+machine → in-review → human-verified
+state machine, no confidence badges, no adjudication queues, no batch accept, no
+sys_dg_config
+.
+The blocking one is provenance:
+source page coordinates are never stored
+.
+pdfplumber
+extracts word-level boxes, the chunker discards them and keeps only page width and height. Region click-through is mandatory across the product — Workbench, 360 views and Q&A citations all depend on data the pipeline currently throws away.
+(d) Entity & Knowledge Layer
+§3.4
+Not started
+Missing
+entity_dg_nodes
+/
+entity_dg_edges
+property-graph schema
+Typed nodes and edges; structural, mention, identity, legal, association
+Four-tier linking policy, escrowed identity links, machine badges
+Bulk threshold confirmation with actor, threshold, corpus, policy version
+Link reversibility with clean cascade
+Threshold governance in
+sys_dg_config
+Conflict to resolve
+§3.10 fixes the container model at
+two levels only
+— Workspace then Project — and rules out department or nested-folder hierarchy. The code has arbitrarily deep recursive folders via
+folders.parent_id
+, with a folder tree endpoint and sidebar UI built on it.
+Either the folder tree goes, or this needs a change request under §10.
+(e) Search & Q&A
+§3.5
+~60%
+Built
+Postgres full-text search plus pgvector HNSW, 1024-dimension BGE-M3
+Reciprocal rank fusion across both legs, then Cohere rerank
+Trilingual query expansion and a HyDE fallback when direct search returns nothing
+Grounded answer generation with result cards attached
+Availability guarantee holds — indexing never waits on verification, because no verification stage exists yet
+Missing
+Uncited-answer refusal
+— §11 hard rule (1). The extension is enabled but nothing enforces refusal
+pg_trgm leg — extension is created in
+0001_baseline_schema.py:26
+, no trigram index exists and no query uses it
+Region-level click-through; citations resolve to a page, not a highlighted area
+Devanagari indexing risk:
+content_tsv
+is generated as
+to_tsvector('english', content)
+while Marathi queries are parsed with the
+simple
+configuration — the two legs disagree
+(f) Records & Versioning
+§3.6
+Not started
+document_versions
+tracks file revisions and is always written as version 1. That is not what this module asks for.
+Amendment chains: base record → amendment sequence → derived current state
+Deterministic re-derivation of current state — no mutable “current” that can drift
+Legal-status layer as a filterable attribute: in force, set aside, under stay, superseded
+Entity / Property 360 view
+(g) Reports & Analytics
+§3.7
+Not started
+The admin panel reports platform usage — user, document, folder, storage, chunk, chat and API-call counts. The SoW asks for something different in kind:
+completeness and reconciliation dashboards with gap scoring per corpus
+, plus on-demand exportable summary reports. Neither exists.
+(h) Governance & Audit
+§3.8
+~15%
+Built
+Tenant isolation through Postgres row-level security
+An
+audit_logs
+table with JSONB detail and API-call logging middleware
+SHA-256 stored per document version
+Missing
+RBAC for six personas — only
+admin
+and
+user
+exist, and the
+permissions
+table has
+zero code references
+Hash
+chains
+. A single hash per version is stored; nothing links them
+Append-only, tamper-evident audit. The table is ordinary and mutable
+Audit coverage — only auth, search and chat emit events. Document view, download, upload, edit and delete are unlogged
+WORM archival storage
+Section 63 (BSA 2023) certificate generation with dual signature blocks
+Retention policy engine — only a 30-day trash purge exists
+Verified-layer boundary for exports and certificates
+(i) Data Operations
+§3.9
+Not started
+Duplicate detection — the SHA-256 is computed and stored but never compared against anything
+Bulk edit with audit capture
+Export to CSV, JSON, XLSX, PDF and PDF/A. Only a presigned download of the original file exists
+(j) Admin & Deployment
+§3.10
+~25%
+Built
+SaaS multi-tenancy with row-level isolation
+A provider abstraction over LLM, embedding, rerank and OCR back-ends
+Docker Compose development stack
+Missing
+Air-gapped profile is currently unreachable.
+No local LLM or VLM provider exists, so metadata extraction, query expansion, HyDE, answer generation and Cohere rerank all send document text to external APIs
+Local VLM reference implementation (Qwen2.5-VL-7B-Instruct on a 24 GB GPU)
+Egress-zero verification
+Kubernetes and Helm packaging
+Licensing enforcement — subscription metering and capacity licensing
+Open decision already taken in code.
+§12 item 3 lists SaaS tenant isolation — schema-per-tenant versus row-level — as an open architecture decision needing security review. The code has already committed to row-level. Worth surfacing so the decision is ratified rather than inherited.
+Engineering standards
+§6 — binding on all modules
+These are cheap to fix now and expensive once production data lands. Every one is currently unmet.
+Standard
+Required
+Current state
+Database naming
+{module}_dg_*
+tables,
+fk_{table}_{ref}
+,
+idx_{table}_{cols}
+Every table violates it —
+documents
+,
+chunks
+,
+metadata
+,
+folders
+,
+audit_logs
+. Indexes use the
+ix_
+prefix
+Configuration-first
+All thresholds and limits in
+sys_dg_config
+, nothing hardcoded
+No such table. Hardcoded: relevance threshold
+0.15
+, RRF
+k=60
+, chunk 512/64, retention 30 days, confidence
+0.9
+Localisation
+EN + MR from day one, strings via
+i18n_dg_translations
+, Devanagari rendering standard
+No i18n library, no translation table,
+<html lang="en">
+, English-only UI
+Auditability
+Every state-changing action emits an audit event
+Auth, search and chat only. Document and folder mutations emit nothing
+Provenance
+Every extracted fact carries document ID, page and region coordinates. No orphan facts
+metadata
+rows carry a document ID only — no page, no region
+Accessibility
+GIGW 3.0 / WCAG 2.1 AA
+No acceptance criteria, no audit performed
+Defects found while reading
+outside the scope comparison
+Four things worth a ticket regardless of how the scope question is settled.
+Where
+Issue
+Why it matters
+config.py:27
+JWT access-token lifetime raised from 15 minutes to
+30 days
+; refresh from 7 to 60 days
+A leaked access token stays valid for a month on a system that is meant to hold evidence-grade government records
+extractor.py:48
+Failed image OCR no longer sets
+extraction_failed
+; the document is indexed with the placeholder text
+"Image document: <filename>"
+An unreadable scan enters the corpus looking like a successful extraction. Silent-fallback class of bug, directly against the confidence and verification model
+worker.py:150
+Every extracted field is written with
+confidence_score = 0.9
+The column implies calibrated confidence and carries none. Any badge or threshold built on it would be meaningless
+models/permission.py
+The
+permissions
+table is defined and migrated but referenced by no code path
+Reads as access control that does not exist. Either wire it or drop it before it is mistaken for working
+Built, but not in the v1 scope
+A material share of the repository implements a consumer file-drive product: folder tree with drag and drop, starring, trash with 30-day retention, context menus, suggested files and folders, drive statistics, persistent chat sessions with attachments, an offline mode and a PWA shell.
+None of it appears in §2 or §3. §4 sets v1 as operator and officer facing, and §10 exists specifically to stop unplanned additions. This is not an argument to delete the work — it is an argument to get it recorded, either as an accepted change request or as deliberate out-of-scope, so the estimate against the milestones stays honest.
+Escalate before the next sprint is planned
+The three §11 hard rules have no implementation and no test
+No uncited Q&A answers. No identity or legal link promoted to the verified layer without a human confirmation event. No handwritten-source verified data without human confirmation. These are product-level acceptance gates for v1, not features to bolt on at the end — and two of the three depend on data structures that do not exist yet.
+Air-gapped acceptance is binary, and currently unreachable
+§3.10 makes zero outbound network calls a release blocker, verifiable by egress monitoring. Today every LLM call and the reranker send document text to external APIs, and there is no local model path. This blocks M5 and depends on assumption A2 (GPU availability), which should be confirmed now rather than at hardening.
+Fix naming, config and provenance columns before more data lands
+The §6 table-naming standard, the
+sys_dg_config
+table, and page and region coordinates on every extracted fact are one migration today. After ingestion at volume they are a migration plus a backfill plus a re-extraction of everything already processed.
+How this was assessed
+Method.
+Full read of the SoW, then a read of the backend source, ORM models, Alembic migrations and frontend routes on branch
+dev
+at
+5d8e1cb
+. No tests were executed and the application was not run.
+Confidence.
+Absence findings are strong — a missing table, endpoint or code path is verifiable by search. Percentages are a judgement call and should be treated as an order of magnitude, not a measurement.
+Not assessed.
+Test suite quality, runtime accuracy against real documents, infrastructure outside the compose file, and the PRD — which the SoW names as the requirements authority. Where this reading and the PRD disagree, §1 says escalate to the product owner rather than resolve it silently.
+Note on the source document.
+An earlier partial extract circulating as “scope of work” contains only sections 1, 3 and 5 of a different, client-facing framing with R-numbered requirements. This analysis uses the full internal SoW v0.3 as the baseline.
+Prepared 17-Aug-2026 · against SoW VeritasDocs v1 v0.3 · code at dev/5d8e1cb

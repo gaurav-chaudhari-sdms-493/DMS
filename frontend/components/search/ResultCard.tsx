@@ -7,9 +7,11 @@ import { Badge } from "../ui/Badge";
 interface ResultCardProps {
   result: SearchResult;
   onPreview?: (result: SearchResult) => void;
+  reranked?: boolean;
+  grounded?: boolean;
 }
 
-export const ResultCard: React.FC<ResultCardProps> = ({ result, onPreview }) => {
+export const ResultCard: React.FC<ResultCardProps> = ({ result, onPreview, reranked = true, grounded = true }) => {
   const createMarkup = (html: string) => {
     return { __html: html };
   };
@@ -51,16 +53,30 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, onPreview }) => 
   const author = metadata.author as string | undefined;
   const date = metadata.date as string | undefined;
 
+  const isLowFocus = !grounded || !reranked;
+
   return (
-    <Card glow className="hover:border-primary/50 group animate-fadeIn flex flex-col gap-4 relative">
+    <Card 
+      glow={!isLowFocus} 
+      className={`group animate-fadeIn flex flex-col gap-4 relative transition-all duration-300 ${
+        isLowFocus 
+          ? "opacity-60 bg-[#f8f9fa]/90 border-dashed border-[#d3d7dc] shadow-none hover:opacity-100 hover:bg-white hover:border-[#0b57d0]/40" 
+          : "hover:border-primary/50"
+      }`}
+    >
       {/* File Title and Page */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-3 overflow-hidden">
-          <div className={`p-2.5 rounded-lg border transition-colors ${getIconColor(ext)}`}>
+          <div className={`p-2.5 rounded-lg border transition-colors ${getIconColor(ext)} ${isLowFocus ? "opacity-70" : ""}`}>
             <FileText className="w-5 h-5" />
           </div>
           <div className="flex flex-col min-w-0">
-            <h4 className="font-bold text-textMain text-base truncate group-hover:text-primary transition-colors" title={result.document_name}>
+            <h4 
+              className={`font-bold text-base truncate transition-colors ${
+                isLowFocus ? "text-[#747775] group-hover:text-primary" : "text-textMain group-hover:text-primary"
+              }`} 
+              title={result.document_name}
+            >
               {result.document_name}
             </h4>
             
@@ -85,7 +101,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, onPreview }) => 
         </div>
         
         {result.page_number && (
-          <Badge status="default" className="shrink-0 ml-2">
+          <Badge status="default" className="shrink-0 ml-2 opacity-80">
             Page {result.page_number}
           </Badge>
         )}
@@ -93,22 +109,44 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, onPreview }) => 
 
       {/* Snippet Content */}
       <div 
-        className="text-sm text-textMuted leading-relaxed bg-surface/20 p-4 rounded-xl border border-borderDark/30 italic group-hover:bg-surface/30 group-hover:border-primary/10 transition-all duration-300"
+        className={`text-sm leading-relaxed p-4 rounded-xl border italic transition-all duration-300 ${
+          isLowFocus 
+            ? "text-[#747775] bg-white/60 border-[#e1e3e1]/60 group-hover:text-textMuted group-hover:bg-surface/30" 
+            : "text-textMuted bg-surface/20 border-borderDark/30 group-hover:bg-surface/30 group-hover:border-primary/10"
+        }`}
         dangerouslySetInnerHTML={createMarkup(result.snippet)}
       />
 
       {/* Score Progress Bar, Preview and Download */}
       <div className="flex items-center justify-between mt-auto pt-3 border-t border-borderDark/40">
         <div className="flex items-center gap-3">
-          <div className="w-24 h-2 bg-surface rounded-full overflow-hidden" title={`Relevance: ${matchPct}%`}>
-            <div 
-              className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(result.score)}`} 
-              style={{ width: `${Math.max(5, matchPct)}%` }} 
-            />
-          </div>
-          <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border transition-all duration-300 ${getMatchGlow(result.score)}`}>
-            {matchPct}% Match
-          </span>
+          {!reranked ? (
+            <span
+              className="text-xs font-medium px-2.5 py-0.5 rounded-full border text-[#747775] bg-[#edf2fc] border-[#d3d7dc]"
+              title="AI ranking was unavailable for this search — this result is unranked, not scored."
+            >
+              Unranked — relevance unknown
+            </span>
+          ) : !grounded ? (
+            <span
+              className="text-xs font-semibold px-2.5 py-0.5 rounded-full border text-amber-800 bg-amber-500/10 border-amber-500/30"
+              title="The AI reviewed this excerpt and did not find information actually answering your query — treat this match score as unreliable."
+            >
+              Possibly not relevant
+            </span>
+          ) : (
+            <>
+              <div className="w-24 h-2 bg-surface rounded-full overflow-hidden" title={`Relevance: ${matchPct}%`}>
+                <div
+                  className={`h-full rounded-full transition-all duration-500 ${getProgressBarColor(result.score)}`}
+                  style={{ width: `${Math.max(5, matchPct)}%` }}
+                />
+              </div>
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border transition-all duration-300 ${getMatchGlow(result.score)}`}>
+                {matchPct}% Match
+              </span>
+            </>
+          )}
         </div>
 
         {/* Action Buttons: Preview shown directly to the left side of Download button */}

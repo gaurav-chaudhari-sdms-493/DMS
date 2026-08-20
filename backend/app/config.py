@@ -40,7 +40,7 @@ class Settings(BaseSettings):
     ai_llm_provider: Literal['openai', 'anthropic', 'groq'] = 'openai'
     ai_embed_provider: Literal['openai', 'bgem3', 'gemini', 'cohere'] = 'bgem3'
     ai_embed_fallback_provider: Literal['cohere', 'openai', 'none'] = 'none'
-    ai_rerank_provider: Literal['cohere', 'none'] = 'cohere'
+    ai_rerank_provider: Literal['cohere', 'bgem3', 'none'] = 'cohere'
     ai_ocr_provider: Literal['pdfplumber', 'llamaparse'] = 'pdfplumber'
     
     openai_api_key: str = ''
@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     groq_api_key2: str = ''
     groq_api_key3: str = ''
     groq_api_keys: str = ''
-    groq_llm_model: str = 'llama-3.3-70b-versatile'
+    groq_llm_model: str = 'openai/gpt-oss-120b'
     
     def get_groq_api_keys(self) -> List[str]:
         keys = []
@@ -76,6 +76,7 @@ class Settings(BaseSettings):
     
     cohere_api_key: str = ''
     cohere_rerank_model: str = 'rerank-english-v3.0'
+    bgem3_rerank_model: str = 'BAAI/bge-reranker-v2-m3'
     
     llamaparse_api_key: str = ''
     

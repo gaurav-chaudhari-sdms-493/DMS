@@ -120,6 +120,31 @@ export default function DrivePage() {
   const [searchResponse, setSearchResponse] = useState<SearchResponse | null>(null);
   const [searching, setSearching] = useState(false);
 
+  // Search Testing Settings (persisted locally — reranker choice + AI summary toggle)
+  const [rerankProvider, setRerankProvider] = useState<"bgem3" | "cohere">("cohere");
+  const [generateSummary, setGenerateSummary] = useState(true);
+
+  useEffect(() => {
+    const savedProvider = typeof window !== "undefined" ? localStorage.getItem("dms_rerank_provider") : null;
+    const savedSummary = typeof window !== "undefined" ? localStorage.getItem("dms_generate_summary") : null;
+    if (savedProvider === "bgem3" || savedProvider === "cohere") {
+      setRerankProvider(savedProvider);
+    } else {
+      setRerankProvider("cohere");
+    }
+    if (savedSummary !== null) setGenerateSummary(savedSummary !== "false");
+  }, []);
+
+  const handleSetRerankProvider = (v: "bgem3" | "cohere") => {
+    setRerankProvider(v);
+    if (typeof window !== "undefined") localStorage.setItem("dms_rerank_provider", v);
+  };
+
+  const handleSetGenerateSummary = (v: boolean) => {
+    setGenerateSummary(v);
+    if (typeof window !== "undefined") localStorage.setItem("dms_generate_summary", String(v));
+  };
+
   // Modals State
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [itemToRename, setItemToRename] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
@@ -355,7 +380,7 @@ export default function DrivePage() {
     setSearchQuery(query);
     setSearching(true);
     try {
-      const res = await api.search.query(query);
+      const res = await api.search.query(query, 5, null, rerankProvider, generateSummary);
       setSearchResponse(res);
       // AUTO-OPEN RIGHT-SIDE PERSISTENT CHAT JUST IN TIME ON SEARCH
       setShowRightChatDrawer(true);
@@ -715,6 +740,10 @@ export default function DrivePage() {
         onClearSearch={handleClearSearch}
         showInfoPanel={showDetailPanel}
         onToggleInfoPanel={() => setShowDetailPanel(!showDetailPanel)}
+        rerankProvider={rerankProvider}
+        onChangeRerankProvider={handleSetRerankProvider}
+        generateSummary={generateSummary}
+        onChangeGenerateSummary={handleSetGenerateSummary}
         onNavigateHome={() => {
           setSearchQuery("");
           setSearchResponse(null);
@@ -829,10 +858,17 @@ export default function DrivePage() {
                     </div>
                   </div>
 
+                  {searchResponse.reranked === false && (
+                    <div className="p-3 bg-amber-50 border border-amber-200 rounded-2xl text-xs text-amber-800 flex items-center gap-2">
+                      <Sparkles className="w-4 h-4 shrink-0" />
+                      <span>AI ranking temporarily unavailable — showing unranked results by keyword/vector match only.</span>
+                    </div>
+                  )}
+
                   {searchResponse.results.length > 0 ? (
                     <div className="grid grid-cols-1 gap-4">
                       {searchResponse.results.map((res, idx) => (
-                        <ResultCard key={`${res.document_id}-${idx}`} result={res} onPreview={handlePreviewSearchResult} />
+                        <ResultCard key={`${res.document_id}-${idx}`} result={res} onPreview={handlePreviewSearchResult} reranked={searchResponse.reranked} grounded={searchResponse.grounded} />
                       ))}
 
                       {/* Small technology message at bottom of loaded docs if results > 1 */}

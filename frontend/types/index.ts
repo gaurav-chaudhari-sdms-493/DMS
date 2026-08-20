@@ -111,6 +111,8 @@ export interface SearchResponse {
   took_ms: number;
   search_mode?: string;
   hyde_triggered?: boolean;
+  reranked?: boolean;
+  grounded?: boolean;
 }
 
 export interface ChatMessage {

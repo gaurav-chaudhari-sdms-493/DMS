@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Sparkles, X, User, LogOut, BarChart3, ChevronDown, ShieldCheck } from "lucide-react";
+import { Sparkles, X, User, LogOut, BarChart3, ChevronDown, ShieldCheck, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -12,6 +12,10 @@ interface DriveTopHeaderProps {
   onToggleInfoPanel: () => void;
   showInfoPanel: boolean;
   onNavigateHome?: () => void;
+  rerankProvider?: "bgem3" | "cohere";
+  onChangeRerankProvider?: (v: "bgem3" | "cohere") => void;
+  generateSummary?: boolean;
+  onChangeGenerateSummary?: (v: boolean) => void;
 }
 
 export function DriveTopHeader({
@@ -21,10 +25,15 @@ export function DriveTopHeader({
   onToggleInfoPanel,
   showInfoPanel,
   onNavigateHome,
+  rerankProvider = "cohere",
+  onChangeRerankProvider,
+  generateSummary = true,
+  onChangeGenerateSummary,
 }: DriveTopHeaderProps) {
   const router = useRouter();
   const [query, setQuery] = useState(searchQuery);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [userName, setUserName] = useState<string>("User");
   const [userEmail, setUserEmail] = useState<string>("");
   const [userInitials, setUserInitials] = useState<string>("U");
@@ -110,6 +119,57 @@ export function DriveTopHeader({
           )}
         </div>
       </form>
+
+      {/* Search Settings: reranker strategy + AI summary on/off — applies to your NEXT search */}
+      <div className="relative shrink-0">
+        <button
+          onClick={() => setSettingsOpen(!settingsOpen)}
+          className="flex items-center gap-1.5 p-2.5 rounded-full text-[#444746] hover:bg-[#e1e3e1]/60 transition-colors focus:outline-none"
+          title="Search settings — reranker & AI summary"
+        >
+          <Settings className="w-5 h-5" />
+        </button>
+
+        {settingsOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setSettingsOpen(false)} />
+            <div className="absolute right-0 mt-2 w-72 bg-white border border-[#d3d7dc] rounded-xl shadow-xl z-50 p-4 space-y-4 text-[#1f1f1f]">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#444746] mb-1">Search Settings</p>
+                <p className="text-[11px] text-[#747775]">Applies to your next global search.</p>
+              </div>
+
+              <div>
+                <label className="text-xs font-medium text-[#444746] mb-1 block">Reranker strategy</label>
+                <select
+                  value={rerankProvider}
+                  onChange={(e) => onChangeRerankProvider?.(e.target.value as "bgem3" | "cohere")}
+                  className="w-full px-3 py-2 rounded-lg border border-[#d3d7dc] bg-[#edf2fc] text-sm font-medium focus:outline-none focus:ring-1 focus:ring-[#0b57d0]"
+                >
+                  <option value="cohere">Cohere (API) — Fast cloud API, no local CPU/GPU load</option>
+                  <option value="bgem3">Local (BGE) — no API cost, higher PC load</option>
+                </select>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-[#444746]">AI Summary generation</p>
+                  <p className="text-[11px] text-[#747775]">Off saves LLM call cost. AI chat still answers when asked.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onChangeGenerateSummary?.(!generateSummary)}
+                  className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${generateSummary ? "bg-[#0b57d0]" : "bg-[#d3d7dc]"}`}
+                >
+                  <span
+                    className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${generateSummary ? "translate-x-5" : ""}`}
+                  />
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
 
       {/* Right User Badge with Dropdown */}
       <div className="relative">

@@ -1,4 +1,5 @@
 import time
+import re
 import logging
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +10,7 @@ from app.services.audit_service import log_action
 from app.services.storage_service import generate_presigned_url
 import json
 from app.ai.factory import get_embed_provider, get_rerank_provider, get_llm_provider
-from app.ai.base import Message
+from app.ai.base import Message, RankedResult
 from app.models.metadata_item import MetadataItem
 
 logger = logging.getLogger(__name__)
@@ -89,13 +90,17 @@ async def search(
     filters: dict | None,
     db: AsyncSession,
     ip_address: str,
+    rerank_provider: str | None = None,
+    generate_summary: bool = True,
 ) -> SearchResponse:
     start_time = time.time()
-    
+
     search_mode = "direct"
     hyde_triggered = False
     hyde_success = False
     hypothetical_snippet = None
+    reranked = True
+    grounded = True
     
     # 1. Enforce AI Input Guardrails
     from app.services.guardrail_service import validate_input_query, validate_output_summary
@@ -109,9 +114,10 @@ async def search(
             cached=False,
             took_ms=took_ms,
             search_mode="failed_all",
-            hyde_triggered=False
+            hyde_triggered=False,
+            reranked=True
         )
-    
+
     query = scrubbed_query
     
     cache_key = generate_cache_key(str(tenant_id), query, filters)
@@ -223,23 +229,31 @@ async def search(
     merged = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:20]
     relevant_ranks = []
     if merged:
-        reranker = get_rerank_provider()
+        reranker = get_rerank_provider(override=rerank_provider)
         doc_texts = [docs_map[cid].content for cid, _ in merged]
-        
-        reranked_primary = await reranker.rerank(query, doc_texts, top_n=limit * 2)
-        if q_mr and q_mr != query:
-            try:
-                reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=limit * 2)
-                rank_map = {r.index: r for r in reranked_primary}
-                for r_trans in reranked_trans:
-                    if r_trans.index in rank_map:
-                        rank_map[r_trans.index].score = max(rank_map[r_trans.index].score, r_trans.score)
-                reranked_primary = list(rank_map.values())
-            except Exception as ex:
-                logger.warning("Secondary translation rerank skipped: %s", ex)
 
-        RELEVANCE_THRESHOLD = 0.15
-        relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
+        try:
+            reranked_primary = await reranker.rerank(query, doc_texts, top_n=limit * 2)
+            if q_mr and q_mr != query:
+                try:
+                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=limit * 2)
+                    rank_map = {r.index: r for r in reranked_primary}
+                    for r_trans in reranked_trans:
+                        if r_trans.index in rank_map:
+                            rank_map[r_trans.index].score = max(rank_map[r_trans.index].score, r_trans.score)
+                    reranked_primary = list(rank_map.values())
+                except Exception as ex:
+                    logger.warning("Secondary translation rerank skipped: %s", ex)
+
+            RELEVANCE_THRESHOLD = 0.15
+            relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
+        except Exception as e:
+            logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
+            reranked = False
+            relevant_ranks = [
+                RankedResult(index=i, score=0.0, text=t)
+                for i, t in enumerate(doc_texts[:limit * 2])
+            ]
 
         if relevant_ranks:
             vec_cids = {str(r.id) for r in all_vec_rows}
@@ -288,24 +302,32 @@ async def search(
                     
                     hyde_merged = sorted(hyde_rrf_scores.items(), key=lambda x: x[1], reverse=True)[:20]
                     if hyde_merged:
-                        reranker = get_rerank_provider()
+                        reranker = get_rerank_provider(override=rerank_provider)
                         doc_texts = [hyde_docs_map[cid].content for cid, _ in hyde_merged]
-                        
-                        reranked_primary = await reranker.rerank(query, doc_texts, top_n=limit * 2)
-                        if q_mr and q_mr != query:
-                            try:
-                                reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=limit * 2)
-                                rank_map = {r.index: r for r in reranked_primary}
-                                for r_trans in reranked_trans:
-                                    if r_trans.index in rank_map:
-                                        rank_map[r_trans.index].score = max(rank_map[r_trans.index].score, r_trans.score)
-                                reranked_primary = list(rank_map.values())
-                            except Exception as ex:
-                                logger.warning("Secondary translation HyDE rerank skipped: %s", ex)
 
-                        RELEVANCE_THRESHOLD = 0.15
-                        relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
-                        
+                        try:
+                            reranked_primary = await reranker.rerank(query, doc_texts, top_n=limit * 2)
+                            if q_mr and q_mr != query:
+                                try:
+                                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=limit * 2)
+                                    rank_map = {r.index: r for r in reranked_primary}
+                                    for r_trans in reranked_trans:
+                                        if r_trans.index in rank_map:
+                                            rank_map[r_trans.index].score = max(rank_map[r_trans.index].score, r_trans.score)
+                                    reranked_primary = list(rank_map.values())
+                                except Exception as ex:
+                                    logger.warning("Secondary translation HyDE rerank skipped: %s", ex)
+
+                            RELEVANCE_THRESHOLD = 0.15
+                            relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
+                        except Exception as e:
+                            logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
+                            reranked = False
+                            relevant_ranks = [
+                                RankedResult(index=i, score=0.0, text=t)
+                                for i, t in enumerate(doc_texts[:limit * 2])
+                            ]
+
                         if relevant_ranks:
                             merged = hyde_merged
                             docs_map = hyde_docs_map
@@ -362,27 +384,33 @@ async def search(
                         snippets_for_llm.append(f"Document: {r.title} (Page {r.page_number or 1})\nExcerpt: {r.content}")
 
                 if snippets_for_llm:
-                    try:
-                        llm = get_llm_provider()
-                        sys_msg = (
-                            "You are an enterprise document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
-                            "- Highlight key numbers, prices, dates, names, policies, and terms in bold formatting.\n"
-                            "- Organize information with clean bullet points or numbered lists where appropriate.\n"
-                            "- If asked to summarize, give a clear, comprehensive summary of the document's contents.\n"
-                            "- Do NOT invent details outside the provided excerpts."
-                        )
-                        user_msg = f"Question: {query}\n\nDocument Contents:\n" + "\n---\n".join(snippets_for_llm)
-                        summary = await llm.complete([
-                            Message(role="system", content=sys_msg),
-                            Message(role="user", content=user_msg)
-                        ])
-                        summary = validate_output_summary(summary)
-                    except Exception as e:
-                        logger.warning("AI summary unavailable for document preview: %s", e)
+                    if not generate_summary:
                         summary = (
-                            f"Found {len(fallback_results)} matching page(s) for '{query}'. "
-                            "AI summary is temporarily unavailable — the excerpts below are unedited source text."
+                            "AI summary generation is disabled for this search (testing mode). "
+                            "Raw retrieved excerpts are shown below."
                         )
+                    else:
+                        try:
+                            llm = get_llm_provider()
+                            sys_msg = (
+                                "You are an enterprise document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
+                                "- Highlight key numbers, prices, dates, names, policies, and terms in bold formatting.\n"
+                                "- Organize information with clean bullet points or numbered lists where appropriate.\n"
+                                "- If asked to summarize, give a clear, comprehensive summary of the document's contents.\n"
+                                "- Do NOT invent details outside the provided excerpts."
+                            )
+                            user_msg = f"Question: {query}\n\nDocument Contents:\n" + "\n---\n".join(snippets_for_llm)
+                            summary = await llm.complete([
+                                Message(role="system", content=sys_msg),
+                                Message(role="user", content=user_msg)
+                            ])
+                            summary = validate_output_summary(summary)
+                        except Exception as e:
+                            logger.warning("AI summary unavailable for document preview: %s", e)
+                            summary = (
+                                f"Found {len(fallback_results)} matching page(s) for '{query}'. "
+                                "AI summary is temporarily unavailable — the excerpts below are unedited source text."
+                            )
 
                     took_ms = int((time.time() - start_time) * 1000)
                     resp = SearchResponse(
@@ -392,7 +420,9 @@ async def search(
                         cached=False,
                         took_ms=took_ms,
                         search_mode=search_mode,
-                        hyde_triggered=hyde_triggered
+                        hyde_triggered=hyde_triggered,
+                        reranked=True,
+                        grounded=True
                     )
                     await log_action(
                         db,
@@ -435,7 +465,9 @@ async def search(
             cached=False,
             took_ms=took_ms,
             search_mode=search_mode,
-            hyde_triggered=hyde_triggered
+            hyde_triggered=hyde_triggered,
+            reranked=True,
+            grounded=True
         )
         await log_action(
             db,
@@ -519,27 +551,40 @@ async def search(
             break
             
     # 7. Generate Natural, Professional AI Summary using LLM
-    try:
-        llm = get_llm_provider()
-        sys_msg = (
-            "You are an enterprise multilingual document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
-            f"- Synthesize your entire response in the user's detected query language ({detected_lang}).\n"
-            "- Highlight key numbers, policies, dates, and names in bold formatting.\n"
-            "- Organize information with clean bullet points or numbered lists where appropriate.\n"
-            "- Do NOT invent details outside the excerpts."
-        )
-        user_msg = f"Question: {query}\n\nRelevant Document Excerpts:\n" + "\n---\n".join(snippets_for_llm)
-        summary = await llm.complete([
-            Message(role="system", content=sys_msg),
-            Message(role="user", content=user_msg)
-        ])
-        summary = validate_output_summary(summary)
-    except Exception as e:
-        logger.warning("AI summary unavailable: %s", e)
+    if not generate_summary:
         summary = (
             f"Found {len(final_results)} matching document(s) for '{query}'. "
-            "AI summary is temporarily unavailable — the excerpts below are unedited source text."
+            "AI summary generation is disabled for this search (testing mode)."
         )
+    else:
+        try:
+            llm = get_llm_provider()
+            sys_msg = (
+                "You are an enterprise multilingual document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
+                f"- Synthesize your entire response in the user's detected query language ({detected_lang}).\n"
+                "- Highlight key numbers, policies, dates, and names in bold formatting.\n"
+                "- Organize information with clean bullet points or numbered lists where appropriate.\n"
+                "- Do NOT invent details outside the excerpts.\n"
+                "- After your full answer, on a new line by itself, output exactly [GROUNDED:true] if the excerpts actually contained information answering the question, "
+                "or [GROUNDED:false] if they did not contain relevant information and you had to decline. Do not explain this marker, just append it."
+            )
+            user_msg = f"Question: {query}\n\nRelevant Document Excerpts:\n" + "\n---\n".join(snippets_for_llm)
+            raw_summary = await llm.complete([
+                Message(role="system", content=sys_msg),
+                Message(role="user", content=user_msg)
+            ])
+            raw_summary = raw_summary.strip()
+            marker_match = re.search(r'\[GROUNDED:\s*(true|false)\s*\]\s*$', raw_summary, re.IGNORECASE)
+            if marker_match:
+                grounded = marker_match.group(1).lower() == "true"
+                raw_summary = raw_summary[:marker_match.start()].rstrip()
+            summary = validate_output_summary(raw_summary)
+        except Exception as e:
+            logger.warning("AI summary unavailable: %s", e)
+            summary = (
+                f"Found {len(final_results)} matching document(s) for '{query}'. "
+                "AI summary is temporarily unavailable — the excerpts below are unedited source text."
+            )
     
     took_ms = int((time.time() - start_time) * 1000)
     
@@ -550,7 +595,9 @@ async def search(
         cached=False,
         took_ms=took_ms,
         search_mode=search_mode,
-        hyde_triggered=hyde_triggered
+        hyde_triggered=hyde_triggered,
+        reranked=reranked,
+        grounded=grounded
     )
     
     # Audit log & Cache

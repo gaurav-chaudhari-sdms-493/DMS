@@ -26,5 +26,7 @@ async def search(
         limit=body.limit,
         filters=body.filters,
         db=db,
-        ip_address=ip_addr
+        ip_address=ip_addr,
+        rerank_provider=body.rerank_provider,
+        generate_summary=body.generate_summary
     )

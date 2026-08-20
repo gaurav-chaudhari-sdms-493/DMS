@@ -1,0 +1,669 @@
+VeritasDocs Build Backlog
+Derived from SoW VeritasDocs v1 · v0.3 · CR-001
+VeritasDocs v1 build backlog
+Every task needed to close the gap between the Scope of Work and the code, grouped by module. Nine decisions gate the work and belong to people rather than to a sprint.
+Code baseline
+branch
+dev
+@
+5d8e1cb
+Tasks
+71 across 11 modules
+Decisions pending
+9
+Prepared
+17-Aug-2026
+How to read a row
+Size
+Rough judgement for one developer —
+S
+days,
+M
+one to two weeks,
+L
+three weeks or more. Not an estimate; the SoW sets dates after estimation against the FSDs.
+Wave
+When it can start, based on what it depends on —
+W0
+first through
+W5
+last. Modules run in parallel, so the wave is what keeps order straight across them.
+Depends
+Must land first.
+A1
+–
+A8
+are SoW assumptions, all externally owned and none resolved.
+D-1
+–
+D-9
+are the decisions listed at the end.
+Modules
+Eleven groups: the cross-cutting foundations, then the ten SoW modules (a) through (j).
+0
+Foundations & engineering standards
+§6 · D2 · 11 tasks
+Do first
+One migration today. After ingestion at volume, each of these becomes a migration plus a backfill plus a re-extraction of everything already processed.
+ID
+Subtask
+Size
+Wave
+Depends
+T01
+Rename all tables, FKs and indexes to the
+{module}_dg_*
+standard. Covers raw SQL in
+search_service.py
+,
+chat_service.py
+and the RLS policies
+M
+W0
+T09
+T02
+Create
+sys_dg_config
+plus a typed, cached accessor with documented defaults
+S
+W0
+—
+T03
+Move hardcoded thresholds into config — relevance 0.15, RRF k=60, chunk 512/64, embed batch, retention 30d, candidate limits
+S
+W0
+T02
+T04
+Add provenance columns
+— page number and region coordinates on every extracted fact, non-null at write time
+M
+W0
+T01
+T05
+Stop discarding word boxes in the chunker; carry them from the extractor to the fact writer
+M
+W0
+T04
+T06
+Define the coordinate contract in D2 — origin, units, page-size normalisation, rotation
+S
+W0
+—
+T07
+Audit events on every mutating document and folder path, plus view and download
+M
+W0
+—
+T08
+Require actor identity at the service boundary; reject anonymous mutations
+S
+W0
+T07
+T09
+D2 — Technical Architecture Document.
+Both deployment profiles, egress-zero approach, model abstraction, Apache AGE evaluation
+L
+W0
+—
+T95
+Localisation — EN + MR, translations table, Noto Sans Devanagari, Marathi digit conversion, language switcher
+L
+W5
+T01
+T96
+Accessibility — GIGW 3.0 / WCAG 2.1 AA baseline audit plus automated CI checks
+M
+W5
+—
+Why first:
+T04 and T05 block the entire Verification Workbench and every region click-through in the product. The pipeline extracts word boxes today and throws them away.
+(a)
+Ingestion & Connector Framework
+§3.1 · 8 tasks
+~20% built
+Built:
+manual upload, REST upload endpoint, SHA-256 at capture, object-storage write, Celery hand-off.
+ID
+Subtask
+Size
+Wave
+Depends
+T40
+Connector abstraction layer — one ingestion contract; later connectors must not require pipeline changes. Port the existing upload onto it
+M
+W1
+T09
+T41
+Mandatory-on-ingest set for every connector: PDF/A-2b with original preserved, provenance record, idempotent retry, failure alerting
+M
+W1
+T40
+T42
+Watched folders and FTP/SFTP poller
+M
+W1
+T40
+T43
+Email-in via a dedicated mailbox
+S
+W1
+T40
+T44
+Scanner integration — TWAIN or network-scan folder drop
+M
+W1
+T40
+T45
+Google Drive — OAuth with refresh and revocation, incremental sync via Changes API, source permissions as provenance, backoff, health status
+L
+W4
+T40, A8
+T46
+SharePoint — same requirement set, incremental sync via delta queries
+L
+W4
+T40, A8
+T47
+NIC e-Office connector, built to the agreed spec.
+Gated at M4 exit
+— ships as fast-follow if access is not secured, never the sole release blocker
+L
+W4
+A7
+(b)
+Document Processing Pipeline
+§3.2 · 14 tasks · the product's core IP
+~10% built
+Built:
+multi-format text extraction, Tesseract fallback, token chunker, one generic LLM metadata pass.
+ID
+Subtask
+Size
+Wave
+Depends
+T21
+Marathi and Devanagari OCR
+— pass
+lang
+to Tesseract (runs English-only today) and install the traineddata
+S
+W1
+—
+T33
+Fix silent OCR failure — failed image OCR no longer flags
+extraction_failed
+, so unreadable scans index as successes
+S
+W1
+—
+T20
+Real per-field confidence, replacing the hardcoded
+0.9
+M
+W1
+D-5
+T23
+Document classification stage plus unclassified queue
+M
+W1
+—
+T24
+Template registry — data-driven, keyed by statutory form and era, validation per template never global
+L
+W1
+T01, T23
+T25
+Seed templates — Basmath Form A (1974), Washim Form B (2004)
+M
+W1
+T24, A1
+T22
+Add the VLM extraction path — none exists in the codebase today
+L
+W1
+T09
+T26
+Handler 1 — multi-page spread join.
+Join halves by serial and row ordinality, parity check, mismatches flagged never auto-joined
+L
+W1
+T24
+T27
+Handler 2 — ditto-chain expansion.
+Per-column expansion, chain-break rules, chains over 10 rows and across pages
+L
+W1
+T24
+T28
+Handler 3 — continuation-row merge.
+Blank-serial rows at page top merge backward
+M
+W1
+T24
+T29
+Handler 4 — blob-cell parse.
+Survey/CTS numbers, area, open space from free-text cells; unit normalisation across sqm, sqft, hectares, gunthas, Akker
+L
+W1
+T24
+T30
+Handwritten and degraded policy — operator capture, marginalia to adjudication, never verified without a human
+M
+W1
+T20
+T31
+D5 — hostile-format regression corpus
+seeded from Waqf ground truth
+M
+W1
+A1
+T32
+D8 — accuracy baseline report.
+The numbers feed sales and tenders
+M
+W1
+T26–T31
+Exit criterion has a hole.
+M1 requires the handlers to reproduce ground truth “within agreed tolerance”, and open item 1 says those numbers do not exist yet — see decision D-4.
+(c)
+Human Verification Workbench
+§3.3 · 5 tasks
+Not started
+ID
+Subtask
+Size
+Wave
+Depends
+T51
+Two-lane model and the per-row
+machine → in-review → human-verified
+state machine
+L
+W2
+T04, T20
+T52
+Adjudication queues — marginalia, join mismatches, low-confidence fields, handwritten regions, with claim and release
+M
+W2
+T51, T26, T30
+T53
+Click-through from field to highlighted source region, reused by 360 views and Q&A citations. Handles rotated and skewed scans
+L
+W2
+T04–T06
+T54
+Operator productivity — keyboard-first navigation, batch accept above a configurable threshold, audit event on every accept
+M
+W2
+T51, T02
+T55
+Hard-rule tests
+— no promotion to verified without an actor event; no handwritten-source verified data without confirmation
+M
+W2
+T51
+Do not
+build a gate that blocks indexing. §3.5 guarantees search never waits on verification — verification gates the evidence layer, not usability.
+(d)
+Entity & Knowledge Layer
+§3.4 · 5 tasks
+Not started
+ID
+Subtask
+Size
+Wave
+Depends
+T10
+Property-graph schema —
+entity_dg_nodes
+and
+entity_dg_edges
+. Every edge carries type, confidence, status, creating actor or policy version, timestamp, evidence pointer
+M
+W0
+T01, T09
+T56
+Tiered linking — tiers 1–2 auto-commit labelled machine, tier 3 escrowed identity links, tier 4 legal links human-only at any confidence
+L
+W3
+T10
+T57
+Bulk threshold confirmation, recording actor, threshold, corpus and policy version on the audit trail and every affected edge
+M
+W3
+T56
+T58
+Link reversibility with clean cascade; machine-accepted links stay permanently labelled
+M
+W3
+T56
+T59
+Per-corpus threshold calibration protocol, required before bulk acceptance is enabled on that corpus
+M
+W3
+T57
+Settle decision D-1 first.
+§3.10 fixes containers at two levels, Workspace then Project, and rules out nested folders. The code has arbitrarily deep recursive folders. Also: the storage decision is already recorded — Postgres edge tables, no graph database in v1. Do not re-litigate it.
+(e)
+Search & Q&A
+§3.5 · 6 tasks
+~60% built
+Built:
+full-text search plus pgvector HNSW, RRF fusion, Cohere rerank, trilingual query expansion, HyDE fallback, grounded answers with result cards, injection screening, PII scrubbing, Redis caching.
+ID
+Subtask
+Size
+Wave
+Depends
+T72
+Add the pg_trgm leg — the extension is created but no trigram index exists and no query uses it
+S
+W4
+—
+T74
+Immediate metadata-level findability on ingest. Search filters on
+status = 'indexed'
+, so a document is invisible until Celery finishes
+M
+W4
+—
+T75
+Devanagari indexing correctness — the tsvector uses the
+english
+configuration while Marathi queries use
+simple
+M
+W4
+T21
+T73
+Search over extracted structured records, not only chunk text
+M
+W4
+T24, T04
+T70
+Uncited-answer refusal
+— bind each claim to a source passage and refuse when grounding is weak. §11 acceptance rule, not a tuning preference
+L
+W4
+T04
+T71
+Citation click-through to the highlighted page region, not just a page number
+M
+W4
+T53
+(f)
+Records & Versioning
+§3.6 · 3 tasks
+Not started
+document_versions
+tracks file revisions and is always written as version 1. This module is record-level amendment history, which is a different thing.
+ID
+Subtask
+Size
+Wave
+Depends
+T60
+Amendment chains — base record to amendments to a
+deterministically re-derivable
+current state, each amendment citing its source page. No mutable “current” that can drift
+L
+W3
+T10, T56
+T61
+Legal-status layer — in force, set aside, under stay, superseded. Filterable everywhere, inherited from a source under litigation
+M
+W3
+T60
+T62
+Entity and Property 360 view — versions, status, linked documents and entities, source click-through on every fact
+L
+W3
+T60, T53
+Test worth writing early:
+apply a corrigendum decades after a base entry that changes a valuation by three orders of magnitude, then assert base view, current view and history are each retrievable, each cite their source page, and re-deriving from the chain reproduces the current view exactly.
+(g)
+Reports & Analytics
+§3.7 · 2 tasks
+Not started
+The admin panel reports
+platform usage
+— user, document, storage and API counts. This module is about the
+corpus
+, which is a different report.
+ID
+Subtask
+Size
+Wave
+Depends
+T76
+Completeness and reconciliation dashboard with gap scoring per corpus — missing fields, failed pages, unverified rows, machine-versus-verified split, confidence distribution, drill-through
+L
+W4
+T20, T51
+T77
+On-demand summary report generation, exportable, with unverified data flagged
+M
+W4
+T78
+(h)
+Governance & Audit
+§3.8 · 7 tasks · carries the “evidence-grade” claim
+~15% built
+Built:
+tenant row-level security, an audit log table, API request logging, SHA-256 per version.
+ID
+Subtask
+Size
+Wave
+Depends
+T34
+The
+permissions
+table has
+zero code references
+— wire it into T50 or drop it, so it is not mistaken for working access control
+S
+W1
+—
+T50
+RBAC for six personas — records officer, operator/adjudicator, department head, legal counsel, IT admin, external auditor. Department scope is an RBAC group over projects, not a container level
+L
+W2
+T34, D-1
+T63
+Tamper-evident audit — append-only enforcement, hash
+chains
+anchored at capture, integrity verification tooling
+L
+W3
+T07
+T64
+WORM archival storage with retention lock per deployment profile
+M
+W3
+—
+T65
+Section 63 certificate generation — hash value, algorithm name, dual signature blocks. Blocking dependency for this module's release
+M
+W3
+A3, D-8
+T66
+Retention policy engine per record class, replacing the 30-day trash purge as the only retention behaviour
+M
+W3
+D-7
+T67
+Verified-layer boundary — exports, certificates and legal derivation consume only human-verified edges. Enforce at the query layer, not per call site
+M
+W3
+T56, D-8
+T67 is what makes tier-3 escrow safe.
+§11 requires it demonstrated on an evidence export that actually contains escrowed links.
+(i)
+Data Operations
+§3.9 · 3 tasks
+Not started
+ID
+Subtask
+Size
+Wave
+Depends
+T78
+Export — CSV, JSON, XLSX, PDF, PDF/A, as an audited action recording actor, scope, format and contents
+M
+W4
+T67
+T79
+Duplicate detection — hash-based (the SHA-256 is stored but never compared) plus fuzzy matching for rescans. Surface for operator resolution, do not silently discard
+M
+W4
+—
+T80
+Bulk edit with per-row audit capture, preview before apply, bounded undo. Cannot promote machine values to verified
+M
+W4
+T07
+(j)
+Admin & Deployment
+§3.10 · 7 tasks
+~25% built
+Built:
+SaaS multi-tenancy with row-level security, a provider abstraction over LLM, embedding, rerank and OCR back-ends, Docker Compose stack.
+ID
+Subtask
+Size
+Wave
+Depends
+T81
+Licensing enforcement — subscription metering for SaaS, node and GPU capacity licence on-prem
+M
+W4
+A5
+T90
+Local model provider
+— Qwen2.5-VL-7B-Instruct on a 24 GB+ GPU, with PaddleOCR / Surya / Docling. Every LLM call currently goes to an external API
+L
+W5
+A2, D-6
+T91
+API-versus-local toggle that
+fails closed
+— a missing local model errors, never silently falls back to an API provider
+M
+W5
+T90
+T92
+Egress-zero verification script and CI coverage
+M
+W5
+T90, T91
+T93
+Helm charts and the air-gapped install runbook. Exit criterion: someone who did not build it installs from the runbook
+L
+W5
+—
+T94
+Project / Collection container level — does not exist today
+M
+W5
+D-1
+T97
+Performance pass on real corpus volumes, including recursive-CTE measurement
+M
+W5
+—
+Air-gapped acceptance is binary:
+zero outbound calls, verifiable by egress monitoring. Cloud connectors are excluded by definition; any
+other
+feature needing internet is a release blocker.
+Decisions that gate the build
+Not development work. Each blocks tasks that cannot sensibly start until it is answered.
+ID
+Decision
+Owner
+Blocks
+D-1
+Container model
+— collapse recursive folders to Workspace → Project (two levels, §3.10), or raise a change request under §10
+Product owner
+T10, T50, T94
+D-2
+Ratify or change SaaS tenant isolation, row-level versus schema-per-tenant. The code already committed to row-level; open item 3 asks for a security review that has not happened
+Tech Lead + security
+module (j)
+D-3
+JWT access-token lifetime — currently 30 days, refresh 60 days
+Tech Lead
+—
+D-4
+M1 accuracy tolerance numbers — “within agreed tolerance” has none today
+Product owner + QA
+M1 exit
+D-5
+Confidence calibration policy — per-template or global bands
+BA + Tech Lead
+T20, T51
+D-6
+Surya GPL inclusion in the on-prem distribution
+Legal
+T90
+D-7
+Retention classes and defaults
+BA
+T66
+D-8
+Escrowed links in evidence exports — exclude entirely, or include with a flag
+Legal counsel
+T65, T67
+D-9
+Scope status of the built drive product — folder tree, star, trash, chat, offline and PWA. Accepted change request, or recorded out-of-scope
+Product owner
+estimates
+Assumptions blocking tasks
+All six are externally owned and none is resolved.
+Ref
+Assumption
+Blocks
+A1
+Waqf reference corpus with human-verified ground truth available to engineering and QA
+T25, T31, T32
+A2
+GPU availability for the local VLM, at least one 24 GB card for development
+T90
+A3
+Legal counsel review of the Section 63 certificate template
+T65
+A5
+Licensing model decision finalised before M4
+T81
+A7
+NIC e-Office integration access — API, database view or file handoff
+T47
+A8
+Google restricted-scope verification and Microsoft Entra admin consent
+T45, T46
+If you only start five things this week
+1
+T04 · T05 · T06 — provenance coordinates
+Block the whole Verification Workbench and every region click-through, and get more expensive with every document ingested.
+2
+T01 · T02 — naming standard and
+sys_dg_config
+One migration now; a migration plus a backfill later.
+3
+T21 — Marathi and Devanagari OCR
+One missing argument. The product cannot currently read the script it is sold on.
+4
+T33 and D-3 — silent OCR failure, and the 30-day JWT
+An unreadable scan currently indexes as though it succeeded, and access tokens live for a month. Both small, both wrong to ship on an evidence system.
+5
+D-1 — the container model conflict
+Decides whether the folder tree survives. The answer changes the data model and the drive UI, so it should not surface halfway through the entity work.
+Out of scope for v1 — do not build, do not stub
+Automated handwritten Urdu/Modi transcription as trusted data · silent promotion of links into the verified layer · GIS and geo-mapping · enterprise search over chat and email bodies · citizen-facing portals · OneDrive and S3/GCS connectors · graph-explorer UI · graph analytics · schema designer · a separate graph database · DPDP consent and erasure workflows · cleaning rules engine · clustering UI · scheduled reports · custom report builder · cross-document synthesis · saved queries · additional Indic scripts · template auto-suggestion · active learning.
+Anything marked P1 or P2 in the PRD enters v1 only through a signed change request under §10. The SoW singles out “small” connector additions as the historically likeliest scope-creep vector.
+Sizes are judgement, not estimates.
+They come from reading the code, and express relative weight only. The SoW sets dates after estimation against the FSDs.
+Authority.
+The SoW names the PRD v1.0 as the requirements authority. Where this backlog and the PRD disagree, §1 says escalate to the product owner rather than resolve it silently.
+Prepared 17-Aug-2026 · from SoW VeritasDocs v1 v0.3 · code at dev/5d8e1cb · 71 tasks, 9 decisions
