@@ -10,6 +10,7 @@ import { RightDock } from "@/components/drive/RightDock";
 import { DriveDetailPanel } from "@/components/drive/DriveDetailPanel";
 import { DocumentPreviewModal } from "@/components/drive/DocumentPreviewModal";
 import { NewFolderModal, RenameModal, MoveModal } from "@/components/drive/Modals";
+import { ConnectorModal } from "@/components/drive/ConnectorModal";
 import { UploadWidget, UploadItem } from "@/components/drive/UploadWidget";
 import { AISummary } from "@/components/search/AISummary";
 import { ResultCard } from "@/components/search/ResultCard";
@@ -147,6 +148,7 @@ export default function DrivePage() {
 
   // Modals State
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [isConnectorModalOpen, setIsConnectorModalOpen] = useState(false);
   const [itemToRename, setItemToRename] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
   const [itemToMove, setItemToMove] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
 
@@ -209,11 +211,22 @@ export default function DrivePage() {
     setIsDragging(false);
   };
 
-  const handleDrop = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
     setIsDragging(false);
     if (currentView === "trash" || currentView === "chat") return;
+
+    const items = e.dataTransfer.items;
+    const entries = items ? Array.from(items).map((item) => item.webkitGetAsEntry?.()).filter(Boolean) : [];
+    const hasDirectory = entries.some((entry: any) => entry.isDirectory);
+
+    if (hasDirectory) {
+      const nested = await Promise.all(entries.map((entry: any) => readEntryContents(entry, "")));
+      await processFolderUpload(nested.flat());
+      return;
+    }
+
     const droppedFiles = Array.from(e.dataTransfer.files || []);
     if (droppedFiles.length > 0) {
       processFilesForUpload(droppedFiles);
@@ -686,8 +699,130 @@ export default function DrivePage() {
     }
   };
 
+  // Recursively read a dropped FileSystemEntry (file or directory) into a
+  // flat list of {file, relativePath}. relativePath includes the dropped
+  // folder's own name as its first segment, so a file dropped inside
+  // "Kunal 2/subdir/x.py" comes back as relativePath "Kunal 2/subdir/x.py"
+  // with file.name cleanly just "x.py".
+  const readEntryContents = (entry: any, basePath: string): Promise<{ file: File; relativePath: string }[]> => {
+    return new Promise((resolve) => {
+      if (entry.isFile) {
+        entry.file(
+          (file: File) => resolve([{ file, relativePath: basePath ? `${basePath}/${entry.name}` : entry.name }]),
+          () => resolve([])
+        );
+      } else if (entry.isDirectory) {
+        const dirReader = entry.createReader();
+        const collected: any[] = [];
+        const readBatch = () => {
+          dirReader.readEntries(async (batch: any[]) => {
+            if (batch.length === 0) {
+              const nextBase = basePath ? `${basePath}/${entry.name}` : entry.name;
+              const nested = await Promise.all(collected.map((child) => readEntryContents(child, nextBase)));
+              resolve(nested.flat());
+            } else {
+              collected.push(...batch);
+              readBatch();
+            }
+          }, () => resolve([]));
+        };
+        readBatch();
+      } else {
+        resolve([]);
+      }
+    });
+  };
+
+  // Cache of "path/segments/joined" -> created/found folder id, so dropping
+  // the same folder twice (or a tree with many files sharing subfolders)
+  // doesn't create duplicate folders or refetch on every file.
+  const folderPathCache = useRef<Map<string, string>>(new Map());
+
+  const getOrCreateFolderId = async (segments: string[], baseParentId: string | null): Promise<string | null> => {
+    let parentId: string | null = baseParentId;
+    let pathKey = "";
+    for (const seg of segments) {
+      pathKey = pathKey ? `${pathKey}/${seg}` : seg;
+      const cached = folderPathCache.current.get(pathKey);
+      if (cached) {
+        parentId = cached;
+        continue;
+      }
+      let folderId: string | null = null;
+      try {
+        const existing = await api.folders.list({ parent_id: parentId });
+        const match = existing.find((f) => f.name === seg);
+        if (match) folderId = match.id;
+      } catch (_) {
+        // listing failed; fall through to create
+      }
+      if (!folderId) {
+        const created = await api.folders.create(seg, parentId);
+        folderId = created.id;
+      }
+      folderPathCache.current.set(pathKey, folderId);
+      parentId = folderId;
+    }
+    return parentId;
+  };
+
+  // Upload a folder tree: creates real, nested folders matching the dropped
+  // directory structure, and uploads each file into the correct folder with
+  // just its own filename (never "FolderName/file.ext" baked into the title).
+  const processFolderUpload = async (entries: { file: File; relativePath: string }[]) => {
+    if (entries.length === 0) return;
+
+    const baseParentId = isUUID(currentFolderId) ? currentFolderId : null;
+
+    const newUploadItems: UploadItem[] = entries.map((entry, i) => ({
+      id: `${Date.now()}-${i}`,
+      name: entry.relativePath,
+      progress: 10,
+      status: "uploading",
+    }));
+    setUploads((prev) => [...prev, ...newUploadItems]);
+
+    for (let i = 0; i < entries.length; i++) {
+      const { file, relativePath } = entries[i];
+      const uploadItemId = newUploadItems[i].id;
+      const segments = relativePath.split("/");
+      const fileName = segments.pop() as string;
+
+      try {
+        const folderId = await getOrCreateFolderId(segments, baseParentId);
+        const cleanFile = new File([file], fileName, { type: file.type });
+        const resp = await api.documents.upload(cleanFile, folderId);
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === uploadItemId
+              ? { ...u, documentId: resp.document_id, progress: 100, status: "indexing" }
+              : u
+          )
+        );
+      } catch (err: any) {
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === uploadItemId
+              ? { ...u, status: "error", errorMsg: err.message || "Upload failed" }
+              : u
+          )
+        );
+      }
+    }
+
+    loadContents();
+  };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
+    const hasRelativePaths = files.some((f) => (f as any).webkitRelativePath);
+    if (hasRelativePaths) {
+      const entries = files.map((f) => ({ file: f, relativePath: (f as any).webkitRelativePath || f.name }));
+      await processFolderUpload(entries);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (folderInputRef.current) folderInputRef.current.value = "";
+      return;
+    }
     if (files.length > 0) {
       await processFilesForUpload(files);
     }
@@ -775,6 +910,7 @@ export default function DrivePage() {
           }}
           onOpenNewFolderModal={() => setIsNewFolderOpen(true)}
           onTriggerFileUpload={() => fileInputRef.current?.click()}
+          onOpenConnectorModal={() => setIsConnectorModalOpen(true)}
           stats={driveStats}
           folderTree={folderTree}
           activeFolderId={currentFolderId}
@@ -1166,6 +1302,11 @@ export default function DrivePage() {
         isOpen={isNewFolderOpen}
         onClose={() => setIsNewFolderOpen(false)}
         onCreate={handleCreateFolder}
+      />
+
+      <ConnectorModal
+        isOpen={isConnectorModalOpen}
+        onClose={() => setIsConnectorModalOpen(false)}
       />
 
       <RenameModal

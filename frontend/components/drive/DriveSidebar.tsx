@@ -12,6 +12,7 @@ import {
   FolderPlus,
   Upload,
   Sparkles,
+  Server,
 } from "lucide-react";
 import type { DriveStats, FolderTreeNode, DocumentListItem } from "@/types";
 import { FolderTreeSidebar } from "./FolderTreeSidebar";
@@ -21,6 +22,7 @@ interface DriveSidebarProps {
   onSelectView: (view: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat") => void;
   onOpenNewFolderModal: () => void;
   onTriggerFileUpload: () => void;
+  onOpenConnectorModal: () => void;
   stats: DriveStats | null;
   folderTree?: FolderTreeNode[];
   activeFolderId?: string | null;
@@ -34,6 +36,7 @@ export function DriveSidebar({
   onSelectView,
   onOpenNewFolderModal,
   onTriggerFileUpload,
+  onOpenConnectorModal,
   stats,
   folderTree = [],
   activeFolderId = null,
@@ -93,6 +96,19 @@ export function DriveSidebar({
                 >
                   <Upload className="w-4 h-4 text-[#00639b]" />
                   <span>File upload</span>
+                </button>
+
+                <div className="h-px bg-[#e1e3e1] my-1" />
+
+                <button
+                  onClick={() => {
+                    setShowNewMenu(false);
+                    onOpenConnectorModal();
+                  }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[#f0f4f9] font-medium text-left"
+                >
+                  <Server className="w-4 h-4 text-[#34a853]" />
+                  <span>Connect a device</span>
                 </button>
               </div>
             </>

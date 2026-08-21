@@ -96,6 +96,27 @@ class Settings(BaseSettings):
     sftp_username: str = 'connector'
     sftp_password: str = ''
     sftp_remote_dir: str = '/upload'
+
+    # The host/port an OUTSIDE machine should actually dial in to reach the SFTP
+    # server (sftp_host/sftp_port above are the Docker-internal address the
+    # backend uses to poll it, not reachable from another laptop on the LAN).
+    sftp_external_host: str = 'localhost'
+    sftp_external_port: int = 2222
+
+    # Email-in connector (demo scope: single fixed local mailbox, not real
+    # internet email — see docker-compose 'mailserver' service)
+    email_enabled: bool = False
+    email_imap_host: str = 'mailserver'
+    email_imap_port: int = 3143
+    email_username: str = 'connector'
+    email_password: str = ''
+    email_address: str = 'connector@dms.local'
+
+    # The host/port an OUTSIDE machine should use to SEND mail into the demo
+    # mailbox over SMTP (not the IMAP host/port above, which the backend uses
+    # to poll it).
+    email_external_smtp_host: str = 'localhost'
+    email_external_smtp_port: int = 3025
     
     @field_validator('cors_origins', mode='before')
     @classmethod

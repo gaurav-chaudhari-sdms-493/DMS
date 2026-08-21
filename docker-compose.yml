@@ -91,6 +91,25 @@ services:
     networks:
       - default
 
+  # Local mail server for the email-in connector demo. GREENMAIL_OPTS below
+  # pins one fixed mailbox (connector@dms.local / connector123) so the demo
+  # doesn't depend on real internet email delivery — send to this box over
+  # SMTP on port 3025, the backend polls it over IMAP on port 3143.
+  mailserver:
+    image: greenmail/standalone:latest
+    ports:
+      - "3025:3025"
+      - "3143:3143"
+    environment:
+      GREENMAIL_OPTS: "-Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=connector:connector123@dms.local -Dgreenmail.auth.disabled=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - default
+
   backend:
     build: ./backend
     ports:
@@ -112,6 +131,8 @@ services:
       - ./backend:/app
       - hf_cache:/root/.cache/huggingface
       - ./connector_inbox/watched_folder:/app/watched_inbox
+      - "/home/stark/Stark Drive :/app/stark_drive_inbox"
+      - connector_state:/app/_state
     working_dir: /app
     command: >
       sh -c "alembic upgrade head && echo 'Backend API Docs: http://localhost:8000/api/docs' && uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -203,6 +224,7 @@ volumes:
   minio_data:
   hf_cache:
   sftp_data:
+  connector_state:
 
 networks:
   default:

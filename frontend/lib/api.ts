@@ -230,6 +230,13 @@ export const api = {
   },
 
 
+  connectors: {
+    getInfo: async (): Promise<any> => {
+      return await request("/api/v1/connectors/info", {
+        method: "GET",
+      });
+    },
+  },
   search: {
     query: async (
       query: string,

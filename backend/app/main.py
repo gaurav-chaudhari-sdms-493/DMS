@@ -12,6 +12,7 @@ from .tasks.worker import celery_app
 from .services.storage_service import ensure_bucket_exists
 from .services.watched_folder_connector import watch_folder_loop
 from .services.sftp_connector import sftp_poll_loop
+from .services.email_connector import email_poll_loop
 from .api_logging_middleware import ApiLoggingMiddleware
 
 from .limiter import limiter
@@ -23,9 +24,11 @@ async def lifespan(app: FastAPI):
     await ensure_bucket_exists()
     watch_task = asyncio.create_task(watch_folder_loop())
     sftp_task = asyncio.create_task(sftp_poll_loop())
+    email_task = asyncio.create_task(email_poll_loop())
     yield
     watch_task.cancel()
     sftp_task.cancel()
+    email_task.cancel()
 
 def create_app() -> FastAPI:
     app = FastAPI(

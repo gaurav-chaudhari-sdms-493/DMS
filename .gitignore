@@ -166,3 +166,6 @@ CLAUDE.md
 /frontend/dist-desktop/linux-unpacked/vk_swiftshader_icd.json
 /frontend/dist-desktop/linux-unpacked/locales/zh-CN.pak
 /frontend/dist-desktop/linux-unpacked/locales/zh-TW.pak
+
+# Local connector test/runtime data — not source, drop-zone contents only
+connector_inbox/

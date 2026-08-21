@@ -12,6 +12,7 @@ production scope (see backlog T40), not a one-night addition.
 """
 import io
 import logging
+import uuid
 from typing import Optional
 from uuid import UUID
 
@@ -22,13 +23,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..models.document import Document
 from ..models.document_version import DocumentVersion
+from ..models.folder import Folder
 from ..models.user import User
 from .document_service import upload_document
 from ..schemas.document import DocumentUploadResponse
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONNECTOR_EMAIL = "admin@example.com"
+DEFAULT_CONNECTOR_EMAIL = "biznesskd07@gmail.com"
 
 _actor_cache: dict[str, tuple[UUID, UUID]] = {}
 
@@ -60,6 +62,44 @@ async def already_ingested(db: AsyncSession, tenant_id: UUID, file_hash: str) ->
         .limit(1)
     )
     return result.scalar_one_or_none() is not None
+
+
+async def get_or_create_folder_path(
+    db: AsyncSession,
+    tenant_id: UUID,
+    segments: list[str],
+    cache: Optional[dict] = None,
+) -> Optional[UUID]:
+    """Resolve nested folder segments (e.g. ["A", "B"]) to a folder_id, creating
+    any that don't exist yet. Reused across connector sources so a subfolder in a
+    watched directory / SFTP tree maps to a real, identically-nested DMS folder."""
+    if cache is None:
+        cache = {}
+
+    parent_id: Optional[UUID] = None
+    for name in segments:
+        key = (parent_id, name)
+        if key in cache:
+            parent_id = cache[key]
+            continue
+
+        result = await db.execute(
+            select(Folder).where(
+                Folder.tenant_id == tenant_id,
+                Folder.name == name,
+                Folder.parent_id == parent_id,
+            )
+        )
+        folder = result.scalar_one_or_none()
+        if folder is None:
+            folder = Folder(id=uuid.uuid4(), name=name, parent_id=parent_id, tenant_id=tenant_id)
+            db.add(folder)
+            await db.flush()
+
+        cache[key] = folder.id
+        parent_id = folder.id
+
+    return parent_id
 
 
 async def ingest_bytes(
