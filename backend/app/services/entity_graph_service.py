@@ -3,9 +3,12 @@ from typing import Optional
 from uuid import UUID
 
 from fastapi import HTTPException
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.entity_edge import EntityEdge
+from app.models.fact import Fact
+from app.models.document import Document
 from app.services.audit_service import log_action
 
 # Tier 1 (structural) and tier 2 (mention) auto-commit as machine — low-risk,
@@ -108,3 +111,72 @@ async def confirm_edge(db: AsyncSession, tenant_id: UUID, edge_id: UUID, actor_i
     )
 
     return edge
+
+
+async def bulk_confirm_edges(
+    db: AsyncSession,
+    tenant_id: UUID,
+    corpus_folder_id: UUID,
+    threshold: float,
+    actor_id: UUID,
+    policy_version: str,
+) -> dict:
+    """T57 — bulk confirm is the same gate at scale: a person accepts every
+    held edge above a chosen score for one collection, in one action.
+    Record the user, the score, the collection and the rule version — on
+    the log AND on every edge it touched (Section 6).
+
+    "Corpus" is scoped to a folder, matching the existing container model
+    (D-1). An edge is only reachable here through its evidence_fact_id ->
+    document -> folder chain — an edge with no evidence (nullable per T10)
+    can't be placed in any corpus and must go through confirm_edge()
+    individually instead.
+
+    Reversal (T58 — link reversibility with clean cascade) is not built
+    yet; this action cannot currently be undone.
+    """
+    if actor_id is None:
+        raise ValueError("bulk confirmation requires an actor")
+    if not policy_version:
+        raise ValueError("bulk confirmation requires a policy/rule version")
+    if threshold is None or not (0.0 <= threshold <= 1.0):
+        raise ValueError("threshold must be between 0 and 1")
+
+    stmt = (
+        select(EntityEdge)
+        .join(Fact, EntityEdge.evidence_fact_id == Fact.id)
+        .join(Document, Fact.document_id == Document.id)
+        .where(
+            EntityEdge.tenant_id == tenant_id,
+            EntityEdge.status == "held",
+            EntityEdge.confidence.is_not(None),
+            EntityEdge.confidence >= threshold,
+            Document.folder_id == corpus_folder_id,
+        )
+    )
+    res = await db.execute(stmt)
+    edges = list(res.scalars().all())
+
+    now = datetime.utcnow()
+    for edge in edges:
+        edge.status = "verified"
+        edge.verified_by_actor_id = actor_id
+        edge.verified_at = now
+        edge.verified_threshold = threshold
+        edge.verified_corpus_folder_id = corpus_folder_id
+        edge.verified_via_policy_version = policy_version
+
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "entity_edge.bulk_confirm",
+        resource_type="folder", resource_id=corpus_folder_id,
+        details={
+            "threshold": threshold,
+            "policy_version": policy_version,
+            "confirmed_count": len(edges),
+            "edge_ids": [str(e.id) for e in edges],
+        },
+    )
+
+    return {"confirmed_count": len(edges), "edge_ids": [e.id for e in edges]}

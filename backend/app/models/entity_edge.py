@@ -67,6 +67,14 @@ class EntityEdge(Base):
     verified_by_actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("iam_dg_users.id"), nullable=True)
     verified_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
 
+    # T57: bulk confirm is the same gate at scale — "record the user, the
+    # score, the collection and the rule version, on the log and on every
+    # link it touched." A single-edge confirm (T56) leaves these NULL;
+    # only bulk_confirm_edges sets them.
+    verified_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    verified_corpus_folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_folders.id", ondelete="SET NULL"), nullable=True)
+    verified_via_policy_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+
     evidence_fact_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_facts.id", ondelete="SET NULL"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
