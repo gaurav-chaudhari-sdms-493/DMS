@@ -178,9 +178,9 @@ async def _fetch_attached_documents_results(
 
         chunk_sql = text("""
             SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path
-            FROM chunks c
-            JOIN documents d ON c.document_id = d.id
-            LEFT JOIN document_versions v ON v.id = d.current_version_id
+            FROM doc_dg_chunks c
+            JOIN doc_dg_documents d ON c.document_id = d.id
+            LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id
             WHERE d.id = :doc_id AND d.tenant_id = :tenant_id AND d.is_trashed = false
             ORDER BY c.page_number ASC, c.chunk_index ASC
             LIMIT 10

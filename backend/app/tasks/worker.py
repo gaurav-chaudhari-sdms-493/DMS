@@ -16,6 +16,7 @@ from ..models.metadata_item import MetadataItem
 from ..ocr.factory import get_ocr_provider
 from ..pipeline.chunker import TextChunker
 from ..services.storage_service import download_file
+from ..services.config_service import get_int, get_float
 from ..config import settings
 
 celery_app = Celery(
@@ -70,7 +71,9 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         pages = await ocr.extract_pages(file_bytes, filename)
 
         # 3. Chunk
-        chunker = TextChunker()
+        chunk_size = await get_int("chunk_size_tokens", 512)
+        chunk_overlap = await get_int("chunk_overlap_tokens", 64)
+        chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         chunks = chunker.chunk_pages(pages)
 
         if not chunks or all(p.get("extraction_failed") for p in pages):
@@ -141,13 +144,14 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
 
                 # Insert metadata items
                 if meta_dict:
+                    extraction_confidence = await get_float("default_extraction_confidence", 0.9)
                     for key, value in meta_dict.items():
                         db_meta = MetadataItem(
                             document_id=document_id,
                             key=key,
                             value=value if isinstance(value, (dict, list)) else {"v": value},
                             source="llm",
-                            confidence_score=0.9,
+                            confidence_score=extraction_confidence,
                         )
                         db.add(db_meta)
 
@@ -214,8 +218,9 @@ def ingest_document_task(document_id_str: str, version_id_str: str, s3_path: str
 
 async def _cleanup_trashed_items_async() -> None:
     from app.services.document_service import cleanup_expired_trashed_items
+    retention_days = await get_int("trash_retention_days", 30)
     async with AsyncSessionLocal() as db:
-        await cleanup_expired_trashed_items(db, retention_days=30)
+        await cleanup_expired_trashed_items(db, retention_days=retention_days)
 
 
 @celery_app.task(name="app.tasks.cleanup_trashed_items_task")

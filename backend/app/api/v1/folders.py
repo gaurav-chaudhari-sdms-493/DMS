@@ -71,7 +71,8 @@ async def update_folder(
     db: AsyncSession = Depends(get_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await folder_service.update_folder(db, folder_id, tenant_id, folder_in)
+    user_id = uuid.UUID(current_user.sub)
+    return await folder_service.update_folder(db, folder_id, tenant_id, folder_in, actor_id=user_id)
 
 
 @router.post("/{folder_id}/star", response_model=FolderResponse)
@@ -81,7 +82,8 @@ async def toggle_star_folder(
     db: AsyncSession = Depends(get_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await folder_service.toggle_star_folder(db, folder_id, tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    return await folder_service.toggle_star_folder(db, folder_id, tenant_id, actor_id=user_id)
 
 
 @router.post("/{folder_id}/trash", response_model=FolderResponse)
@@ -91,7 +93,8 @@ async def toggle_trash_folder(
     db: AsyncSession = Depends(get_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await folder_service.toggle_trash_folder(db, folder_id, tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    return await folder_service.toggle_trash_folder(db, folder_id, tenant_id, actor_id=user_id)
 
 
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
@@ -101,4 +104,5 @@ async def delete_folder_permanently(
     db: AsyncSession = Depends(get_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    await folder_service.delete_folder_permanently(db, folder_id, tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    await folder_service.delete_folder_permanently(db, folder_id, tenant_id, actor_id=user_id)

@@ -11,16 +11,16 @@ if TYPE_CHECKING:
     from app.models.document import Document
 
 class DocumentVersion(Base):
-    __tablename__ = "document_versions"
+    __tablename__ = "doc_dg_document_versions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("doc_dg_documents.id"), index=True)
     s3_path: Mapped[str] = mapped_column()
     version_number: Mapped[int] = mapped_column(default=1)
     file_hash: Mapped[str] = mapped_column()
     file_size_bytes: Mapped[int] = mapped_column()
     original_filename: Mapped[str] = mapped_column()
-    uploaded_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
+    uploaded_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("iam_dg_users.id"), index=True, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     document: Mapped["Document"] = relationship(

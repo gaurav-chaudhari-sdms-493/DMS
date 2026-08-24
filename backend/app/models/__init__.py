@@ -10,6 +10,10 @@ from app.models.audit_log import AuditLog
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.models.api_log import ApiLog
+from app.models.sys_config import SysConfig
+from app.models.page import DocumentPage
+from app.models.fact import Fact
+from app.models.fact_region import FactRegion
 from app.database import Base
 
 

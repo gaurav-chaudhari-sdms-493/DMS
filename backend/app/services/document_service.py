@@ -21,6 +21,7 @@ from ..schemas.document import (
     DriveStatsResponse,
 )
 from ..services.storage_service import upload_file, generate_presigned_url, delete_file
+from ..services.audit_service import log_action
 from ..pipeline.ingestion import ingest_document
 
 logger = logging.getLogger(__name__)
@@ -84,6 +85,8 @@ async def upload_document(
     doc.current_version_id = version_id
     await db.commit()
     await db.refresh(doc)
+
+    await log_action(db, user_id, tenant_id, "document.create", resource_type="document", resource_id=doc.id, details={"title": doc.title})
 
     # Schedule async ingestion
     await ingest_document(
@@ -187,6 +190,7 @@ async def get_document(
     document_id: UUID,
     tenant_id: UUID,
     db: AsyncSession,
+    actor_id: UUID,
 ) -> DocumentDetailResponse:
     """Retrieve a document with its versions, presigned download link, and metadata."""
     stmt = (
@@ -233,6 +237,8 @@ async def get_document(
         for m in doc.metadata_items
     ]
 
+    await log_action(db, actor_id, tenant_id, "document.view", resource_type="document", resource_id=doc.id)
+
     return DocumentDetailResponse(
         document_id=doc.id,
         title=doc.title,
@@ -254,6 +260,7 @@ async def update_document(
     document_id: UUID,
     tenant_id: UUID,
     doc_in: DocumentUpdate,
+    actor_id: UUID,
 ) -> DocumentListItem:
     stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
     res = await db.execute(stmt)
@@ -261,18 +268,23 @@ async def update_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    changes = {}
     if doc_in.folder_id is not None:
         folder = await db.get(Folder, doc_in.folder_id)
         if not folder or folder.tenant_id != tenant_id:
             raise HTTPException(status_code=404, detail="Target folder not found")
         doc.folder_id = doc_in.folder_id
+        changes["folder_id"] = str(doc_in.folder_id)
 
     if doc_in.title is not None:
         doc.title = doc_in.title
+        changes["title"] = doc_in.title
 
     await db.commit()
     await db.refresh(doc)
-    
+
+    await log_action(db, actor_id, tenant_id, "document.update", resource_type="document", resource_id=doc.id, details=changes)
+
     curr_v = next((v for v in doc.versions if v.id == doc.current_version_id), doc.versions[-1] if doc.versions else None)
     size = curr_v.file_size_bytes if curr_v else 0
     s3_path = curr_v.s3_path if curr_v else None
@@ -295,7 +307,7 @@ async def update_document(
     )
 
 
-async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> DocumentListItem:
+async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: UUID, actor_id: UUID) -> DocumentListItem:
     stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
     res = await db.execute(stmt)
     doc = res.scalar_one_or_none()
@@ -306,6 +318,8 @@ async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: U
     await db.commit()
     await db.refresh(doc)
 
+    await log_action(db, actor_id, tenant_id, "document.star_toggle", resource_type="document", resource_id=doc.id, details={"is_starred": doc.is_starred})
+
     curr_v = next((v for v in doc.versions if v.id == doc.current_version_id), doc.versions[-1] if doc.versions else None)
     size = curr_v.file_size_bytes if curr_v else 0
     s3_path = curr_v.s3_path if curr_v else None
@@ -328,7 +342,7 @@ async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: U
     )
 
 
-async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> DocumentListItem:
+async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: UUID, actor_id: UUID) -> DocumentListItem:
     stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
     res = await db.execute(stmt)
     doc = res.scalar_one_or_none()
@@ -340,6 +354,8 @@ async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: 
     await db.commit()
     await db.refresh(doc)
 
+    await log_action(db, actor_id, tenant_id, "document.trash_toggle", resource_type="document", resource_id=doc.id, details={"is_trashed": doc.is_trashed})
+
     curr_v = next((v for v in doc.versions if v.id == doc.current_version_id), doc.versions[-1] if doc.versions else None)
     size = curr_v.file_size_bytes if curr_v else 0
     s3_path = curr_v.s3_path if curr_v else None
@@ -362,12 +378,14 @@ async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: 
     )
 
 
-async def delete_document_permanently(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> None:
+async def delete_document_permanently(db: AsyncSession, document_id: UUID, tenant_id: UUID, actor_id: UUID) -> None:
     stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
     res = await db.execute(stmt)
     doc = res.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    doc_title = doc.title
 
     for v in doc.versions:
         if v.s3_path:
@@ -391,6 +409,8 @@ async def delete_document_permanently(db: AsyncSession, document_id: UUID, tenan
 
     await db.delete(doc)
     await db.commit()
+
+    await log_action(db, actor_id, tenant_id, "document.delete", resource_type="document", resource_id=document_id, details={"title": doc_title})
 
 
 async def get_drive_stats(db: AsyncSession, tenant_id: UUID) -> DriveStatsResponse:

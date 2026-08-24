@@ -12,6 +12,7 @@ import json
 from app.ai.factory import get_embed_provider, get_rerank_provider, get_llm_provider
 from app.ai.base import Message, RankedResult
 from app.models.metadata_item import MetadataItem
+from app.services.config_service import get_int, get_float
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +156,7 @@ async def search(
             else:
                 filter_clauses.append(f"""
                     AND EXISTS (
-                        SELECT 1 FROM metadata m 
+                        SELECT 1 FROM doc_dg_metadata_items m
                         WHERE m.document_id = d.id 
                           AND m.key = :filter_key_{idx} 
                           AND (
@@ -171,32 +172,33 @@ async def search(
                 params[f"filter_like_val_{idx}"] = f'%"{v}"%'
                 
     filter_str = "\n".join(filter_clauses)
-    
+    candidate_limit = await get_int("search_candidate_limit", 20)
+
     # 3. Vector search (pgvector <=> operator across English, Hindi, Marathi embeddings)
     vec_sql = text(f"""
         SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
                1 - (c.embedding <=> CAST(:query_embedding AS vector)) as vector_score
-        FROM chunks c 
-        JOIN documents d ON c.document_id = d.id
-        LEFT JOIN document_versions v ON v.id = d.current_version_id
+        FROM doc_dg_chunks c
+        JOIN doc_dg_documents d ON c.document_id = d.id
+        LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id
         WHERE d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
         ORDER BY c.embedding <=> CAST(:query_embedding AS vector)
-        LIMIT 20
+        LIMIT {candidate_limit}
     """)
-    
+
     all_vec_rows = []
     for q_emb in q_embeddings:
         q_emb_str = "[" + ",".join(str(f) for f in q_emb) + "]"
         vec_res = await db.execute(vec_sql, {**params, "query_embedding": q_emb_str})
         all_vec_rows.extend(vec_res.fetchall())
-    
+
     # 4. Keyword search (English + Simple Unicode for Devanagari Marathi/Hindi)
     kw_sql = text(f"""
         SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
                ts_rank(c.content_tsv, q) as keyword_score
-        FROM chunks c
-        JOIN documents d ON c.document_id = d.id
-        LEFT JOIN document_versions v ON v.id = d.current_version_id,
+        FROM doc_dg_chunks c
+        JOIN doc_dg_documents d ON c.document_id = d.id
+        LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id,
         COALESCE(
           NULLIF(plainto_tsquery('english', :query_en), ''),
           NULLIF(websearch_to_tsquery('english', :query_en), ''),
@@ -205,7 +207,7 @@ async def search(
         ) q
         WHERE c.content_tsv @@ q AND d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
         ORDER BY keyword_score DESC
-        LIMIT 20
+        LIMIT {candidate_limit}
     """)
     
     kw_res = await db.execute(kw_sql, params)
@@ -214,12 +216,12 @@ async def search(
     # 5. RRF Merge (Reciprocal Rank Fusion across all language vectors and keywords)
     rrf_scores = {}
     docs_map = {}
-    k = 60
-    
+    k = await get_int("search_rrf_k", 60)
+
     for rank, row in enumerate(all_vec_rows):
         cid = str(row.id)
         docs_map[cid] = row
-        rrf_scores[cid] = rrf_scores.get(cid, 0) + (1.0 / (k + (rank % 20) + 1))
+        rrf_scores[cid] = rrf_scores.get(cid, 0) + (1.0 / (k + (rank % candidate_limit) + 1))
         
     for rank, row in enumerate(kw_rows):
         cid = str(row.id)
@@ -245,7 +247,7 @@ async def search(
                 except Exception as ex:
                     logger.warning("Secondary translation rerank skipped: %s", ex)
 
-            RELEVANCE_THRESHOLD = 0.15
+            RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
             relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
         except Exception as e:
             logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
@@ -318,7 +320,7 @@ async def search(
                                 except Exception as ex:
                                     logger.warning("Secondary translation HyDE rerank skipped: %s", ex)
 
-                            RELEVANCE_THRESHOLD = 0.15
+                            RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
                             relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
                         except Exception as e:
                             logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
@@ -335,7 +337,7 @@ async def search(
                             hyde_success = True
                             logger.info("Tri-Lingual HyDE Fallback SUCCESS: Found %d matching candidate(s)", len(relevant_ranks))
                         else:
-                            logger.info("HyDE candidates scored below relevance threshold (0.15). Yielding 0 results.")
+                            logger.info("HyDE candidates scored below relevance threshold (%.2f). Yielding 0 results.", RELEVANCE_THRESHOLD)
             except Exception as e:
                 logger.error("Tri-Lingual HyDE fallback vector search failed: %s", e)
 
@@ -355,9 +357,9 @@ async def search(
             if target_doc_id:
                 chunk_sql = text("""
                     SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path
-                    FROM chunks c
-                    JOIN documents d ON c.document_id = d.id
-                    LEFT JOIN document_versions v ON v.id = d.current_version_id
+                    FROM doc_dg_chunks c
+                    JOIN doc_dg_documents d ON c.document_id = d.id
+                    LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id
                     WHERE d.id = :target_doc_id AND d.tenant_id = CAST(:tenant_id AS uuid) AND d.is_trashed = false
                     ORDER BY c.page_number ASC, c.chunk_index ASC
                     LIMIT 30
@@ -445,7 +447,8 @@ async def search(
         took_ms = int((time.time() - start_time) * 1000)
 
         # Check if any documents in this tenant are currently being indexed
-        pending_sql = text("SELECT title FROM documents WHERE tenant_id = CAST(:tenant_id AS uuid) AND status IN ('pending', 'processing') AND is_trashed = false LIMIT 3")
+        pending_preview_limit = await get_int("search_pending_docs_preview_limit", 3)
+        pending_sql = text(f"SELECT title FROM doc_dg_documents WHERE tenant_id = CAST(:tenant_id AS uuid) AND status IN ('pending', 'processing') AND is_trashed = false LIMIT {pending_preview_limit}")
         pending_res = await db.execute(pending_sql, {"tenant_id": str(tenant_id)})
         pending_titles = [r.title for r in pending_res.fetchall()]
 
@@ -617,6 +620,7 @@ async def search(
         },
         ip_address=ip_address
     )
-    await cache_search_result(cache_key, resp)
+    cache_ttl = await get_int("search_cache_ttl_seconds", 300)
+    await cache_search_result(cache_key, resp, ttl=cache_ttl)
     
     return resp

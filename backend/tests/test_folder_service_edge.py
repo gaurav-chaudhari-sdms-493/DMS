@@ -61,14 +61,14 @@ async def test_folder_cycle_prevention():
 
             # 1. Attempt to move Root to be its own parent
             with pytest.raises(HTTPException) as exc1:
-                await update_folder(db, root.id, tenant_id, FolderUpdate(parent_id=root.id))
+                await update_folder(db, root.id, tenant_id, FolderUpdate(parent_id=root.id), actor_id=user_id)
             assert exc1.value.status_code == 400
             assert "own parent" in exc1.value.detail
             await db.rollback()
 
             # 2. Attempt to move Root into Grandchild (cycle detection)
             with pytest.raises(HTTPException) as exc2:
-                await update_folder(db, root.id, tenant_id, FolderUpdate(parent_id=grandchild.id))
+                await update_folder(db, root.id, tenant_id, FolderUpdate(parent_id=grandchild.id), actor_id=user_id)
             assert exc2.value.status_code == 400
             assert "subfolders" in exc2.value.detail
             await db.rollback()
@@ -97,7 +97,7 @@ async def test_folder_star_trash_and_tree():
             f2 = await create_folder(db, tenant_id, user_id, FolderCreate(name="Beta", parent_id=f1.id))
 
             # Toggle star
-            starred = await toggle_star_folder(db, f1.id, tenant_id)
+            starred = await toggle_star_folder(db, f1.id, tenant_id, actor_id=user_id)
             assert starred.is_starred is True
 
             # Check tree
@@ -108,7 +108,7 @@ async def test_folder_star_trash_and_tree():
             assert tree[0].subfolders[0].name == "Beta"
 
             # Toggle trash
-            trashed = await toggle_trash_folder(db, f2.id, tenant_id)
+            trashed = await toggle_trash_folder(db, f2.id, tenant_id, actor_id=user_id)
             assert trashed.is_trashed is True
 
             # Trashed folder excluded from tree
@@ -116,7 +116,7 @@ async def test_folder_star_trash_and_tree():
             assert len(tree_after_trash[0].subfolders) == 0
 
             # Permanent deletion
-            await delete_folder_permanently(db, f2.id, tenant_id)
+            await delete_folder_permanently(db, f2.id, tenant_id, actor_id=user_id)
             with pytest.raises(HTTPException) as exc:
                 await get_folder(db, f2.id, tenant_id)
             assert exc.value.status_code == 404

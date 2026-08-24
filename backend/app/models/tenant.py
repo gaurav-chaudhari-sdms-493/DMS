@@ -11,7 +11,7 @@ if TYPE_CHECKING:
     from app.models.document import Document
 
 class Tenant(Base):
-    __tablename__ = "tenants"
+    __tablename__ = "iam_dg_tenants"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(index=True)

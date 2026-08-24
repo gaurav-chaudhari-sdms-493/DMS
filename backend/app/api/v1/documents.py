@@ -77,7 +77,8 @@ async def get_document_api(
     db: AsyncSession = Depends(get_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await document_service.get_document(document_id, tenant_id, db)
+    user_id = uuid.UUID(current_user.sub)
+    return await document_service.get_document(document_id, tenant_id, db, actor_id=user_id)
 
 
 @router.patch('/{document_id}', response_model=DocumentListItem)
@@ -88,7 +89,8 @@ async def update_document_api(
     db: AsyncSession = Depends(get_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await document_service.update_document(db, document_id, tenant_id, doc_in)
+    user_id = uuid.UUID(current_user.sub)
+    return await document_service.update_document(db, document_id, tenant_id, doc_in, actor_id=user_id)
 
 
 @router.post('/{document_id}/star', response_model=DocumentListItem)
@@ -98,7 +100,8 @@ async def toggle_star_document_api(
     db: AsyncSession = Depends(get_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await document_service.toggle_star_document(db, document_id, tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    return await document_service.toggle_star_document(db, document_id, tenant_id, actor_id=user_id)
 
 
 @router.post('/{document_id}/trash', response_model=DocumentListItem)
@@ -108,7 +111,8 @@ async def toggle_trash_document_api(
     db: AsyncSession = Depends(get_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await document_service.toggle_trash_document(db, document_id, tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    return await document_service.toggle_trash_document(db, document_id, tenant_id, actor_id=user_id)
 
 
 @router.post('/trash/cleanup')
@@ -127,4 +131,5 @@ async def delete_document_api(
     db: AsyncSession = Depends(get_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    await document_service.delete_document_permanently(db, document_id, tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    await document_service.delete_document_permanently(db, document_id, tenant_id, actor_id=user_id)

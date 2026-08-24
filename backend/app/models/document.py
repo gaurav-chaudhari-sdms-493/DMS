@@ -15,13 +15,13 @@ if TYPE_CHECKING:
     from app.models.folder import Folder
 
 class Document(Base):
-    __tablename__ = "documents"
+    __tablename__ = "doc_dg_documents"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
-    current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("document_versions.id", use_alter=True, name="fk_document_current_version_id"), nullable=True)
-    folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("folders.id", ondelete="SET NULL"), index=True, nullable=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("iam_dg_tenants.id"), index=True)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("iam_dg_users.id"), index=True, nullable=True)
+    current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_document_versions.id", use_alter=True, name="fk_doc_dg_documents_current_version"), nullable=True)
+    folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_folders.id", ondelete="SET NULL"), index=True, nullable=True)
     title: Mapped[str] = mapped_column()
     doc_type: Mapped[Optional[str]] = mapped_column()
     mime_type: Mapped[Optional[str]] = mapped_column(nullable=True)
