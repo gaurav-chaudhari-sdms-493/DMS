@@ -14,6 +14,8 @@ from app.models.page import DocumentPage
 from app.models.fact import Fact
 from app.models.fact_region import FactRegion
 from app.models.template import Template
+from app.models.entity_node import EntityNode
+from app.models.entity_edge import EntityEdge
 from app.database import Base
 
 
