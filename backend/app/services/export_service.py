@@ -48,7 +48,7 @@ def _confirmation_status(status: str) -> str:
     return "human_verified" if status == "verified" else "unconfirmed_machine_suggested"
 
 
-async def _gather_export_data(db: AsyncSession, tenant_id: UUID, node_id: UUID, mode: ExportMode) -> Dict[str, Any]:
+async def gather_evidence_package(db: AsyncSession, tenant_id: UUID, node_id: UUID, mode: ExportMode) -> Dict[str, Any]:
     view = await get_entity_360_view(db, tenant_id, node_id)
 
     linked_entities = []
@@ -211,7 +211,7 @@ async def generate_export(
     if export_format not in CONTENT_TYPES:
         raise HTTPException(status_code=400, detail=f"Unknown export format '{export_format}'")
 
-    data = await _gather_export_data(db, tenant_id, node_id, mode)
+    data = await gather_evidence_package(db, tenant_id, node_id, mode)
 
     if export_format == "json":
         content = _to_json_bytes(data)
