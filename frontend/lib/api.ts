@@ -237,6 +237,13 @@ export const api = {
       });
     },
   },
+  facts: {
+    get: async (factId: string): Promise<any> => {
+      return await request(`/api/v1/facts/${factId}`, {
+        method: "GET",
+      });
+    },
+  },
   search: {
     query: async (
       query: string,

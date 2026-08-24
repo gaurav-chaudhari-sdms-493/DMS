@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import auth, documents, search, folders, chat, admin, health, connectors
+from . import auth, documents, search, folders, chat, admin, health, connectors, facts
 
 api_router = APIRouter(prefix='/api/v1')
 api_router.include_router(health.router, tags=['health'])
@@ -10,3 +10,4 @@ api_router.include_router(search.router, prefix='/search', tags=['search'])
 api_router.include_router(chat.router, prefix='/chat', tags=['chat'])
 api_router.include_router(admin.router, prefix='/admin', tags=['admin'])
 api_router.include_router(connectors.router)
+api_router.include_router(facts.router)

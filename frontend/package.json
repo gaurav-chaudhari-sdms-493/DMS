@@ -8,7 +8,9 @@
   "main": "main.js",
   "scripts": {
     "dev": "next dev",
+    "predev": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
     "build": "next build",
+    "prebuild": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
     "start": "next start",
     "lint": "next lint",
     "desktop:dev": "electron .",
@@ -47,6 +49,7 @@
     "next": "14",
     "react": "^18",
     "react-dom": "^18",
+    "react-pdf": "^9.1.1",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
