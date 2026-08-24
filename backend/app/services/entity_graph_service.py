@@ -136,6 +136,12 @@ async def bulk_confirm_edges(
     Every confirmed edge gets a fresh verified_batch_id, the precise
     handle revert_bulk_batch() (T58) needs to undo exactly this run —
     policy_version is a reusable business label, not a unique run id.
+
+    T59: bulk acceptance is disabled on a corpus until a human has
+    calibrated it (corpus_calibration_service.calibrate_corpus) — a
+    hardcoded/uncalibrated confidence score "implies calibrated
+    confidence and carries none; any threshold built on it is
+    meaningless" (scope gap, engineering standards).
     """
     if actor_id is None:
         raise ValueError("bulk confirmation requires an actor")
@@ -143,6 +149,14 @@ async def bulk_confirm_edges(
         raise ValueError("bulk confirmation requires a policy/rule version")
     if threshold is None or not (0.0 <= threshold <= 1.0):
         raise ValueError("threshold must be between 0 and 1")
+
+    from app.services.corpus_calibration_service import is_corpus_calibrated
+    if not await is_corpus_calibrated(db, tenant_id, corpus_folder_id):
+        raise HTTPException(
+            status_code=409,
+            detail="This corpus has not been calibrated — bulk acceptance is disabled until a human certifies "
+                   "the confidence scores here are meaningful (corpus_calibration_service.calibrate_corpus)",
+        )
 
     stmt = (
         select(EntityEdge)
