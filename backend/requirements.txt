@@ -31,6 +31,7 @@ python-pptx>=1.0.0
 striprtf>=0.0.26
 pandas>=2.0.0
 xlrd>=2.0.1
+reportlab>=4.0.0
 
 # Local embedding model (BGE-M3) — no API key required
 sentence-transformers>=3.0.0
