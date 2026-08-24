@@ -1,0 +1,229 @@
+"""T51/T52/T54/T55 — the Human Verification Workbench's fact lane.
+
+Mirrors entity_graph_service.py's confirm_edge/bulk_confirm_edges (T56/
+T57) exactly, so facts and entity edges go through the same shape of
+promotion. 'machine' facts are never promoted further — permanent, same
+as tier1/2 edges. Only 'in_review' facts can reach 'verified', and only
+through a real actor event (T55's hard rule; enforced the same way T08
+enforces it everywhere else — no actor_id, no write).
+
+Do not build a gate that blocks indexing (Section 3.5) — nothing here
+touches search or chunk indexing, which already happened at ingest
+regardless of a fact's verification status.
+"""
+import uuid as uuid_module
+from datetime import datetime
+from typing import Optional
+from uuid import UUID
+
+from fastapi import HTTPException
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.document import Document
+from app.models.fact import Fact
+from app.services.audit_service import log_action
+
+
+async def claim_fact(db: AsyncSession, tenant_id: UUID, fact_id: UUID, actor_id: UUID) -> Fact:
+    """T52 — a courtesy lock, not a hard gate: confirm_fact() doesn't
+    require a claim, this just stops two operators working the same item
+    without knowing it."""
+    fact = await db.get(Fact, fact_id)
+    if not fact or fact.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Fact not found")
+
+    if fact.claimed_by_actor_id and fact.claimed_by_actor_id != actor_id:
+        raise HTTPException(status_code=409, detail="Fact is already claimed by another operator")
+
+    fact.claimed_by_actor_id = actor_id
+    fact.claimed_at = datetime.utcnow()
+    await db.flush()
+    return fact
+
+
+async def release_fact(db: AsyncSession, tenant_id: UUID, fact_id: UUID, actor_id: UUID) -> Fact:
+    fact = await db.get(Fact, fact_id)
+    if not fact or fact.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Fact not found")
+
+    if fact.claimed_by_actor_id and fact.claimed_by_actor_id != actor_id:
+        raise HTTPException(status_code=409, detail="Only the operator who claimed this fact can release it")
+
+    fact.claimed_by_actor_id = None
+    fact.claimed_at = None
+    await db.flush()
+    return fact
+
+
+async def confirm_fact(db: AsyncSession, tenant_id: UUID, fact_id: UUID, actor_id: UUID) -> Fact:
+    """T51 — the single-fact human confirmation action: in_review -> verified.
+
+    'machine' facts are never promoted here, same reasoning as T56's
+    edges: a value the confidence bands already auto-committed keeps that
+    label for good, even after a person has looked at it.
+    """
+    if actor_id is None:
+        raise ValueError("confirmation requires an actor")  # same rule as T08
+
+    fact = await db.get(Fact, fact_id)
+    if not fact or fact.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Fact not found")
+
+    if fact.status == "verified":
+        raise HTTPException(status_code=409, detail="Fact is already verified")
+    if fact.status != "in_review":
+        raise HTTPException(
+            status_code=409,
+            detail=f"'{fact.status}' facts do not go through confirmation — auto-committed values stay permanently labelled",
+        )
+
+    fact.status = "verified"
+    fact.verified_by_actor_id = actor_id
+    fact.verified_at = datetime.utcnow()
+    fact.claimed_by_actor_id = None
+    fact.claimed_at = None
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "fact.confirm",
+        resource_type="fact", resource_id=fact.id,
+        details={"field_name": fact.field_name, "is_handwritten": fact.is_handwritten},
+    )
+
+    return fact
+
+
+async def bulk_confirm_facts(
+    db: AsyncSession,
+    tenant_id: UUID,
+    corpus_folder_id: UUID,
+    threshold: float,
+    actor_id: UUID,
+    policy_version: str,
+) -> dict:
+    """T54 — batch accept every in_review fact above a chosen confidence for
+    one corpus, in one action. Record the user, the score, the collection
+    and the rule version — on the log and on every fact it touched.
+
+    T55 hard rule: a handwritten fact is never included here, confidence
+    notwithstanding — only confirm_fact() (a real person looking at that
+    one fact) can verify one. T59: bulk acceptance is disabled on an
+    uncalibrated corpus, same gate T57 already applies to entity edges —
+    an uncalibrated confidence score "implies calibrated confidence and
+    carries none."
+    """
+    if actor_id is None:
+        raise ValueError("bulk confirmation requires an actor")
+    if not policy_version:
+        raise ValueError("bulk confirmation requires a policy/rule version")
+    if threshold is None or not (0.0 <= threshold <= 1.0):
+        raise ValueError("threshold must be between 0 and 1")
+
+    from app.services.corpus_calibration_service import is_corpus_calibrated
+    if not await is_corpus_calibrated(db, tenant_id, corpus_folder_id):
+        raise HTTPException(
+            status_code=409,
+            detail="This corpus has not been calibrated — bulk acceptance is disabled until a human certifies "
+                   "the confidence scores here are meaningful (corpus_calibration_service.calibrate_corpus)",
+        )
+
+    stmt = (
+        select(Fact)
+        .join(Document, Fact.document_id == Document.id)
+        .where(
+            Fact.tenant_id == tenant_id,
+            Fact.status == "in_review",
+            Fact.confidence.is_not(None),
+            Fact.confidence >= threshold,
+            Fact.is_handwritten == False,  # noqa: E712 — T55 hard rule
+            Document.folder_id == corpus_folder_id,
+        )
+    )
+    res = await db.execute(stmt)
+    facts = list(res.scalars().all())
+
+    batch_id = uuid_module.uuid4()
+    now = datetime.utcnow()
+    for fact in facts:
+        fact.status = "verified"
+        fact.verified_by_actor_id = actor_id
+        fact.verified_at = now
+        fact.verified_threshold = threshold
+        fact.verified_corpus_folder_id = corpus_folder_id
+        fact.verified_via_policy_version = policy_version
+        fact.verified_batch_id = batch_id
+        fact.claimed_by_actor_id = None
+        fact.claimed_at = None
+
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "fact.bulk_confirm",
+        resource_type="folder", resource_id=corpus_folder_id,
+        details={
+            "batch_id": str(batch_id),
+            "threshold": threshold,
+            "policy_version": policy_version,
+            "confirmed_count": len(facts),
+            "fact_ids": [str(f.id) for f in facts],
+        },
+    )
+
+    return {"batch_id": batch_id, "confirmed_count": len(facts), "fact_ids": [f.id for f in facts]}
+
+
+async def get_adjudication_queue(
+    db: AsyncSession, tenant_id: UUID, category: str = "low_confidence", limit: int = 50, offset: int = 0,
+) -> dict:
+    """T52 — adjudication queue. Only 'low_confidence' (any in_review
+    fact) is real today. 'handwritten' filters on is_handwritten, which
+    nothing sets yet (T30 isn't built) — included so the queue's shape is
+    ready the moment something does, not to claim it's populated now.
+    'marginalia' and 'join_mismatch' aren't backed by any data source yet
+    (marginalia has no capture path; join_mismatch would come from
+    Handler 1/T26's spread-join, which isn't wired into extraction yet
+    per T22's own documented gap) — requesting either raises rather than
+    silently returning an always-empty queue that looks like "nothing to
+    review" instead of "not built yet".
+    """
+    valid_categories = {"low_confidence", "handwritten"}
+    not_yet_available = {"marginalia", "join_mismatch"}
+    if category in not_yet_available:
+        raise HTTPException(
+            status_code=501,
+            detail=f"'{category}' queue category has no data source yet — "
+                   f"{'marginalia capture (T30)' if category == 'marginalia' else 'spread-join wiring (T26 handler integration)'} isn't built",
+        )
+    if category not in valid_categories:
+        raise HTTPException(status_code=400, detail=f"Unknown category '{category}'. Valid: {sorted(valid_categories | not_yet_available)}")
+
+    conditions = [Fact.tenant_id == tenant_id, Fact.status == "in_review"]
+    if category == "handwritten":
+        conditions.append(Fact.is_handwritten == True)  # noqa: E712
+
+    from sqlalchemy import func
+    count_res = await db.execute(select(func.count(Fact.id)).where(*conditions))
+    total = count_res.scalar() or 0
+
+    res = await db.execute(
+        select(Fact).where(*conditions).order_by(Fact.confidence.asc().nulls_first()).limit(limit).offset(offset)
+    )
+    facts = list(res.scalars().all())
+
+    return {
+        "category": category,
+        "total": total,
+        "facts": [
+            {
+                "fact_id": str(f.id),
+                "document_id": str(f.document_id),
+                "field_name": f.field_name,
+                "value": f.value,
+                "confidence": f.confidence,
+                "is_handwritten": f.is_handwritten,
+                "claimed_by_actor_id": str(f.claimed_by_actor_id) if f.claimed_by_actor_id else None,
+            }
+            for f in facts
+        ],
+    }
