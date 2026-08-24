@@ -2,7 +2,7 @@ from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.record import Record
@@ -191,3 +191,75 @@ async def get_full_history(db: AsyncSession, tenant_id: UUID, record_id: UUID) -
             for a in amendments
         ],
     }
+
+
+# --- T61: legal-status layer -------------------------------------------
+#
+# "Filterable everywhere" needs an efficient way to know every record's
+# CURRENT legal status without looping get_current_state() per record
+# (O(records x amendments) doesn't scale) — but T60's core rule still
+# holds: never store a mutable current value. The fix is a single SQL
+# query that derives every record's latest status in one pass (Postgres
+# DISTINCT ON, ordered by effective_date/created_at) — computed fresh on
+# every call, nothing cached or written back to the record row.
+#
+# "Inherited from a source under litigation": every status-setting
+# amendment cites its evidence_fact_id (mandatory, per T60) — the exact
+# court order or litigation document that caused the status change. A
+# record's status is never asserted without a traceable source; that
+# citation *is* the inheritance mechanism this system already has.
+# Automatic cross-record status propagation (e.g. "this property's
+# litigation also stays every other record touching it") isn't built —
+# it isn't specified which relationships would drive that, and guessing
+# would risk silently changing the legal status of records nobody
+# reviewed. That's real future work, not something to invent here.
+
+_LATEST_STATUS_SQL = """
+    SELECT DISTINCT ON (record_id) record_id, legal_status, evidence_fact_id, effective_date
+    FROM record_dg_amendments
+    WHERE tenant_id = :tenant_id AND legal_status IS NOT NULL
+    ORDER BY record_id, effective_date DESC, created_at DESC
+"""
+
+
+async def list_records_by_legal_status(db: AsyncSession, tenant_id: UUID, legal_status: str) -> List[dict]:
+    """Every record currently at the given legal status — derived, not stored."""
+    if legal_status not in VALID_LEGAL_STATUSES:
+        raise ValueError(f"invalid legal_status {legal_status!r}; must be one of {VALID_LEGAL_STATUSES}")
+
+    stmt = text(f"""
+        SELECT r.id AS record_id, r.record_type, r.subject_node_id,
+               COALESCE(latest.legal_status, :default_status) AS legal_status,
+               latest.evidence_fact_id AS status_evidence_fact_id
+        FROM record_dg_records r
+        LEFT JOIN ({_LATEST_STATUS_SQL}) latest ON latest.record_id = r.id
+        WHERE r.tenant_id = :tenant_id
+          AND COALESCE(latest.legal_status, :default_status) = :legal_status
+    """)
+    res = await db.execute(stmt, {"tenant_id": str(tenant_id), "default_status": DEFAULT_LEGAL_STATUS, "legal_status": legal_status})
+    return [
+        {
+            "record_id": row.record_id,
+            "record_type": row.record_type,
+            "subject_node_id": row.subject_node_id,
+            "legal_status": row.legal_status,
+            "status_evidence_fact_id": row.status_evidence_fact_id,
+        }
+        for row in res.fetchall()
+    ]
+
+
+async def get_legal_status_summary(db: AsyncSession, tenant_id: UUID) -> Dict[str, int]:
+    """Count of records at each legal status, for a filter UI / dashboard."""
+    stmt = text(f"""
+        SELECT COALESCE(latest.legal_status, :default_status) AS legal_status, count(*) AS n
+        FROM record_dg_records r
+        LEFT JOIN ({_LATEST_STATUS_SQL}) latest ON latest.record_id = r.id
+        WHERE r.tenant_id = :tenant_id
+        GROUP BY COALESCE(latest.legal_status, :default_status)
+    """)
+    res = await db.execute(stmt, {"tenant_id": str(tenant_id), "default_status": DEFAULT_LEGAL_STATUS})
+    summary = {status: 0 for status in VALID_LEGAL_STATUSES}
+    for row in res.fetchall():
+        summary[row.legal_status] = row.n
+    return summary
