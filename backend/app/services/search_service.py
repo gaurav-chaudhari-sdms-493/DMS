@@ -5,7 +5,7 @@ from typing import List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
-from app.schemas.search import SearchResponse, SearchResult
+from app.schemas.search import SearchResponse, SearchResult, Citation
 from app.services.cache_service import get_cached_search, cache_search_result, generate_cache_key
 from app.services.audit_service import log_action
 from app.services.storage_service import generate_presigned_url
@@ -63,6 +63,96 @@ async def _find_pending_title_matches(
             metadata={"pending": True, "status": row.status},
         ))
     return matches
+
+
+def _parse_claims_json(raw: str):
+    """Best-effort parse of the LLM's structured claim response — tolerates
+    ```json fences the model adds despite being told not to."""
+    raw = raw.strip()
+    fence_match = re.match(r"^```(?:json)?\s*(.*?)\s*```$", raw, re.DOTALL)
+    if fence_match:
+        raw = fence_match.group(1)
+    try:
+        data = json.loads(raw)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: list):
+    """T70 — bind every claim in the answer to the excerpt(s) that actually
+    support it, and refuse outright when the excerpts don't answer the
+    question. This is the product's hard rule (Section 8): a confident,
+    well-sourced-*looking* answer with nothing behind it is the exact
+    failure this gate exists to prevent — so an unsupported claim is
+    dropped, not shown, and an unanswerable question gets no answer at all
+    rather than a plausible-sounding guess.
+
+    Returns (summary_text_or_None, citations, grounded).
+    """
+    from app.services.guardrail_service import validate_output_summary
+
+    llm = get_llm_provider()
+
+    numbered = "\n\n".join(
+        f"[{i + 1}] Document: {e['document_name']} (Page {e['page_number'] or 1})\n{e['content']}"
+        for i, e in enumerate(excerpts)
+    )
+
+    sys_msg = (
+        "You are an enterprise multilingual document intelligence assistant. "
+        "Answer strictly and only from the numbered excerpts below — never from outside knowledge.\n"
+        f"Respond in the user's detected query language ({detected_lang}).\n\n"
+        'Respond with ONLY a single JSON object, no markdown fences, no other text, in this exact shape:\n'
+        '{"answerable": true, "claims": [{"text": "one factual statement", "sources": [1, 2]}]}\n\n'
+        "Rules:\n"
+        "- Break your answer into individual factual claims. Each claim's \"sources\" must list every excerpt "
+        "number that actually supports it. Never cite an excerpt that does not contain the stated fact.\n"
+        '- If the excerpts do not contain information that answers the question, respond with '
+        '{"answerable": false, "claims": []} and nothing else. Do not answer from outside knowledge and do not '
+        "guess — this is a hard rule, not a style preference.\n"
+        "- Keep claim text natural and complete; bold key numbers/names/dates with **markdown** where useful."
+    )
+    user_msg = f"Question: {query}\n\nNumbered excerpts:\n{numbered}"
+
+    raw = await llm.complete([
+        Message(role="system", content=sys_msg),
+        Message(role="user", content=user_msg),
+    ])
+
+    parsed = _parse_claims_json(raw)
+    if not parsed or not parsed.get("answerable") or not parsed.get("claims"):
+        return None, [], False
+
+    summary_lines = []
+    citations = []
+
+    for claim in parsed["claims"]:
+        claim_text = str(claim.get("text", "")).strip()
+        sources = claim.get("sources", [])
+        if not claim_text or not isinstance(sources, list):
+            continue
+        valid_sources = [s for s in sources if isinstance(s, int) and 1 <= s <= len(excerpts)]
+        if not valid_sources:
+            # The model cited nothing real for this claim — drop the claim
+            # rather than show an unbound statement.
+            continue
+        claim_text = validate_output_summary(claim_text)
+        summary_lines.append(f"- {claim_text}")
+        for s in valid_sources:
+            ex = excerpts[s - 1]
+            citations.append(Citation(
+                claim=claim_text,
+                document_id=ex["document_id"],
+                document_name=ex["document_name"],
+                page_number=ex["page_number"],
+                chunk_id=ex.get("chunk_id"),
+            ))
+
+    if not summary_lines:
+        return None, [], False
+
+    return "\n".join(summary_lines), citations, True
 
 
 async def _expand_trilingual_query(query: str) -> dict:
@@ -145,7 +235,7 @@ async def search(
     grounded = True
     
     # 1. Enforce AI Input Guardrails
-    from app.services.guardrail_service import validate_input_query, validate_output_summary
+    from app.services.guardrail_service import validate_input_query
     is_safe, error_msg, scrubbed_query = validate_input_query(query)
     if not is_safe:
         took_ms = int((time.time() - start_time) * 1000)
@@ -417,7 +507,7 @@ async def search(
                 chunk_res = await db.execute(chunk_sql, {"target_doc_id": target_doc_id, "tenant_id": str(tenant_id)})
                 doc_chunk_rows = chunk_res.fetchall()
 
-                snippets_for_llm = []
+                excerpts = []
                 fallback_results = []
 
                 if doc_chunk_rows:
@@ -433,9 +523,17 @@ async def search(
                             score=1.0,
                             metadata={}
                         ))
-                        snippets_for_llm.append(f"Document: {r.title} (Page {r.page_number or 1})\nExcerpt: {r.content}")
+                        excerpts.append({
+                            "document_id": r.doc_id,
+                            "document_name": r.title,
+                            "page_number": r.page_number,
+                            "chunk_id": r.id,
+                            "content": r.content,
+                        })
 
-                if snippets_for_llm:
+                if excerpts:
+                    citations = []
+                    doc_grounded = True
                     if not generate_summary:
                         summary = (
                             "AI summary generation is disabled for this search (testing mode). "
@@ -443,38 +541,30 @@ async def search(
                         )
                     else:
                         try:
-                            llm = get_llm_provider()
-                            sys_msg = (
-                                "You are an enterprise document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
-                                "- Highlight key numbers, prices, dates, names, policies, and terms in bold formatting.\n"
-                                "- Organize information with clean bullet points or numbered lists where appropriate.\n"
-                                "- If asked to summarize, give a clear, comprehensive summary of the document's contents.\n"
-                                "- Do NOT invent details outside the provided excerpts."
-                            )
-                            user_msg = f"Question: {query}\n\nDocument Contents:\n" + "\n---\n".join(snippets_for_llm)
-                            summary = await llm.complete([
-                                Message(role="system", content=sys_msg),
-                                Message(role="user", content=user_msg)
-                            ])
-                            summary = validate_output_summary(summary)
+                            summary, citations, doc_grounded = await _generate_grounded_answer(query, "English", excerpts)
+                            if summary is None:
+                                summary = "The document does not contain information that answers this question."
                         except Exception as e:
                             logger.warning("AI summary unavailable for document preview: %s", e)
                             summary = (
                                 f"Found {len(fallback_results)} matching page(s) for '{query}'. "
                                 "AI summary is temporarily unavailable — the excerpts below are unedited source text."
                             )
+                            doc_grounded = False
 
                     took_ms = int((time.time() - start_time) * 1000)
                     resp = SearchResponse(
                         query=query,
                         ai_summary=summary,
                         results=fallback_results,
+                        citations=citations,
+                        refused=not doc_grounded,
                         cached=False,
                         took_ms=took_ms,
                         search_mode=search_mode,
                         hyde_triggered=hyde_triggered,
                         reranked=True,
-                        grounded=True
+                        grounded=doc_grounded
                     )
                     await log_action(
                         db,
@@ -551,7 +641,7 @@ async def search(
         return resp
         
     final_results = []
-    snippets_for_llm = []
+    excerpts = []
     doc_ids_for_metadata = []
     seen_dedup = set()
     
@@ -608,8 +698,14 @@ async def search(
             score=rank_res.score,
             metadata=meta_map.get(row.doc_id, {})
         ))
-        snippets_for_llm.append(f"Document: {row.title} (Page {row.page_number or 1})\nExcerpt: {row.content}")
-        
+        excerpts.append({
+            "document_id": row.doc_id,
+            "document_name": row.title,
+            "page_number": row.page_number,
+            "chunk_id": row.id,
+            "content": row.content,
+        })
+
         if len(final_results) >= limit:
             break
 
@@ -618,7 +714,10 @@ async def search(
     already_found = {r.document_id for r in final_results}
     final_results.extend(await _find_pending_title_matches(db, tenant_id, query, exclude_doc_ids=already_found))
 
-    # 7. Generate Natural, Professional AI Summary using LLM
+    # 7. Generate the AI answer — T70: every claim bound to a source excerpt,
+    # refuse outright rather than guess when the excerpts don't answer it.
+    citations = []
+    refused = False
     if not generate_summary:
         summary = (
             f"Found {len(final_results)} matching document(s) for '{query}'. "
@@ -626,40 +725,26 @@ async def search(
         )
     else:
         try:
-            llm = get_llm_provider()
-            sys_msg = (
-                "You are an enterprise multilingual document intelligence assistant. Answer the user's question accurately, naturally, and professionally using ONLY the provided document excerpts.\n"
-                f"- Synthesize your entire response in the user's detected query language ({detected_lang}).\n"
-                "- Highlight key numbers, policies, dates, and names in bold formatting.\n"
-                "- Organize information with clean bullet points or numbered lists where appropriate.\n"
-                "- Do NOT invent details outside the excerpts.\n"
-                "- After your full answer, on a new line by itself, output exactly [GROUNDED:true] if the excerpts actually contained information answering the question, "
-                "or [GROUNDED:false] if they did not contain relevant information and you had to decline. Do not explain this marker, just append it."
-            )
-            user_msg = f"Question: {query}\n\nRelevant Document Excerpts:\n" + "\n---\n".join(snippets_for_llm)
-            raw_summary = await llm.complete([
-                Message(role="system", content=sys_msg),
-                Message(role="user", content=user_msg)
-            ])
-            raw_summary = raw_summary.strip()
-            marker_match = re.search(r'\[GROUNDED:\s*(true|false)\s*\]\s*$', raw_summary, re.IGNORECASE)
-            if marker_match:
-                grounded = marker_match.group(1).lower() == "true"
-                raw_summary = raw_summary[:marker_match.start()].rstrip()
-            summary = validate_output_summary(raw_summary)
+            summary, citations, grounded = await _generate_grounded_answer(query, detected_lang, excerpts)
+            if summary is None:
+                summary = f"The documents do not contain information that answers '{query}'."
+                refused = True
         except Exception as e:
             logger.warning("AI summary unavailable: %s", e)
             summary = (
                 f"Found {len(final_results)} matching document(s) for '{query}'. "
                 "AI summary is temporarily unavailable — the excerpts below are unedited source text."
             )
-    
+            grounded = False
+
     took_ms = int((time.time() - start_time) * 1000)
-    
+
     resp = SearchResponse(
         query=query,
         ai_summary=summary,
         results=final_results,
+        citations=citations,
+        refused=refused,
         cached=False,
         took_ms=took_ms,
         search_mode=search_mode,
@@ -667,7 +752,7 @@ async def search(
         reranked=reranked,
         grounded=grounded
     )
-    
+
     # Audit log & Cache
     await log_action(
         db,

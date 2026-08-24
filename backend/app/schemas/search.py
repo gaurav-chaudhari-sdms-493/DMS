@@ -18,10 +18,20 @@ class SearchResult(BaseModel):
     score: float
     metadata: dict
 
+class Citation(BaseModel):
+    """T70 — one claim in the AI answer, bound to the exact passage it came from."""
+    claim: str
+    document_id: UUID
+    document_name: str
+    page_number: Optional[int]
+    chunk_id: Optional[UUID] = None
+
 class SearchResponse(BaseModel):
     query: str
     ai_summary: str
     results: List[SearchResult]
+    citations: List[Citation] = []
+    refused: bool = False
     cached: bool = False
     took_ms: int
     search_mode: Optional[str] = "direct"
