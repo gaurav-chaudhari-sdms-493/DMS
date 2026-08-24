@@ -7,6 +7,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.template import Template
 
+# D-5 — conservative default for any field that doesn't declare its own
+# confidence_bands: a template nobody has calibrated yet should default
+# toward "ask a person," not toward "trust it."
+DEFAULT_CONFIDENCE_BANDS = {"auto_commit": 0.85, "review_floor": 0.5}
+
+
+def classify_confidence(field_def: Dict[str, Any], confidence: Optional[float]) -> str:
+    """D-5 — apply one field's confidence_bands (or the conservative global
+    default) to a reported confidence score. Returns 'machine' or
+    'in_review' — never 'verified', which only the human promotion step
+    (T51, not yet built) may write.
+
+    No reported confidence at all is treated as the lowest-trust case:
+    'in_review', not an auto-commit by default.
+    """
+    if confidence is None:
+        return "in_review"
+
+    bands = field_def.get("confidence_bands") or DEFAULT_CONFIDENCE_BANDS
+    auto_commit = bands.get("auto_commit", DEFAULT_CONFIDENCE_BANDS["auto_commit"])
+    return "machine" if confidence >= auto_commit else "in_review"
+
 
 @dataclass
 class ValidationError:

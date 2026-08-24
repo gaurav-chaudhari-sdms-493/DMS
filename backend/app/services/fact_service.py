@@ -68,6 +68,7 @@ async def get_fact_with_regions(db: AsyncSession, fact_id: UUID, tenant_id: UUID
         "field_name": fact.field_name,
         "value": fact.value,
         "confidence": fact.confidence,
+        "status": fact.status,
         "document_id": str(fact.document_id),
         "document_title": doc.title,
         "download_url": download_url,

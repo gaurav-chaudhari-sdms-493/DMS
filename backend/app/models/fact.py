@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy import ForeignKey, Float, Text
+from sqlalchemy import ForeignKey, Float, Text, CheckConstraint
 from datetime import datetime
 import uuid
 from typing import TYPE_CHECKING, Any, List, Optional
@@ -21,6 +21,9 @@ class Fact(Base):
     """
 
     __tablename__ = "doc_dg_facts"
+    __table_args__ = (
+        CheckConstraint("status IN ('machine', 'in_review', 'verified')", name="ck_doc_dg_facts_status"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("iam_dg_tenants.id"), index=True)
@@ -29,6 +32,11 @@ class Fact(Base):
     field_name: Mapped[str] = mapped_column(Text, nullable=False)
     value: Mapped[Any] = mapped_column(JSONB, nullable=False)
     confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # T20/D-5 — 'machine' (auto-committed, confidence cleared its band) or
+    # 'in_review' (below the template's auto_commit threshold, or below its
+    # hard review_floor). 'verified' is written only by the human promotion
+    # step in T51, which does not exist yet — nothing sets it today.
+    status: Mapped[str] = mapped_column(Text, nullable=False, default="machine")
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     regions: Mapped[List["FactRegion"]] = relationship(

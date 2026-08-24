@@ -47,6 +47,7 @@ from app.models.template import Template
 from app.pipeline.handlers.blob_cell_parser import parse_blob_cell
 from app.pipeline.handlers.continuation_merge import merge_continuation_rows
 from app.pipeline.handlers.ditto_chain import expand_ditto_chains
+from app.services.template_service import classify_confidence
 
 logger = logging.getLogger(__name__)
 
@@ -298,13 +299,15 @@ async def extract_facts_for_document(
                             "flags": parsed.flags,
                         }
 
+                    fact_confidence = (sum(confidences) / len(confidences)) if confidences else None
                     fact = Fact(
                         tenant_id=tenant_id,
                         document_id=document_id,
                         version_id=version_id,
                         field_name=field_name,
                         value=fact_value if isinstance(fact_value, (dict, list)) else {"v": fact_value},
-                        confidence=(sum(confidences) / len(confidences)) if confidences else None,
+                        confidence=fact_confidence,
+                        status=classify_confidence(field_def, fact_confidence),
                     )
                     db.add(fact)
                     await db.flush()
