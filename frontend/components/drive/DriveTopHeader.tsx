@@ -208,6 +208,14 @@ export function DriveTopHeader({
                   <User className="w-4 h-4 text-primary" />
                   <span>Profile & Analytics</span>
                 </Link>
+                <Link
+                  href="/workbench"
+                  onClick={() => setDropdownOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMain hover:bg-white/5 transition-colors font-medium"
+                >
+                  <ShieldCheck className="w-4 h-4 text-primary" />
+                  <span>Verification Workbench</span>
+                </Link>
               </div>
 
               <div className="border-t border-borderDark/60 pt-1 mt-1">

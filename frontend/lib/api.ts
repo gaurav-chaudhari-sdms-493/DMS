@@ -243,6 +243,32 @@ export const api = {
         method: "GET",
       });
     },
+    // T51/T52 — the adjudication queue: 'low_confidence' is any in_review
+    // fact; 'handwritten' filters on is_handwritten (nothing sets that yet,
+    // T30 isn't built, but the category is ready). 'marginalia' and
+    // 'join_mismatch' 501 on the backend — not built yet, not silently empty.
+    getQueue: async (category: string = "low_confidence", limit: number = 50, offset: number = 0): Promise<any> => {
+      return await request(`/api/v1/facts/queue?category=${encodeURIComponent(category)}&limit=${limit}&offset=${offset}`, {
+        method: "GET",
+      });
+    },
+    claim: async (factId: string): Promise<any> => {
+      return await request(`/api/v1/facts/${factId}/claim`, { method: "POST" });
+    },
+    release: async (factId: string): Promise<any> => {
+      return await request(`/api/v1/facts/${factId}/release`, { method: "POST" });
+    },
+    confirm: async (factId: string): Promise<any> => {
+      return await request(`/api/v1/facts/${factId}/confirm`, { method: "POST" });
+    },
+    bulkConfirm: async (corpusFolderId: string, threshold: number, policyVersion: string): Promise<any> => {
+      const params = new URLSearchParams({
+        corpus_folder_id: corpusFolderId,
+        threshold: String(threshold),
+        policy_version: policyVersion,
+      });
+      return await request(`/api/v1/facts/bulk-confirm?${params.toString()}`, { method: "POST" });
+    },
   },
   search: {
     query: async (
@@ -368,6 +394,12 @@ export const api = {
     },
   },
   documents: {
+    // T23 — the classification queue, same shape as the fact adjudication queue.
+    getUnclassifiedQueue: async (limit: number = 50, offset: number = 0): Promise<any> => {
+      return await request(`/api/v1/documents/queue/unclassified?limit=${limit}&offset=${offset}`, {
+        method: "GET",
+      });
+    },
     upload: async (file: File, folderId?: string | null): Promise<any> => {
       const formData = new FormData();
       formData.append("file", file);
