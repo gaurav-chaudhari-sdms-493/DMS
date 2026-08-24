@@ -1,5 +1,5 @@
 from app.config import settings
-from app.ai.base import LLMProvider, EmbeddingProvider, RerankerProvider, Message
+from app.ai.base import LLMProvider, EmbeddingProvider, RerankerProvider, VLMProvider, Message
 from typing import List
 
 import logging
@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 _llm_provider: LLMProvider | None = None
 _embed_provider: EmbeddingProvider | None = None
 _rerank_providers_by_name: dict[str, RerankerProvider] = {}
+_vlm_provider: VLMProvider | None | bool = False  # False = not yet resolved
 
 class FallbackEmbeddingProvider(EmbeddingProvider):
     def __init__(self, primary: EmbeddingProvider, fallback: EmbeddingProvider):
@@ -151,3 +152,20 @@ def get_rerank_provider(override: str | None = None) -> RerankerProvider:
     if name not in _rerank_providers_by_name:
         _rerank_providers_by_name[name] = _build_rerank_provider(name)
     return _rerank_providers_by_name[name]
+
+
+def get_vlm_provider() -> VLMProvider | None:
+    """T22 — returns None (not an error) when VLM extraction is disabled or
+    unconfigured, since it's an optional enrichment step on top of chunk
+    indexing, not something ingestion should ever fail over."""
+    global _vlm_provider
+    if _vlm_provider is not False:
+        return _vlm_provider
+
+    if settings.ai_vlm_provider == 'gemini' and settings.google_api_key:
+        from app.ai.providers.gemini_provider import GeminiVLMProvider
+        _vlm_provider = GeminiVLMProvider(api_key=settings.google_api_key, model=settings.gemini_vlm_model)
+    else:
+        _vlm_provider = None
+
+    return _vlm_provider

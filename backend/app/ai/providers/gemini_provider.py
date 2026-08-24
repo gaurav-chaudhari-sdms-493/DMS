@@ -1,6 +1,7 @@
+import base64
 import httpx
 from typing import List
-from app.ai.base import EmbeddingProvider
+from app.ai.base import EmbeddingProvider, VLMProvider
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,3 +53,47 @@ class GeminiEmbeddingProvider(EmbeddingProvider):
     @property
     def dimensions(self) -> int:
         return 1024
+
+
+class GeminiVLMProvider(VLMProvider):
+    """T22 — Gemini's generateContent endpoint accepts an inline image part
+    alongside text, which is what lets one call both read a scanned register
+    page and report where on the page it read each field from."""
+
+    def __init__(self, api_key: str, model: str):
+        self.api_key = api_key
+        self.model = model
+
+    async def extract_structured(self, image_bytes: bytes, prompt: str) -> str:
+        model_name = self.model if self.model.startswith("models/") else f"models/{self.model}"
+        url = f"https://generativelanguage.googleapis.com/v1beta/{model_name}:generateContent?key={self.api_key}"
+
+        payload = {
+            "contents": [{
+                "parts": [
+                    {"text": prompt},
+                    {"inline_data": {"mime_type": "image/png", "data": base64.b64encode(image_bytes).decode("ascii")}},
+                ]
+            }],
+            "generationConfig": {
+                "temperature": 0.1,
+                "response_mime_type": "application/json",
+            },
+        }
+
+        async with httpx.AsyncClient(timeout=90.0) as client:
+            response = await client.post(url, json=payload)
+            if response.status_code != 200:
+                raise Exception(f"Gemini VLM request failed with status {response.status_code}: {response.text}")
+
+            data = response.json()
+            candidates = data.get("candidates") or []
+            if not candidates:
+                block_reason = data.get("promptFeedback", {}).get("blockReason")
+                raise Exception(f"Gemini VLM returned no candidates (blockReason={block_reason})")
+
+            parts = candidates[0].get("content", {}).get("parts", [])
+            text = "".join(p.get("text", "") for p in parts)
+            if not text.strip():
+                raise Exception("Gemini VLM returned an empty response")
+            return text

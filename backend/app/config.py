@@ -53,7 +53,15 @@ class Settings(BaseSettings):
     ai_embed_fallback_provider: Literal['cohere', 'openai', 'none'] = 'none'
     ai_rerank_provider: Literal['cohere', 'bgem3', 'none'] = 'cohere'
     ai_ocr_provider: Literal['pdfplumber', 'llamaparse'] = 'pdfplumber'
-    
+
+    # T22 — VLM extraction path. Only Gemini is wired up today: it's the one
+    # already-configured provider with real vision support (google_api_key is
+    # shared with the T09 embedding path). 'none' disables T22 outright and
+    # ingestion falls back to chunk-only indexing, same as before this task.
+    ai_vlm_provider: Literal['gemini', 'none'] = 'gemini'
+    gemini_vlm_model: str = 'gemini-3.6-flash'
+    vlm_max_pages_per_document: int = 25
+
     openai_api_key: str = ''
     openai_llm_model: str = 'gpt-4o-mini'
     openai_embed_model: str = 'text-embedding-3-small'

@@ -163,6 +163,29 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                             doc.title = meta_dict["title"]
                             doc.doc_type = meta_dict.get("document_type")
 
+                # 5b. T22 — VLM extraction against a matching template, if one exists.
+                # Best-effort and non-blocking: a savepoint isolates it so a failure
+                # here never aborts the chunk/metadata commit above (search must
+                # never wait on this, Section 3.5).
+                try:
+                    from app.pipeline.vlm_extraction import select_template_for_document, extract_facts_for_document
+                    sample_text = pages[0].get("text", "") if pages else ""
+                    template = await select_template_for_document(db, sample_text)
+                    if template:
+                        async with db.begin_nested():
+                            facts_count = await extract_facts_for_document(
+                                db, tenant_id, document_id, version_id,
+                                file_bytes, filename, pages, template,
+                            )
+                        if facts_count:
+                            logger.info(
+                                f"T22 VLM extraction wrote {facts_count} facts for "
+                                f"document {document_id} against template "
+                                f"{template.form_type}/{template.era_label}"
+                            )
+                except Exception as vlm_err:
+                    logger.warning(f"T22 VLM extraction skipped for document {document_id}: {vlm_err}")
+
                 # Update status to indexed
                 stmt = select(Document).where(Document.id == document_id)
                 res = await db.execute(stmt)
