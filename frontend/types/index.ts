@@ -103,10 +103,22 @@ export interface SearchResult {
   metadata: Record<string, unknown>;
 }
 
+export interface Citation {
+  number: number;
+  claim: string;
+  document_id: string;
+  document_name: string;
+  page_number: number | null;
+  chunk_id?: string | null;
+  download_url?: string | null;
+}
+
 export interface SearchResponse {
   query: string;
   ai_summary: string;
   results: SearchResult[];
+  citations?: Citation[];
+  refused?: boolean;
   cached: boolean;
   took_ms: number;
   search_mode?: string;

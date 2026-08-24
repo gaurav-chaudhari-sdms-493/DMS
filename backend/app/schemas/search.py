@@ -19,12 +19,19 @@ class SearchResult(BaseModel):
     metadata: dict
 
 class Citation(BaseModel):
-    """T70 — one claim in the AI answer, bound to the exact passage it came from."""
+    """T70 — one claim in the AI answer, bound to the exact passage it came from.
+    T71: `number` matches the [N] marker inline in ai_summary; click-through
+    opens `download_url` at `page_number` — a page-level jump, not a
+    pixel-precise highlighted box (chunks only carry a page number, not a
+    region; true region highlighting needs the fact/region pipeline, T22).
+    """
+    number: int
     claim: str
     document_id: UUID
     document_name: str
     page_number: Optional[int]
     chunk_id: Optional[UUID] = None
+    download_url: Optional[str] = None
 
 class SearchResponse(BaseModel):
     query: str

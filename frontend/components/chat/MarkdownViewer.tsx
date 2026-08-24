@@ -4,9 +4,13 @@ import React from "react";
 interface MarkdownViewerProps {
   content: string;
   className?: string;
+  /** T71: when provided, [1] [2] style markers become clickable citation
+   * buttons instead of plain text. Opt-in only — callers that don't pass
+   * this (chat, etc.) render literal "[1]" text unchanged, same as before. */
+  onCitationClick?: (n: number) => void;
 }
 
-export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps) {
+export function MarkdownViewer({ content, className = "", onCitationClick }: MarkdownViewerProps) {
   if (!content) return null;
 
   // Simple, safe, robust Markdown parser for LLM responses
@@ -53,8 +57,11 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
     };
 
     const parseInline = (text: string): React.ReactNode => {
-      // Bold text **text**
-      const parts = text.split(/(\*\*.*?\*\*|\*.*?\*|`.*?`)/g);
+      // Bold text **text**, plus [N] citation markers when onCitationClick is set
+      const splitPattern = onCitationClick
+        ? /(\*\*.*?\*\*|\*.*?\*|`.*?`|\[\d+\])/g
+        : /(\*\*.*?\*\*|\*.*?\*|`.*?`)/g;
+      const parts = text.split(splitPattern);
       return parts.map((part, i) => {
         if (part.startsWith("**") && part.endsWith("**")) {
           return (
@@ -78,6 +85,20 @@ export function MarkdownViewer({ content, className = "" }: MarkdownViewerProps)
             >
               {part.slice(1, -1)}
             </code>
+          );
+        }
+        if (onCitationClick && /^\[\d+\]$/.test(part)) {
+          const n = parseInt(part.slice(1, -1), 10);
+          return (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onCitationClick(n)}
+              className="inline-flex items-center justify-center align-super ml-0.5 w-4 h-4 text-[10px] font-bold rounded-full bg-[#e8f0fe] hover:bg-[#c2e7ff] text-[#0b57d0] border border-[#c2d5f5] cursor-pointer leading-none"
+              title={`Open source ${n}`}
+            >
+              {n}
+            </button>
           );
         }
         return part;

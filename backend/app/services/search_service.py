@@ -126,6 +126,9 @@ async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: li
 
     summary_lines = []
     citations = []
+    # T71: number citations by unique (document, page) — not by excerpt index —
+    # so two excerpts from the same page share one marker instead of two.
+    source_number_by_key: dict = {}
 
     for claim in parsed["claims"]:
         claim_text = str(claim.get("text", "")).strip()
@@ -138,16 +141,27 @@ async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: li
             # rather than show an unbound statement.
             continue
         claim_text = validate_output_summary(claim_text)
-        summary_lines.append(f"- {claim_text}")
+
+        claim_numbers = []
         for s in valid_sources:
             ex = excerpts[s - 1]
+            key = (ex["document_id"], ex["page_number"])
+            if key not in source_number_by_key:
+                source_number_by_key[key] = len(source_number_by_key) + 1
+            n = source_number_by_key[key]
+            if n not in claim_numbers:
+                claim_numbers.append(n)
             citations.append(Citation(
+                number=n,
                 claim=claim_text,
                 document_id=ex["document_id"],
                 document_name=ex["document_name"],
                 page_number=ex["page_number"],
                 chunk_id=ex.get("chunk_id"),
             ))
+
+        markers = "".join(f" [{n}]" for n in sorted(claim_numbers))
+        summary_lines.append(f"- {claim_text}{markers}")
 
     if not summary_lines:
         return None, [], False
@@ -544,6 +558,10 @@ async def search(
                             summary, citations, doc_grounded = await _generate_grounded_answer(query, "English", excerpts)
                             if summary is None:
                                 summary = "The document does not contain information that answers this question."
+                            else:
+                                doc_url_by_id = {r.document_id: r.download_url for r in fallback_results}
+                                for c in citations:
+                                    c.download_url = doc_url_by_id.get(c.document_id)
                         except Exception as e:
                             logger.warning("AI summary unavailable for document preview: %s", e)
                             summary = (
@@ -729,6 +747,10 @@ async def search(
             if summary is None:
                 summary = f"The documents do not contain information that answers '{query}'."
                 refused = True
+            else:
+                doc_url_by_id = {r.document_id: r.download_url for r in final_results}
+                for c in citations:
+                    c.download_url = doc_url_by_id.get(c.document_id)
         except Exception as e:
             logger.warning("AI summary unavailable: %s", e)
             summary = (

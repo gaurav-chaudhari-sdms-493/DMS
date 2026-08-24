@@ -975,7 +975,7 @@ export default function DrivePage() {
               ) : searchResponse ? (
                 <div className="space-y-6">
                   {searchResponse.ai_summary && (
-                    <AISummary summary={searchResponse.ai_summary} />
+                    <AISummary summary={searchResponse.ai_summary} citations={searchResponse.citations} />
                   )}
 
                   <div className="flex items-center justify-between border-b border-[#e1e3e1] pb-2">
