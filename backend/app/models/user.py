@@ -12,8 +12,19 @@ if TYPE_CHECKING:
     from app.models.tenant import Tenant
 
 class UserRole(str, enum.Enum):
+    # T50 — six personas (Section 9/12). 'admin'/'user' are the original
+    # two values, kept because Postgres enum types can't drop values
+    # without recreating the type; existing rows are migrated onto the
+    # new personas (admin -> it_admin, user -> operator), not left on
+    # the old values.
     admin = "admin"
     user = "user"
+    records_officer = "records_officer"
+    operator = "operator"  # "operator/adjudicator" in the spec
+    department_head = "department_head"
+    legal_counsel = "legal_counsel"
+    it_admin = "it_admin"
+    auditor = "auditor"  # external auditor, read-only
 
 class User(Base):
     __tablename__ = "iam_dg_users"

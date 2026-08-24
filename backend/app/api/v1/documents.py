@@ -10,7 +10,7 @@ from ...schemas.document import (
     DriveStatsResponse,
 )
 from ...schemas.auth import TokenPayload
-from ...deps import get_db, require_tenant_access
+from ...deps import get_db, require_tenant_access, require_role
 from ...services import document_service
 import uuid
 
@@ -128,7 +128,7 @@ async def cleanup_trashed_items_api(
 @router.delete('/{document_id}', status_code=status.HTTP_204_NO_CONTENT)
 async def delete_document_api(
     document_id: uuid.UUID,
-    current_user: TokenPayload = Depends(require_tenant_access),
+    current_user: TokenPayload = Depends(require_role('records_officer', 'department_head', 'it_admin')),
     db: AsyncSession = Depends(get_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)

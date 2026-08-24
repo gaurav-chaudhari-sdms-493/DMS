@@ -4,10 +4,10 @@ from typing import List, Optional
 import uuid
 
 from app.database import get_db
-from app.deps import require_tenant_access
+from app.deps import require_tenant_access, require_role
 from app.schemas.auth import TokenPayload
 from app.schemas.folder import FolderCreate, FolderUpdate, FolderResponse, FolderTreeNode
-from app.services import folder_service
+from app.services import folder_service, department_service
 
 router = APIRouter(prefix="/folders", tags=["Folders"])
 
@@ -33,7 +33,7 @@ async def list_folders(
     db: AsyncSession = Depends(get_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await folder_service.list_folders(
+    folders = await folder_service.list_folders(
         db=db,
         tenant_id=tenant_id,
         parent_id=parent_id,
@@ -41,6 +41,17 @@ async def list_folders(
         is_starred=is_starred,
         is_trashed=is_trashed
     )
+
+    # T50: department-scoped personas only see projects (folders) their
+    # department has been granted — "an RBAC group over projects, not a
+    # container level." Tenant-wide roles (it_admin/auditor/legal_counsel)
+    # are unaffected.
+    if current_user.role in department_service.DEPARTMENT_SCOPED_ROLES:
+        user_id = uuid.UUID(current_user.sub)
+        granted = await department_service.list_user_department_folder_ids(db, tenant_id, user_id)
+        folders = [f for f in folders if f.id in granted]
+
+    return folders
 
 
 @router.get("/tree", response_model=List[FolderTreeNode])
@@ -100,7 +111,7 @@ async def toggle_trash_folder(
 @router.delete("/{folder_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_folder_permanently(
     folder_id: uuid.UUID,
-    current_user: TokenPayload = Depends(require_tenant_access),
+    current_user: TokenPayload = Depends(require_role('records_officer', 'department_head', 'it_admin')),
     db: AsyncSession = Depends(get_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)

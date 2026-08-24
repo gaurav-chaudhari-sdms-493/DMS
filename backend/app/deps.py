@@ -26,6 +26,22 @@ async def require_tenant_access(current_user: TokenPayload = Depends(get_current
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="No tenant context")
     return current_user
 
+
+def require_role(*allowed_roles: str):
+    """T50 — reusable role-gate dependency, e.g. Depends(require_role('it_admin', 'auditor')).
+    Replaces the old pattern of a plain function called manually inside a
+    handler body (admin.py's require_admin), which doesn't compose across
+    many endpoints for six personas.
+    """
+    async def _check(current_user: TokenPayload = Depends(require_tenant_access)) -> TokenPayload:
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=f"This action requires one of: {', '.join(allowed_roles)}",
+            )
+        return current_user
+    return _check
+
 async def get_tenant_db(
     current_user: TokenPayload = Depends(require_tenant_access),
 ):

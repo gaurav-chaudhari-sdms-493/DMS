@@ -4,7 +4,7 @@ from sqlalchemy import select, func, case, extract, cast, String, Float
 from datetime import datetime, timedelta
 import uuid
 
-from ...deps import get_db, require_tenant_access
+from ...deps import get_db, require_role
 from ...schemas.auth import TokenPayload
 from ...models.user import User
 from ...models.tenant import Tenant
@@ -19,20 +19,12 @@ from ...models.api_log import ApiLog
 router = APIRouter()
 
 
-def require_admin(current_user: TokenPayload):
-    """Verify the current user has admin role."""
-    if current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Admin access required")
-    return current_user
-
-
 @router.get('/analytics')
 async def get_admin_analytics(
-    current_user: TokenPayload = Depends(require_tenant_access),
+    current_user: TokenPayload = Depends(require_role('it_admin')),
     db: AsyncSession = Depends(get_db),
 ):
     """Comprehensive DMS analytics for the Admin Panel, scoped to active tenant."""
-    require_admin(current_user)
     tenant_id = uuid.UUID(current_user.tenant_id)
 
     # ── System Overview ──
@@ -215,11 +207,10 @@ async def get_admin_analytics(
 
 @router.get('/api-analytics')
 async def get_api_analytics(
-    current_user: TokenPayload = Depends(require_tenant_access),
+    current_user: TokenPayload = Depends(require_role('it_admin')),
     db: AsyncSession = Depends(get_db),
 ):
     """API call analytics from api_logs table, scoped to active tenant."""
-    require_admin(current_user)
     tenant_id = uuid.UUID(current_user.tenant_id)
 
     # ── Total API Calls ──
