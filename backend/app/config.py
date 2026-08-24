@@ -40,6 +40,12 @@ class Settings(BaseSettings):
     s3_endpoint_url: str = 'http://localhost:9000'
     s3_public_endpoint_url: str = 'http://localhost:9000'
     s3_presigned_url_expiry_seconds: int = 900
+
+    # T64 — WORM archival storage. A separate bucket from s3_bucket_name:
+    # S3/MinIO Object Lock can only be enabled at bucket creation time, and
+    # the main operational bucket already exists without it — retrofitting
+    # would mean deleting and recreating a bucket that holds real data.
+    s3_archive_bucket_name: str = 'docsearch-archive'
     
     # AI Providers
     ai_llm_provider: Literal['openai', 'anthropic', 'groq'] = 'openai'
