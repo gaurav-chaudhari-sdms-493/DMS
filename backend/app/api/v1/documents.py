@@ -11,7 +11,7 @@ from ...schemas.document import (
 )
 from ...schemas.auth import TokenPayload
 from ...deps import get_db, require_tenant_access, require_role
-from ...services import document_service, classification_service
+from ...services import document_service, classification_service, duplicate_service
 import uuid
 
 router = APIRouter()
@@ -49,6 +49,17 @@ async def get_drive_stats_api(
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await document_service.get_drive_stats(db, tenant_id)
+
+
+@router.get('/{document_id}/fuzzy-duplicates')
+async def get_fuzzy_duplicates_api(
+    document_id: uuid.UUID,
+    threshold: float = 0.92,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await duplicate_service.find_fuzzy_duplicates(db, tenant_id, document_id, threshold=threshold)
 
 
 @router.get('/queue/unclassified')
