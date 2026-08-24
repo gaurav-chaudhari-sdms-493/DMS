@@ -1,3 +1,4 @@
+import uuid as uuid_module
 from datetime import datetime
 from typing import Optional
 from uuid import UUID
@@ -132,8 +133,9 @@ async def bulk_confirm_edges(
     can't be placed in any corpus and must go through confirm_edge()
     individually instead.
 
-    Reversal (T58 — link reversibility with clean cascade) is not built
-    yet; this action cannot currently be undone.
+    Every confirmed edge gets a fresh verified_batch_id, the precise
+    handle revert_bulk_batch() (T58) needs to undo exactly this run —
+    policy_version is a reusable business label, not a unique run id.
     """
     if actor_id is None:
         raise ValueError("bulk confirmation requires an actor")
@@ -157,6 +159,7 @@ async def bulk_confirm_edges(
     res = await db.execute(stmt)
     edges = list(res.scalars().all())
 
+    batch_id = uuid_module.uuid4()
     now = datetime.utcnow()
     for edge in edges:
         edge.status = "verified"
@@ -165,6 +168,7 @@ async def bulk_confirm_edges(
         edge.verified_threshold = threshold
         edge.verified_corpus_folder_id = corpus_folder_id
         edge.verified_via_policy_version = policy_version
+        edge.verified_batch_id = batch_id
 
     await db.flush()
 
@@ -172,6 +176,7 @@ async def bulk_confirm_edges(
         db, actor_id, tenant_id, "entity_edge.bulk_confirm",
         resource_type="folder", resource_id=corpus_folder_id,
         details={
+            "batch_id": str(batch_id),
             "threshold": threshold,
             "policy_version": policy_version,
             "confirmed_count": len(edges),
@@ -179,4 +184,92 @@ async def bulk_confirm_edges(
         },
     )
 
-    return {"confirmed_count": len(edges), "edge_ids": [e.id for e in edges]}
+    return {"batch_id": batch_id, "confirmed_count": len(edges), "edge_ids": [e.id for e in edges]}
+
+
+async def revert_edge(db: AsyncSession, tenant_id: UUID, edge_id: UUID, actor_id: UUID) -> EntityEdge:
+    """T58 — link reversibility: undo one confirmation, verified -> held.
+
+    "A link the machine created keeps that label for good, even after a
+    person has looked at it" — machine (tier 1/2) edges can never be
+    reverted because they were never a human decision to begin with.
+    Reverting clears every verified_* field, whether the edge was
+    confirmed individually or as part of a bulk batch — the *history* of
+    who verified it and when lives in the append-only audit log, not on
+    the live edge row.
+    """
+    if actor_id is None:
+        raise ValueError("reverting a confirmation requires an actor")
+
+    edge = await db.get(EntityEdge, edge_id)
+    if not edge or edge.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Edge not found")
+
+    if edge.status == "machine":
+        raise HTTPException(
+            status_code=409,
+            detail="Machine-accepted links stay permanently labelled and cannot be reverted",
+        )
+    if edge.status == "held":
+        raise HTTPException(status_code=409, detail="Edge is not verified — nothing to revert")
+
+    previous_verifier = edge.verified_by_actor_id
+    previous_batch_id = edge.verified_batch_id
+
+    edge.status = "held"
+    edge.verified_by_actor_id = None
+    edge.verified_at = None
+    edge.verified_threshold = None
+    edge.verified_corpus_folder_id = None
+    edge.verified_via_policy_version = None
+    edge.verified_batch_id = None
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "entity_edge.revert",
+        resource_type="entity_edge", resource_id=edge.id,
+        details={
+            "edge_type": edge.edge_type,
+            "tier": edge.tier,
+            "previously_verified_by": str(previous_verifier) if previous_verifier else None,
+            "previous_batch_id": str(previous_batch_id) if previous_batch_id else None,
+        },
+    )
+
+    return edge
+
+
+async def revert_bulk_batch(db: AsyncSession, tenant_id: UUID, batch_id: UUID, actor_id: UUID) -> dict:
+    """T58 — undo an entire bulk-confirm run in one action, by its exact
+    batch_id. Clean cascade: reverts precisely the edges that batch
+    touched, nothing from any other run, back to 'held'.
+    """
+    if actor_id is None:
+        raise ValueError("reverting a bulk confirmation requires an actor")
+
+    stmt = select(EntityEdge).where(
+        EntityEdge.tenant_id == tenant_id,
+        EntityEdge.verified_batch_id == batch_id,
+        EntityEdge.status == "verified",
+    )
+    res = await db.execute(stmt)
+    edges = list(res.scalars().all())
+
+    for edge in edges:
+        edge.status = "held"
+        edge.verified_by_actor_id = None
+        edge.verified_at = None
+        edge.verified_threshold = None
+        edge.verified_corpus_folder_id = None
+        edge.verified_via_policy_version = None
+        edge.verified_batch_id = None
+
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "entity_edge.bulk_revert",
+        resource_type="entity_edge_batch", resource_id=batch_id,
+        details={"reverted_count": len(edges), "edge_ids": [str(e.id) for e in edges]},
+    )
+
+    return {"reverted_count": len(edges), "edge_ids": [e.id for e in edges]}

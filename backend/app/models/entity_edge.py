@@ -74,6 +74,10 @@ class EntityEdge(Base):
     verified_threshold: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     verified_corpus_folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_folders.id", ondelete="SET NULL"), nullable=True)
     verified_via_policy_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    # T58: a precise handle for "undo this exact bulk run" — policy_version
+    # is a reusable business label (the same rule can run again next week),
+    # so it can't identify one specific batch on its own.
+    verified_batch_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
 
     evidence_fact_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_facts.id", ondelete="SET NULL"), nullable=True)
 
