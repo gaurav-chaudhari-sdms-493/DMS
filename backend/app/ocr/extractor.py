@@ -6,6 +6,10 @@ from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
+# Trilingual OCR per the product's English/Hindi/Marathi coverage — requires the
+# tesseract-ocr-hin and tesseract-ocr-mar language packs (see backend/Dockerfile).
+TESSERACT_LANG = "eng+hin+mar"
+
 def extract_pages_from_file(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
     """
     Extract structured pages and text content from various file formats:
@@ -40,7 +44,7 @@ def _extract_image(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
         from PIL import Image
         import pytesseract
         img = Image.open(io.BytesIO(file_bytes))
-        text = pytesseract.image_to_string(img) or ""
+        text = pytesseract.image_to_string(img, lang=TESSERACT_LANG) or ""
         logger.info(f"Image OCR extracted {len(text)} chars from {filename}")
     except Exception as e:
         logger.warning(f"Failed to perform Tesseract OCR on image file {filename}: {e}")
@@ -72,7 +76,7 @@ def _extract_pdf(file_bytes: bytes, filename: str = "") -> List[Dict[str, Any]]:
                     try:
                         import pytesseract
                         pil_img = page.to_image(resolution=150).original
-                        ocr_text = pytesseract.image_to_string(pil_img) or ""
+                        ocr_text = pytesseract.image_to_string(pil_img, lang=TESSERACT_LANG) or ""
                         if ocr_text.strip():
                             text = ocr_text
                             logger.info(f"Tesseract OCR extracted {len(text)} chars from page {i+1} of {filename}")

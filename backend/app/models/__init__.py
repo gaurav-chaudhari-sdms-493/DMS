@@ -14,6 +14,7 @@ from app.models.sys_config import SysConfig
 from app.models.page import DocumentPage
 from app.models.fact import Fact
 from app.models.fact_region import FactRegion
+from app.models.template import Template
 from app.database import Base
 
 
