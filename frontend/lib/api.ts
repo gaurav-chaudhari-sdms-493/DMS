@@ -270,6 +270,15 @@ export const api = {
       return await request(`/api/v1/facts/bulk-confirm?${params.toString()}`, { method: "POST" });
     },
   },
+  governance: {
+    // T76 — completeness/reconciliation dashboard, gap-scored per corpus (folder).
+    getCompleteness: async (corpusFolderId: string): Promise<any> => {
+      return await request(`/api/v1/governance/completeness/${corpusFolderId}`, { method: "GET" });
+    },
+    getCompletenessDrill: async (corpusFolderId: string, category: string): Promise<any> => {
+      return await request(`/api/v1/governance/completeness/${corpusFolderId}/drill?category=${encodeURIComponent(category)}`, { method: "GET" });
+    },
+  },
   search: {
     query: async (
       query: string,

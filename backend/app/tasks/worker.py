@@ -206,6 +206,10 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 doc = res.scalar_one_or_none()
                 if doc:
                     doc.status = "indexed"
+                    # T76 — every document gets these, not just template
+                    # matches (unlike doc_dg_pages, which only T22 writes to).
+                    doc.pages_total_count = len(pages)
+                    doc.pages_failed_count = sum(1 for p in pages if p.get("extraction_failed"))
 
         try:
             from app.services.cache_service import invalidate_tenant_cache

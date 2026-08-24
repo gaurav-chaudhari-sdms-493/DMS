@@ -48,6 +48,11 @@ class Document(Base):
         ForeignKey("doc_dg_templates.id", ondelete="SET NULL"), nullable=True
     )
 
+    # T76 — populated once at ingest for every document (not just template
+    # matches, unlike doc_dg_pages which only T22's VLM path writes to).
+    pages_total_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    pages_failed_count: Mapped[int] = mapped_column(default=0, nullable=False)
+
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="documents")
     folder: Mapped[Optional["Folder"]] = relationship("Folder", back_populates="documents")
     versions: Mapped[List["DocumentVersion"]] = relationship(
