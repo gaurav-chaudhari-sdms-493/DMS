@@ -20,3 +20,10 @@ class AuditLog(Base):
     user_agent: Mapped[Optional[str]] = mapped_column(nullable=True)
     details: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
+
+    # T63 — tamper-evident hash chain, anchored per tenant. NULL on rows
+    # written before this migration: "adding a chain later proves nothing
+    # about rows written before it" (Section 12) — those rows are honestly
+    # left unprotected rather than backfilled with a fabricated hash.
+    previous_hash: Mapped[Optional[str]] = mapped_column(nullable=True)
+    event_hash: Mapped[Optional[str]] = mapped_column(nullable=True, index=True)
