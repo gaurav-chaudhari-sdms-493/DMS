@@ -25,6 +25,7 @@ wheels/
 .installed.cfg
 *.egg
 .pytest_cache/
+.coverage
 .venv/
 venv/
 ENV/

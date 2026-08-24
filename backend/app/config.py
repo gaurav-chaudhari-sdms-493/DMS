@@ -29,8 +29,8 @@ class Settings(BaseSettings):
     # JWT
     jwt_secret_key: str = 'secret'
     jwt_algorithm: str = 'HS256'
-    jwt_access_token_expire_minutes: int = 43200  # 30 days
-    jwt_refresh_token_expire_days: int = 60  # 60 days
+    jwt_access_token_expire_minutes: int = 15  # 15 minutes
+    jwt_refresh_token_expire_days: int = 7  # 7 days
     
     # AWS S3 / MinIO
     aws_access_key_id: str = 'minioadmin'

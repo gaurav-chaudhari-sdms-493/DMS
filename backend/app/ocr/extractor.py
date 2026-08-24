@@ -45,14 +45,16 @@ def _extract_image(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"Failed to perform Tesseract OCR on image file {filename}: {e}")
 
-    if not text.strip():
+    failed = not text.strip()
+    if failed:
         text = f"Image document: {filename}"
 
     return [{
         "page_number": 1,
         "text": text.strip(),
         "words": [],
-        "bbox": {}
+        "bbox": {},
+        "extraction_failed": failed
     }]
 
 
