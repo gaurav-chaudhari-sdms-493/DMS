@@ -60,6 +60,13 @@ class EntityEdge(Base):
     created_by_actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("iam_dg_users.id"), nullable=True)
     created_by_policy_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # T56: who *created* an edge and who *confirmed* it (held -> verified)
+    # are different facts — a human can create a tier-3/4 edge directly and
+    # it still needs a separate confirmation event before it counts as
+    # verified evidence, same as a machine-extracted one does.
+    verified_by_actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("iam_dg_users.id"), nullable=True)
+    verified_at: Mapped[Optional[datetime]] = mapped_column(nullable=True)
+
     evidence_fact_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_facts.id", ondelete="SET NULL"), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
