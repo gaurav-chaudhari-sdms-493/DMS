@@ -33,6 +33,7 @@ async def upload_document(
     user_id: UUID,
     db: AsyncSession,
     folder_id: Optional[UUID] = None,
+    force: bool = False,
 ) -> DocumentUploadResponse:
     """Upload a document to MinIO S3, create DB records, and schedule async ingestion."""
     if folder_id:
@@ -51,6 +52,34 @@ async def upload_document(
         raise HTTPException(status_code=413, detail=f"File exceeds the {settings.max_upload_size_mb} MB limit")
 
     file_hash = hashlib.sha256(file_bytes).hexdigest()
+
+    # T79: the hash was always stored but never compared — surface an exact
+    # duplicate to the operator instead of silently re-processing it. Never
+    # drop the file: `force=True` lets the operator upload it anyway.
+    if not force:
+        dup_stmt = (
+            select(Document, DocumentVersion)
+            .join(DocumentVersion, DocumentVersion.document_id == Document.id)
+            .where(
+                DocumentVersion.file_hash == file_hash,
+                Document.tenant_id == tenant_id,
+                Document.is_trashed == False,
+            )
+            .limit(1)
+        )
+        dup_res = await db.execute(dup_stmt)
+        dup_row = dup_res.first()
+        if dup_row:
+            existing_doc, existing_version = dup_row
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "An identical file already exists in your drive.",
+                    "existing_document_id": str(existing_doc.id),
+                    "existing_document_title": existing_doc.title,
+                    "existing_uploaded_at": existing_version.created_at.isoformat(),
+                },
+            )
 
     doc_id = uuid.uuid4()
     version_id = uuid.uuid4()

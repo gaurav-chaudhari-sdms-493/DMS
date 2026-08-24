@@ -21,12 +21,13 @@ router = APIRouter()
 async def upload_document_api(
     file: UploadFile,
     folder_id: Optional[uuid.UUID] = Query(None),
+    force: bool = Query(False, description="Upload even if an identical file already exists"),
     current_user: TokenPayload = Depends(require_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
-    return await document_service.upload_document(file, tenant_id, user_id, db, folder_id=folder_id)
+    return await document_service.upload_document(file, tenant_id, user_id, db, folder_id=folder_id, force=force)
 
 
 @router.post('/bulk', response_model=BatchDocumentUploadResponse, status_code=201)

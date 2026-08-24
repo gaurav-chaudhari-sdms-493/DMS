@@ -1,6 +1,7 @@
 import time
 import re
 import logging
+from typing import List
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text, select
@@ -22,6 +23,46 @@ def _make_snippet(content: str, max_chars: int = 400) -> str:
     if not content or len(content) <= max_chars:
         return content or ""
     return content[:max_chars].rsplit(" ", 1)[0] + "…"
+
+
+async def _find_pending_title_matches(
+    db: AsyncSession, tenant_id: UUID, query: str, exclude_doc_ids: set
+) -> List[SearchResult]:
+    """T74 — a document must be findable by metadata before indexing finishes.
+
+    Content search filters on status='indexed', so a still-processing
+    document is otherwise invisible until Celery catches up. This matches
+    by title alone (no chunks exist yet for a pending document) and marks
+    the result as pending so the caller can show it's still being indexed.
+    """
+    stmt = text("""
+        SELECT d.id, d.title, d.status, v.s3_path
+        FROM doc_dg_documents d
+        LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id
+        WHERE d.tenant_id = CAST(:tenant_id AS uuid)
+          AND d.is_trashed = false
+          AND d.status IN ('pending', 'processing')
+          AND d.title ILIKE :title_pattern
+        LIMIT 5
+    """)
+    res = await db.execute(stmt, {"tenant_id": str(tenant_id), "title_pattern": f"%{query}%"})
+    rows = res.fetchall()
+
+    matches = []
+    for row in rows:
+        if row.id in exclude_doc_ids:
+            continue
+        url = await generate_presigned_url(row.s3_path) if row.s3_path else ""
+        matches.append(SearchResult(
+            document_id=row.id,
+            document_name=row.title,
+            download_url=url,
+            page_number=None,
+            snippet="This document is still being processed (OCR, chunking, embedding) — full-text search will include it shortly.",
+            score=0.0,
+            metadata={"pending": True, "status": row.status},
+        ))
+    return matches
 
 
 async def _expand_trilingual_query(query: str) -> dict:
@@ -192,20 +233,29 @@ async def search(
         vec_res = await db.execute(vec_sql, {**params, "query_embedding": q_emb_str})
         all_vec_rows.extend(vec_res.fetchall())
 
-    # 4. Keyword search (English + Simple Unicode for Devanagari Marathi/Hindi)
+    # 4. Keyword search — English (stemmed) and Devanagari/Marathi (unstemmed
+    # 'simple' config) are searched against their own matching tsvector column
+    # (T75): a 'simple' query against an 'english'-stemmed vector silently
+    # drops matches, since english config removes stopwords and stems words
+    # the simple-config query never touched.
     kw_sql = text(f"""
         SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
-               ts_rank(c.content_tsv, q) as keyword_score
+               GREATEST(ts_rank(c.content_tsv, q_en), ts_rank(c.content_tsv_simple, q_simple)) as keyword_score
         FROM doc_dg_chunks c
         JOIN doc_dg_documents d ON c.document_id = d.id
         LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id,
         COALESCE(
           NULLIF(plainto_tsquery('english', :query_en), ''),
           NULLIF(websearch_to_tsquery('english', :query_en), ''),
+          ''::tsquery
+        ) q_en,
+        COALESCE(
           NULLIF(plainto_tsquery('simple', :query_mr), ''),
-          plainto_tsquery('simple', :query_en)
-        ) q
-        WHERE c.content_tsv @@ q AND d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
+          NULLIF(plainto_tsquery('simple', :query_en), ''),
+          ''::tsquery
+        ) q_simple
+        WHERE (c.content_tsv @@ q_en OR c.content_tsv_simple @@ q_simple)
+          AND d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
         ORDER BY keyword_score DESC
         LIMIT {candidate_limit}
     """)
@@ -446,25 +496,35 @@ async def search(
 
         took_ms = int((time.time() - start_time) * 1000)
 
-        # Check if any documents in this tenant are currently being indexed
-        pending_preview_limit = await get_int("search_pending_docs_preview_limit", 3)
-        pending_sql = text(f"SELECT title FROM doc_dg_documents WHERE tenant_id = CAST(:tenant_id AS uuid) AND status IN ('pending', 'processing') AND is_trashed = false LIMIT {pending_preview_limit}")
-        pending_res = await db.execute(pending_sql, {"tenant_id": str(tenant_id)})
-        pending_titles = [r.title for r in pending_res.fetchall()]
+        # T74: a document must be findable by metadata before indexing
+        # finishes — try a title match against still-processing documents
+        # before falling back to a generic "nothing found" message.
+        title_matches = await _find_pending_title_matches(db, tenant_id, query, exclude_doc_ids=set())
 
-        if pending_titles:
-            titles_str = ", ".join([f"'{t}'" for t in pending_titles])
+        if title_matches:
             summary_text = (
-                f"No indexed matches found for '{query}'.\n\n"
-                f"ℹ️ **AI Indexing Notice**: {len(pending_titles)} document(s) ({titles_str}) are currently being processed in the background (OCR, text chunking, and 1024d vector embedding generation). Please wait a few seconds for indexing to finish and search again."
+                f"Found {len(title_matches)} matching document(s) by name for '{query}', "
+                f"still being indexed — full-text search will include them shortly."
             )
         else:
-            summary_text = f"No matching documents were found in your drive for '{query}'."
+            pending_preview_limit = await get_int("search_pending_docs_preview_limit", 3)
+            pending_sql = text(f"SELECT title FROM doc_dg_documents WHERE tenant_id = CAST(:tenant_id AS uuid) AND status IN ('pending', 'processing') AND is_trashed = false LIMIT {pending_preview_limit}")
+            pending_res = await db.execute(pending_sql, {"tenant_id": str(tenant_id)})
+            pending_titles = [r.title for r in pending_res.fetchall()]
+
+            if pending_titles:
+                titles_str = ", ".join([f"'{t}'" for t in pending_titles])
+                summary_text = (
+                    f"No indexed matches found for '{query}'.\n\n"
+                    f"ℹ️ **AI Indexing Notice**: {len(pending_titles)} document(s) ({titles_str}) are currently being processed in the background (OCR, text chunking, and 1024d vector embedding generation). Please wait a few seconds for indexing to finish and search again."
+                )
+            else:
+                summary_text = f"No matching documents were found in your drive for '{query}'."
 
         resp = SearchResponse(
             query=query,
             ai_summary=summary_text,
-            results=[],
+            results=title_matches,
             cached=False,
             took_ms=took_ms,
             search_mode=search_mode,
@@ -483,7 +543,7 @@ async def search(
                 "hyde_triggered": hyde_triggered,
                 "hyde_success": hyde_success,
                 "hypothetical_snippet": hypothetical_snippet,
-                "result_count": 0,
+                "result_count": len(title_matches),
                 "took_ms": took_ms
             },
             ip_address=ip_address
@@ -552,7 +612,12 @@ async def search(
         
         if len(final_results) >= limit:
             break
-            
+
+    # T74: also surface any still-processing documents whose title matches —
+    # findable by metadata immediately, not just once indexing finishes.
+    already_found = {r.document_id for r in final_results}
+    final_results.extend(await _find_pending_title_matches(db, tenant_id, query, exclude_doc_ids=already_found))
+
     # 7. Generate Natural, Professional AI Summary using LLM
     if not generate_summary:
         summary = (
