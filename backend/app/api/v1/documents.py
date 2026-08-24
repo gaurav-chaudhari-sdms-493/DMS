@@ -11,7 +11,7 @@ from ...schemas.document import (
 )
 from ...schemas.auth import TokenPayload
 from ...deps import get_db, require_tenant_access, require_role
-from ...services import document_service
+from ...services import document_service, classification_service
 import uuid
 
 router = APIRouter()
@@ -49,6 +49,42 @@ async def get_drive_stats_api(
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await document_service.get_drive_stats(db, tenant_id)
+
+
+@router.get('/queue/unclassified')
+async def list_unclassified_documents_api(
+    limit: int = 50,
+    offset: int = 0,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await classification_service.list_unclassified_documents(db, tenant_id, limit=limit, offset=offset)
+
+
+@router.post('/{document_id}/classify')
+async def classify_document_api(
+    document_id: uuid.UUID,
+    template_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    doc = await classification_service.manually_classify_document(db, tenant_id, document_id, template_id, user_id)
+    return {"document_id": str(doc.id), "classification_status": doc.classification_status, "matched_template_id": str(doc.matched_template_id)}
+
+
+@router.post('/{document_id}/dismiss-classification')
+async def dismiss_document_classification_api(
+    document_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    doc = await classification_service.dismiss_document_classification(db, tenant_id, document_id, user_id)
+    return {"document_id": str(doc.id), "classification_status": doc.classification_status}
 
 
 @router.get('', response_model=List[DocumentListItem])

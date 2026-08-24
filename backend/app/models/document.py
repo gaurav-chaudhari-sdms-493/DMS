@@ -39,6 +39,15 @@ class Document(Base):
         ForeignKey("sys_dg_retention_classes.class_name"), default="unclassified_permanent", nullable=False
     )
 
+    # T23 — 'unclassified' is a normal resting state, not an error: most
+    # documents in this system (budgets, financial analyses, ...) are not
+    # statutory forms and never will be. 'dismissed' is an operator
+    # explicitly confirming that, so it stops reappearing in the queue.
+    classification_status: Mapped[str] = mapped_column(default="unclassified", nullable=False)
+    matched_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("doc_dg_templates.id", ondelete="SET NULL"), nullable=True
+    )
+
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="documents")
     folder: Mapped[Optional["Folder"]] = relationship("Folder", back_populates="documents")
     versions: Mapped[List["DocumentVersion"]] = relationship(

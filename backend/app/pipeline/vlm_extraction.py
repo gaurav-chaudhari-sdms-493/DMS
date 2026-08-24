@@ -15,13 +15,11 @@ Two things this deliberately does NOT do yet:
     what order) and no seeded template declares it yet (T25 is blocked on
     A1 — no real reference corpus to model one on). join_spread() is wired
     up and ready; nothing calls it until a template opts in.
-  - Document classification (T23). select_template_for_document() below is
-    a light best-effort match against whatever templates exist, using the
-    existing text LLM — not the classification stage + unclassified queue
-    T23 actually specifies. When no template matches (or none are
-    registered, which is the case until T25/A1 lands), extraction is
-    skipped and the document stays chunk-only-indexed, same as before this
-    task existed.
+Document classification (T23) is now a separate stage
+(app/services/classification_service.py) that runs unconditionally at
+ingest and persists its result on the document, rather than the ad-hoc
+unpersisted match this module used to do inline. worker.py calls it first
+and passes the resolved template in here.
 
 Best-effort by design: a VLM failure never fails ingestion. Search and
 chunk indexing must never wait on this (Section 3.5), so every call site
@@ -37,8 +35,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.base import Message
-from app.ai.factory import get_llm_provider, get_vlm_provider
+from app.ai.factory import get_vlm_provider
 from app.config import settings
 from app.models.fact import Fact
 from app.models.fact_region import FactRegion
@@ -61,37 +58,6 @@ RENDERABLE_EXTENSIONS = {"pdf", "jpg", "jpeg", "png", "bmp", "webp", "tiff"}
 #   "type": "blob"               — free-text cell to run through parse_blob_cell
 
 
-async def select_template_for_document(db: AsyncSession, sample_text: str) -> Optional[Template]:
-    """Best-effort template match — see module docstring: this is not T23."""
-    res = await db.execute(select(Template))
-    templates = list(res.scalars().all())
-    if not templates:
-        return None
-
-    options = [f"{t.form_type} | {t.era_label}" for t in templates]
-    prompt = (
-        "A scanned government document starts with this text:\n\n"
-        f"{sample_text[:1500]}\n\n"
-        "Which of these registered form templates, if any, does it match?\n"
-        + "\n".join(f"- {o}" for o in options)
-        + "\n\nReply with ONLY the exact 'form_type | era_label' string of the best match, "
-          "or the single word NONE if it doesn't match any of them."
-    )
-    try:
-        llm = get_llm_provider()
-        # max_tokens has headroom beyond the one-line answer: reasoning models
-        # (e.g. Groq's gpt-oss) spend part of the budget on hidden reasoning
-        # tokens before the visible answer, so a tight limit here returns "".
-        resp = (await llm.complete([Message(role="user", content=prompt)], temperature=0.0, max_tokens=512)).strip()
-    except Exception as e:
-        logger.warning(f"T22 template match call failed: {e}")
-        return None
-
-    resp_last_line = resp.strip().splitlines()[-1].strip().strip('"') if resp.strip() else ""
-    for t, option in zip(templates, options):
-        if resp_last_line == option or option in resp_last_line:
-            return t
-    return None
 
 
 def _render_pdf_page_png(file_bytes: bytes, page_number: int) -> Optional[tuple[bytes, float, float, float]]:

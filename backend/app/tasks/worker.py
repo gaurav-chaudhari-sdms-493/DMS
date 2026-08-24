@@ -163,15 +163,29 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                             doc.title = meta_dict["title"]
                             doc.doc_type = meta_dict.get("document_type")
 
-                # 5b. T22 — VLM extraction against a matching template, if one exists.
+                # 5b. T23 — classification stage, unconditional (runs regardless of
+                # whether VLM extraction is even enabled). Persists the result on
+                # the document instead of the ad-hoc unpersisted match T22 used to
+                # do inline. A savepoint isolates it, same reasoning as T22 below.
+                template = None
+                try:
+                    from app.services.classification_service import classify_document
+                    sample_text = pages[0].get("text", "") if pages else ""
+                    async with db.begin_nested():
+                        classified_doc = await classify_document(db, tenant_id, document_id, sample_text)
+                    if classified_doc.matched_template_id:
+                        from app.models.template import Template as TemplateModel
+                        template = await db.get(TemplateModel, classified_doc.matched_template_id)
+                except Exception as classify_err:
+                    logger.warning(f"T23 classification skipped for document {document_id}: {classify_err}")
+
+                # 5c. T22 — VLM extraction against the matched template, if any.
                 # Best-effort and non-blocking: a savepoint isolates it so a failure
                 # here never aborts the chunk/metadata commit above (search must
                 # never wait on this, Section 3.5).
-                try:
-                    from app.pipeline.vlm_extraction import select_template_for_document, extract_facts_for_document
-                    sample_text = pages[0].get("text", "") if pages else ""
-                    template = await select_template_for_document(db, sample_text)
-                    if template:
+                if template:
+                    try:
+                        from app.pipeline.vlm_extraction import extract_facts_for_document
                         async with db.begin_nested():
                             facts_count = await extract_facts_for_document(
                                 db, tenant_id, document_id, version_id,
@@ -183,8 +197,8 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                                 f"document {document_id} against template "
                                 f"{template.form_type}/{template.era_label}"
                             )
-                except Exception as vlm_err:
-                    logger.warning(f"T22 VLM extraction skipped for document {document_id}: {vlm_err}")
+                    except Exception as vlm_err:
+                        logger.warning(f"T22 VLM extraction skipped for document {document_id}: {vlm_err}")
 
                 # Update status to indexed
                 stmt = select(Document).where(Document.id == document_id)
