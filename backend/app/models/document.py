@@ -32,6 +32,13 @@ class Document(Base):
     is_trashed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     trashed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
+    # T66/D-7 — governs whether/when the retention engine may purge this
+    # document once trashed. Defaults to the never-purge class; only
+    # 'operational_trash' has a finite period (see D7 decision doc).
+    retention_class: Mapped[str] = mapped_column(
+        ForeignKey("sys_dg_retention_classes.class_name"), default="unclassified_permanent", nullable=False
+    )
+
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="documents")
     folder: Mapped[Optional["Folder"]] = relationship("Folder", back_populates="documents")
     versions: Mapped[List["DocumentVersion"]] = relationship(

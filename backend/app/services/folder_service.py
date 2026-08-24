@@ -148,7 +148,10 @@ async def toggle_trash_folder(db: AsyncSession, folder_id: UUID, tenant_id: UUID
     return FolderResponse.model_validate(folder)
 
 
-async def delete_folder_permanently(db: AsyncSession, folder_id: UUID, tenant_id: UUID, actor_id: UUID) -> None:
+async def delete_folder_permanently(
+    db: AsyncSession, folder_id: UUID, tenant_id: UUID,
+    actor_id: UUID, policy_version: Optional[str] = None,
+) -> None:
     from app.services.document_service import delete_document_permanently
 
     folder = await db.get(Folder, folder_id)
@@ -162,19 +165,21 @@ async def delete_folder_permanently(db: AsyncSession, folder_id: UUID, tenant_id
     doc_res = await db.execute(doc_stmt)
     doc_ids = doc_res.scalars().all()
     for d_id in doc_ids:
-        await delete_document_permanently(db, d_id, tenant_id, actor_id)
+        await delete_document_permanently(db, d_id, tenant_id, actor_id=actor_id, policy_version=policy_version)
 
     # 2. Delete all subfolders recursively
     sub_stmt = select(Folder.id).where(Folder.parent_id == folder_id, Folder.tenant_id == tenant_id)
     sub_res = await db.execute(sub_stmt)
     sub_ids = sub_res.scalars().all()
     for s_id in sub_ids:
-        await delete_folder_permanently(db, s_id, tenant_id, actor_id)
+        await delete_folder_permanently(db, s_id, tenant_id, actor_id=actor_id, policy_version=policy_version)
 
     await db.delete(folder)
+    # T08/T66 — same fix as delete_document_permanently: log before commit,
+    # not after, so an irreversible delete and its audit record land in
+    # one transaction.
+    await log_action(db, actor_id, tenant_id, "folder.delete", resource_type="folder", resource_id=folder_id, details={"name": folder_name}, policy_version=policy_version)
     await db.commit()
-
-    await log_action(db, actor_id, tenant_id, "folder.delete", resource_type="folder", resource_id=folder_id, details={"name": folder_name})
 
 
 async def get_folder_tree(db: AsyncSession, tenant_id: UUID) -> List[FolderTreeNode]:

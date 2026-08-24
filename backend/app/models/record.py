@@ -33,4 +33,10 @@ class Record(Base):
     created_by_actor_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("iam_dg_users.id"), nullable=True)
     created_by_policy_version: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
+    # T66/D-7 — defaults to the never-purge class; a record is never engine-
+    # purged by age regardless of what this is set to (see D7 decision doc).
+    retention_class: Mapped[str] = mapped_column(
+        ForeignKey("sys_dg_retention_classes.class_name"), nullable=False, default="statutory_record"
+    )
+
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

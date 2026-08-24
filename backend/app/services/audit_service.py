@@ -45,12 +45,21 @@ async def log_action(
     resource_type: Optional[str] = None,
     resource_id: Optional[uuid.UUID] = None,
     ip_address: Optional[str] = None,
-    details: Optional[Any] = None
+    details: Optional[Any] = None,
+    policy_version: Optional[str] = None,
 ) -> AuditLog:
     # T08: a chain full of empty user fields proves nothing — refuse any
-    # change that has no actor attached, at the write layer, not just in the UI.
+    # change that has no actor attached, at the write layer, not just in
+    # the UI. audit_dg_logs.actor_id is NOT NULL + FK'd to a real user row
+    # at the DB level (stricter than the SQLAlchemy model declares) — a
+    # scheduled/policy-driven action still needs a real actor_id (see
+    # audit_service._resolve_policy_actor / T66's retention purge for how
+    # one gets resolved for a non-human-initiated action). policy_version
+    # is recorded alongside it as an annotation, not a substitute for it.
     if actor_id is None:
         raise ValueError(f"Refusing to write audit event '{action}': no actor_id provided")
+    if policy_version is not None:
+        details = {**(details or {}), "policy_version": policy_version}
 
     # T63: serialize chain appends per tenant so two concurrent log_action
     # calls can't both read the same tail and fork the chain. Released

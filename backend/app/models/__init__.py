@@ -20,6 +20,7 @@ from app.models.record import Record
 from app.models.record_amendment import RecordAmendment
 from app.models.corpus_calibration import CorpusCalibration
 from app.models.department import Department, DepartmentMember, DepartmentFolder
+from app.models.retention_class import RetentionClass
 from app.database import Base
 
 
