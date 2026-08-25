@@ -366,8 +366,35 @@ async def search(
     
     kw_res = await db.execute(kw_sql, params)
     kw_rows = kw_res.fetchall()
-    
-    # 5. RRF Merge (Reciprocal Rank Fusion across all language vectors and keywords)
+
+    # 4b. Fuzzy/trigram search (T72) — catches misspellings vector search's
+    # semantics and keyword search's exact tokens both miss (a typo'd proper
+    # noun like "Depshmukh" for "Deshmukh"). word_similarity(), not plain
+    # similarity(): matching a short query against a whole chunk of running
+    # text with similarity() dilutes the score against chunk length (a real
+    # substring match scored ~0.2); word_similarity() finds the best-matching
+    # substring instead and scored the same case at 1.0. The threshold is a
+    # GUC, not a bind param — SET LOCAL only accepts literals, but this value
+    # comes from sys_dg_config, never from the request, so interpolating it
+    # is safe. LOCAL keeps it scoped to this transaction, not the pooled
+    # connection.
+    trgm_threshold = await get_float("search_trigram_threshold", 0.3)
+    await db.execute(text(f"SET LOCAL pg_trgm.word_similarity_threshold = {trgm_threshold}"))
+    trgm_sql = text(f"""
+        SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path,
+               word_similarity(:query_en, c.content) as trigram_score
+        FROM doc_dg_chunks c
+        JOIN doc_dg_documents d ON c.document_id = d.id
+        LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id
+        WHERE d.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false {filter_str}
+          AND :query_en <% c.content
+        ORDER BY trigram_score DESC
+        LIMIT {candidate_limit}
+    """)
+    trgm_res = await db.execute(trgm_sql, params)
+    trgm_rows = trgm_res.fetchall()
+
+    # 5. RRF Merge (Reciprocal Rank Fusion across all language vectors, keywords, and fuzzy matches)
     rrf_scores = {}
     docs_map = {}
     k = await get_int("search_rrf_k", 60)
@@ -376,8 +403,13 @@ async def search(
         cid = str(row.id)
         docs_map[cid] = row
         rrf_scores[cid] = rrf_scores.get(cid, 0) + (1.0 / (k + (rank % candidate_limit) + 1))
-        
+
     for rank, row in enumerate(kw_rows):
+        cid = str(row.id)
+        docs_map[cid] = row
+        rrf_scores[cid] = rrf_scores.get(cid, 0) + (1.0 / (k + rank + 1))
+
+    for rank, row in enumerate(trgm_rows):
         cid = str(row.id)
         docs_map[cid] = row
         rrf_scores[cid] = rrf_scores.get(cid, 0) + (1.0 / (k + rank + 1))
@@ -414,17 +446,16 @@ async def search(
         if relevant_ranks:
             vec_cids = {str(r.id) for r in all_vec_rows}
             kw_cids = {str(r.id) for r in kw_rows}
+            trgm_cids = {str(r.id) for r in trgm_rows}
             matched_cids = {str(merged[rank_res.index][0]) for rank_res in relevant_ranks if rank_res.index < len(merged)}
-            has_vec = bool(matched_cids & vec_cids)
-            has_kw = bool(matched_cids & kw_cids)
-            if has_vec and has_kw:
-                search_mode = "vector+keyword"
-            elif has_vec:
-                search_mode = "vector"
-            elif has_kw:
-                search_mode = "keyword"
-            else:
-                search_mode = "vector+keyword"
+            contributing_legs = []
+            if matched_cids & vec_cids:
+                contributing_legs.append("vector")
+            if matched_cids & kw_cids:
+                contributing_legs.append("keyword")
+            if matched_cids & trgm_cids:
+                contributing_legs.append("fuzzy")
+            search_mode = "+".join(contributing_legs) if contributing_legs else "vector+keyword"
 
     # --- Step 6: TRI-LINGUAL HYDE AUTOMATIC FALLBACK ---
     if not merged or not relevant_ranks:

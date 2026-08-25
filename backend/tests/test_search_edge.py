@@ -6,6 +6,9 @@ from app.services.chat_service import _extract_score_threshold, _is_explicit_sea
 from app.database import AsyncSessionLocal
 from app.models.tenant import Tenant
 from app.models.user import User
+from app.models.document import Document
+from app.models.document_version import DocumentVersion
+from app.models.chunk import Chunk
 
 
 def test_validate_output_summary_edge_cases():
@@ -56,5 +59,53 @@ async def test_search_isolated_tenant_empty_results():
             )
             assert res is not None
             assert len(res.results) == 0
+        finally:
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_search_fuzzy_leg_catches_misspelled_proper_noun():
+    """T72 — a typo'd proper noun ("Depshmukh" for "Deshmukh") has zero
+    keyword tsvector matches and an unreliable vector-semantic match, but
+    word_similarity() finds it. rerank_provider is forced to 'bgem3'
+    (local) so this test doesn't depend on a live, rate-limited Cohere key."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id = uuid.uuid4()
+            user_id = uuid.uuid4()
+            tenant = Tenant(id=tenant_id, name=f"Fuzzy Tenant {uuid.uuid4().hex[:6]}")
+            user = User(id=user_id, tenant_id=tenant_id, email=f"fuzzy_{uuid.uuid4().hex[:6]}@test.com", hashed_password="pw")
+            db.add_all([tenant, user])
+            await db.commit()
+
+            doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="Deshmukh bio", status="indexed")
+            version = DocumentVersion(
+                id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+                file_hash="deadbeef", file_size_bytes=1, original_filename="deshmukh.txt",
+            )
+            db.add_all([doc, version])
+            await db.flush()
+            doc.current_version_id = version.id
+            chunk = Chunk(
+                id=uuid.uuid4(), document_id=doc.id, version_id=version.id, tenant_id=tenant_id,
+                content="A short biography of Priya Deshmukh, compliance officer.",
+                embedding=[0.0] * 1024, chunk_metadata={}, page_number=1, chunk_index=0, s3_path="x",
+            )
+            db.add(chunk)
+            await db.commit()
+
+            res = await search(
+                query="Depshmukh",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                limit=10,
+                filters=None,
+                db=db,
+                ip_address="127.0.0.1",
+                rerank_provider="bgem3",
+                generate_summary=False,
+            )
+            assert len(res.results) >= 1
+            assert "fuzzy" in res.search_mode
         finally:
             await db.close()
