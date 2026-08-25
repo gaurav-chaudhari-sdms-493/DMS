@@ -11,6 +11,9 @@ import {
   AlertCircle,
   Keyboard,
   PenLine,
+  Pencil,
+  Undo2,
+  Eye,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -58,6 +61,76 @@ export default function WorkbenchPage() {
   const [bulkPolicyVersion, setBulkPolicyVersion] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ confirmed_count: number; batch_id: string } | null>(null);
+
+  // T80 — bulk edit: select rows, preview the change, then apply. One
+  // typed value replaces every selected row's value — the common case
+  // this is for (the same OCR misread recurring across many rows).
+  const [selectedFactIds, setSelectedFactIds] = useState<Set<string>>(new Set());
+  const [editValue, setEditValue] = useState("");
+  const [editLoading, setEditLoading] = useState(false);
+  const [editPreview, setEditPreview] = useState<{ changed_count: number; total: number; rows: any[] } | null>(null);
+  const [editResult, setEditResult] = useState<{ batch_id: string; changed_count: number } | null>(null);
+
+  const toggleFactSelection = (factId: string) => {
+    setSelectedFactIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(factId)) next.delete(factId);
+      else next.add(factId);
+      return next;
+    });
+    setEditPreview(null);
+    setEditResult(null);
+  };
+
+  const buildEdits = () => Array.from(selectedFactIds).map((fact_id) => ({ fact_id, new_value: { v: editValue } }));
+
+  const previewBulkEdit = async () => {
+    if (selectedFactIds.size === 0 || !editValue.trim()) return;
+    setEditLoading(true);
+    setError("");
+    try {
+      const result = await api.facts.bulkEdit(buildEdits(), true);
+      setEditPreview(result);
+    } catch (e: any) {
+      setError(e?.message || "Failed to preview the bulk edit");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const applyBulkEdit = async () => {
+    if (selectedFactIds.size === 0 || !editValue.trim()) return;
+    setEditLoading(true);
+    setError("");
+    try {
+      const result = await api.facts.bulkEdit(buildEdits(), false);
+      setEditResult(result);
+      setEditPreview(null);
+      setSelectedFactIds(new Set());
+      setEditValue("");
+      await loadQueue(category);
+    } catch (e: any) {
+      setError(e?.message || "Bulk edit failed");
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
+  const undoBulkEdit = async () => {
+    if (!editResult) return;
+    setEditLoading(true);
+    setError("");
+    try {
+      await api.facts.revertBulkEdit(editResult.batch_id);
+      setNotice(`Reverted bulk edit batch ${editResult.batch_id.slice(0, 8)}…`);
+      setEditResult(null);
+      await loadQueue(category);
+    } catch (e: any) {
+      setError(e?.message || "Failed to revert the bulk edit");
+    } finally {
+      setEditLoading(false);
+    }
+  };
 
   const loadQueue = useCallback(async (cat: Category) => {
     setLoading(true);
@@ -225,24 +298,33 @@ export default function WorkbenchPage() {
 
             <div className="divide-y divide-[#e1e3e1]">
               {facts.map((fact, idx) => (
-                <button
+                <div
                   key={fact.fact_id}
-                  onClick={() => setSelectedIndex(idx)}
-                  className={`w-full text-left px-5 py-3 flex items-center justify-between gap-4 transition-colors ${
+                  className={`w-full flex items-center gap-3 px-5 py-3 transition-colors ${
                     idx === selectedIndex ? "bg-[#e8f0fe]" : "hover:bg-[#f8f9fa]"
                   }`}
                 >
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-[#1f1f1f] truncate">{fact.field_name}</div>
-                    <div className="text-xs text-[#747775] truncate">{formatValue(fact.value)}</div>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {fact.claimed_by_actor_id && <Lock className="w-3.5 h-3.5 text-[#9aa0a6]" />}
-                    <span className="text-xs font-mono text-[#444746]">
-                      {fact.confidence !== null ? fact.confidence.toFixed(2) : "—"}
-                    </span>
-                  </div>
-                </button>
+                  <input
+                    type="checkbox"
+                    checked={selectedFactIds.has(fact.fact_id)}
+                    onChange={() => toggleFactSelection(fact.fact_id)}
+                    onClick={(e) => e.stopPropagation()}
+                    className="shrink-0 w-4 h-4 accent-[#0b57d0]"
+                    title="Select for bulk edit"
+                  />
+                  <button onClick={() => setSelectedIndex(idx)} className="flex-1 min-w-0 text-left flex items-center justify-between gap-4">
+                    <div className="min-w-0">
+                      <div className="text-sm font-medium text-[#1f1f1f] truncate">{fact.field_name}</div>
+                      <div className="text-xs text-[#747775] truncate">{formatValue(fact.value)}</div>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {fact.claimed_by_actor_id && <Lock className="w-3.5 h-3.5 text-[#9aa0a6]" />}
+                      <span className="text-xs font-mono text-[#444746]">
+                        {fact.confidence !== null ? fact.confidence.toFixed(2) : "—"}
+                      </span>
+                    </div>
+                  </button>
+                </div>
               ))}
             </div>
           </Card>
@@ -330,6 +412,69 @@ export default function WorkbenchPage() {
             {bulkResult && (
               <div className="mt-3 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
                 Confirmed {bulkResult.confirmed_count} fact{bulkResult.confirmed_count === 1 ? "" : "s"} — batch {bulkResult.batch_id.slice(0, 8)}&hellip;
+              </div>
+            )}
+          </Card>
+
+          <Card className="bg-white border border-[#e1e3e1]">
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">Bulk edit (T80)</h2>
+            <p className="text-xs text-[#747775] mb-3">
+              Check rows in the queue, type the corrected value, preview before applying. Never marks a
+              value verified — every edited row lands in review, even if it was previously machine or verified.
+            </p>
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-[#444746]">
+                {selectedFactIds.size} row{selectedFactIds.size === 1 ? "" : "s"} selected
+              </div>
+              <input
+                type="text"
+                placeholder="Corrected value"
+                value={editValue}
+                onChange={(e) => { setEditValue(e.target.value); setEditPreview(null); }}
+                disabled={selectedFactIds.size === 0}
+                className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40 disabled:opacity-50"
+              />
+              <div className="flex gap-2">
+                <Button
+                  size="sm" variant="secondary" className="flex-1"
+                  loading={editLoading} disabled={selectedFactIds.size === 0 || !editValue.trim()}
+                  onClick={previewBulkEdit}
+                >
+                  <Eye className="w-3.5 h-3.5 mr-1.5" />
+                  Preview
+                </Button>
+                <Button
+                  size="sm" className="flex-1"
+                  loading={editLoading} disabled={!editPreview || editPreview.changed_count === 0}
+                  onClick={applyBulkEdit}
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                  Apply
+                </Button>
+              </div>
+            </div>
+
+            {editPreview && (
+              <div className="mt-3 text-xs bg-[#f0f4f9] border border-[#e1e3e1] rounded-lg px-3 py-2 space-y-1 max-h-40 overflow-y-auto">
+                <div className="font-semibold text-[#444746]">
+                  {editPreview.changed_count} of {editPreview.total} row{editPreview.total === 1 ? "" : "s"} will change
+                </div>
+                {editPreview.rows.filter((r: any) => r.changed).map((r: any) => (
+                  <div key={r.fact_id} className="text-[#1f1f1f]">
+                    {r.field_name}: {formatValue(r.previous_value)} &rarr; {formatValue(r.new_value)}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {editResult && (
+              <div className="mt-3 flex items-center justify-between gap-2 text-xs text-green-700 bg-green-50 border border-green-200 rounded-lg px-3 py-2">
+                <span>
+                  Edited {editResult.changed_count} fact{editResult.changed_count === 1 ? "" : "s"} — batch {editResult.batch_id.slice(0, 8)}&hellip;
+                </span>
+                <button onClick={undoBulkEdit} className="flex items-center gap-1 font-bold text-[#0b57d0] hover:underline shrink-0">
+                  <Undo2 className="w-3.5 h-3.5" /> Undo
+                </button>
               </div>
             )}
           </Card>

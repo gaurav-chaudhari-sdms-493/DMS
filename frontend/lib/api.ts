@@ -243,10 +243,9 @@ export const api = {
         method: "GET",
       });
     },
-    // T51/T52 — the adjudication queue: 'low_confidence' is any in_review
-    // fact; 'handwritten' filters on is_handwritten (nothing sets that yet,
-    // T30 isn't built, but the category is ready). 'marginalia' and
-    // 'join_mismatch' 501 on the backend — not built yet, not silently empty.
+    // T51/T52/T30 — the adjudication queue: 'low_confidence', 'handwritten'
+    // and 'marginalia' are real categories. 'join_mismatch' still 501s on
+    // the backend — blocked on A1/T26, not built, not silently empty.
     getQueue: async (category: string = "low_confidence", limit: number = 50, offset: number = 0): Promise<any> => {
       return await request(`/api/v1/facts/queue?category=${encodeURIComponent(category)}&limit=${limit}&offset=${offset}`, {
         method: "GET",
@@ -274,6 +273,18 @@ export const api = {
         policy_version: policyVersion,
       });
       return await request(`/api/v1/facts/bulk-confirm?${params.toString()}`, { method: "POST" });
+    },
+    // T80 — correct many facts' values in one action. dryRun=true is the
+    // "preview before applying" step, same validation path as applying.
+    // Never promotes to verified — always demotes to in_review.
+    bulkEdit: async (edits: { fact_id: string; new_value: any }[], dryRun: boolean = false): Promise<any> => {
+      return await request(`/api/v1/facts/bulk-edit`, {
+        method: "POST",
+        body: JSON.stringify({ edits, dry_run: dryRun }),
+      });
+    },
+    revertBulkEdit: async (batchId: string): Promise<any> => {
+      return await request(`/api/v1/facts/bulk-edit/revert/${batchId}`, { method: "POST" });
     },
   },
   governance: {

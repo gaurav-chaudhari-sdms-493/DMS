@@ -8,7 +8,10 @@ from app.models.folder import Folder
 from app.models.document import Document
 from app.models.document_version import DocumentVersion
 from app.models.fact import Fact
-from app.services.fact_verification_service import confirm_fact, bulk_confirm_facts, mark_fact_handwritten, get_adjudication_queue
+from app.services.fact_verification_service import (
+    confirm_fact, bulk_confirm_facts, mark_fact_handwritten, get_adjudication_queue,
+    bulk_edit_facts, revert_bulk_edit_batch,
+)
 from app.services.corpus_calibration_service import calibrate_corpus
 
 
@@ -271,6 +274,154 @@ async def test_adjudication_queue_join_mismatch_still_501():
             with pytest.raises(HTTPException) as exc_info:
                 await get_adjudication_queue(db, tenant_id, category="join_mismatch")
             assert exc_info.value.status_code == 501
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_bulk_edit_facts_requires_actor():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="machine")
+            db.add(fact)
+            await db.flush()
+
+            with pytest.raises(ValueError):
+                await bulk_edit_facts(db, tenant_id, [{"fact_id": fact.id, "new_value": {"v": "Corrected"}}], None)
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_bulk_edit_facts_dry_run_writes_nothing():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="machine")
+            db.add(fact)
+            await db.flush()
+
+            result = await bulk_edit_facts(
+                db, tenant_id, [{"fact_id": fact.id, "new_value": {"v": "Corrected"}}], actor_id, dry_run=True,
+            )
+            assert result["dry_run"] is True
+            assert result["changed_count"] == 1
+            assert result["batch_id"] is None
+            assert result["rows"][0]["previous_value"] == {"v": "Test Value"}
+            assert result["rows"][0]["new_value"] == {"v": "Corrected"}
+
+            await db.refresh(fact)
+            assert fact.value == {"v": "Test Value"}
+            assert fact.status == "machine"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_bulk_edit_facts_never_promotes_to_verified():
+    """T80's hard rule: editing a machine-committed value always demotes
+    it to in_review — it can never come out of a bulk edit 'verified'."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="machine")
+            db.add(fact)
+            await db.flush()
+
+            result = await bulk_edit_facts(
+                db, tenant_id, [{"fact_id": fact.id, "new_value": {"v": "Corrected"}}], actor_id,
+            )
+            assert result["changed_count"] == 1
+            assert result["batch_id"] is not None
+
+            await db.refresh(fact)
+            assert fact.value == {"v": "Corrected"}
+            assert fact.status == "in_review"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_bulk_edit_facts_clears_prior_verification():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="verified")
+            db.add(fact)
+            await db.flush()
+            fact.verified_by_actor_id = actor_id
+            await db.flush()
+
+            await bulk_edit_facts(db, tenant_id, [{"fact_id": fact.id, "new_value": {"v": "Corrected"}}], actor_id)
+
+            await db.refresh(fact)
+            assert fact.status == "in_review"
+            assert fact.verified_by_actor_id is None
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_bulk_edit_facts_skips_noop_edits():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="machine")
+            db.add(fact)
+            await db.flush()
+
+            result = await bulk_edit_facts(
+                db, tenant_id, [{"fact_id": fact.id, "new_value": {"v": "Test Value"}}], actor_id,
+            )
+            assert result["changed_count"] == 0
+            assert result["rows"][0]["changed"] is False
+
+            await db.refresh(fact)
+            assert fact.status == "machine"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_revert_bulk_edit_batch_restores_value_and_status():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="machine")
+            db.add(fact)
+            await db.flush()
+
+            result = await bulk_edit_facts(
+                db, tenant_id, [{"fact_id": fact.id, "new_value": {"v": "Corrected"}}], actor_id,
+            )
+            batch_id = uuid.UUID(result["batch_id"])
+
+            revert_result = await revert_bulk_edit_batch(db, tenant_id, batch_id, actor_id)
+            assert str(fact.id) in revert_result["fact_ids"]
+
+            await db.refresh(fact)
+            assert fact.value == {"v": "Test Value"}
+            assert fact.status == "machine"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_revert_bulk_edit_batch_unknown_batch_404s():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            with pytest.raises(HTTPException) as exc_info:
+                await revert_bulk_edit_batch(db, tenant_id, uuid.uuid4(), actor_id)
+            assert exc_info.value.status_code == 404
         finally:
             await db.rollback()
             await db.close()

@@ -13,13 +13,14 @@ regardless of a fact's verification status.
 """
 import uuid as uuid_module
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.audit_log import AuditLog
 from app.models.document import Document
 from app.models.fact import Fact
 from app.services.audit_service import log_action
@@ -263,3 +264,151 @@ async def get_adjudication_queue(
             for f in facts
         ],
     }
+
+
+async def bulk_edit_facts(
+    db: AsyncSession, tenant_id: UUID, edits: List[Dict[str, Any]], actor_id: UUID, dry_run: bool = False,
+) -> dict:
+    """T80 — correct many facts' values in one action: the bulk version
+    of the checking screen's single-fact [C] correct action (Section 5),
+    not a bulk version of T51's confirm. An edit NEVER sets 'verified' —
+    it always lands at 'in_review', whatever the fact's status was
+    before, clearing any prior verification (confirming a fact attests to
+    a specific value; a changed value hasn't been looked at by anyone).
+    That's how "cannot promote machine values to verified" (Section 10)
+    holds by construction, not by a separate check.
+
+    dry_run=True runs every validation and computes the same before/after
+    preview without writing anything — "show a preview before applying"
+    is the same code path as applying, not a second implementation that
+    could drift from it.
+
+    `edits` is an explicit list of {"fact_id": UUID, "new_value": Any} —
+    exactly which facts change and what they change to is decided by the
+    caller (the workbench UI, T54), not a find-and-replace pattern
+    matched server-side.
+    """
+    if actor_id is None:
+        raise ValueError("bulk edit requires an actor")
+    if not edits:
+        raise ValueError("no edits provided")
+
+    fact_ids = [e["fact_id"] for e in edits]
+    res = await db.execute(select(Fact).where(Fact.tenant_id == tenant_id, Fact.id.in_(fact_ids)))
+    facts_by_id = {f.id: f for f in res.scalars().all()}
+
+    batch_id = uuid_module.uuid4()
+    rows = []
+    changed_count = 0
+
+    for edit in edits:
+        fact_id = edit["fact_id"]
+        new_value = edit["new_value"]
+        fact = facts_by_id.get(fact_id)
+        if not fact:
+            rows.append({"fact_id": str(fact_id), "error": "not found"})
+            continue
+
+        previous_value = fact.value
+        previous_status = fact.status
+        if previous_value == new_value:
+            rows.append({
+                "fact_id": str(fact_id), "field_name": fact.field_name,
+                "previous_value": previous_value, "new_value": new_value,
+                "changed": False,
+            })
+            continue
+
+        changed_count += 1
+        rows.append({
+            "fact_id": str(fact_id), "field_name": fact.field_name,
+            "previous_value": previous_value, "new_value": new_value,
+            "previous_status": previous_status, "new_status": "in_review",
+            "changed": True,
+        })
+
+        if not dry_run:
+            fact.value = new_value
+            fact.status = "in_review"
+            fact.verified_by_actor_id = None
+            fact.verified_at = None
+            fact.verified_threshold = None
+            fact.verified_corpus_folder_id = None
+            fact.verified_via_policy_version = None
+            fact.verified_batch_id = None
+            fact.claimed_by_actor_id = None
+            fact.claimed_at = None
+
+            await log_action(
+                db, actor_id, tenant_id, "fact.bulk_edit",
+                resource_type="fact", resource_id=fact.id,
+                details={
+                    "batch_id": str(batch_id),
+                    "field_name": fact.field_name,
+                    "previous_value": previous_value,
+                    "new_value": new_value,
+                    "previous_status": previous_status,
+                },
+            )
+
+    if not dry_run and changed_count:
+        await db.flush()
+
+    return {
+        "batch_id": str(batch_id) if not dry_run and changed_count else None,
+        "dry_run": dry_run,
+        "total": len(edits),
+        "changed_count": changed_count,
+        "rows": rows,
+    }
+
+
+async def revert_bulk_edit_batch(db: AsyncSession, tenant_id: UUID, batch_id: UUID, actor_id: UUID) -> dict:
+    """T80 — bounded undo: restore every fact one bulk-edit batch touched
+    to its pre-edit value and status. The audit log (append-only, T63) is
+    the source of truth for what to restore — no separate value-history
+    table, same "history lives in the audit log, not on the live row"
+    design T58's edge revert already established.
+
+    Bounded on purpose: this restores content and review-state (value,
+    status), not the full prior verification provenance (who verified
+    it, when, under what threshold) — that stays in the audit log to
+    consult, it isn't auto-resurrected. One level of undo, not a stack —
+    reverting a batch twice is a no-op the second time (nothing left at
+    'in_review' from this batch to distinguish from unrelated edits).
+    """
+    if actor_id is None:
+        raise ValueError("reverting a bulk edit requires an actor")
+
+    stmt = select(AuditLog).where(
+        AuditLog.actor_tenant_id == tenant_id,
+        AuditLog.action == "fact.bulk_edit",
+        AuditLog.details["batch_id"].astext == str(batch_id),
+    )
+    res = await db.execute(stmt)
+    log_entries = list(res.scalars().all())
+    if not log_entries:
+        raise HTTPException(status_code=404, detail="No bulk-edit batch found with this id")
+
+    fact_ids = [entry.resource_id for entry in log_entries]
+    facts_res = await db.execute(select(Fact).where(Fact.tenant_id == tenant_id, Fact.id.in_(fact_ids)))
+    facts_by_id = {f.id: f for f in facts_res.scalars().all()}
+
+    reverted = []
+    for entry in log_entries:
+        fact = facts_by_id.get(entry.resource_id)
+        if not fact:
+            continue
+        fact.value = entry.details["previous_value"]
+        fact.status = entry.details["previous_status"]
+        reverted.append(str(fact.id))
+
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "fact.bulk_edit_revert",
+        resource_type="fact_batch", resource_id=batch_id,
+        details={"batch_id": str(batch_id), "reverted_count": len(reverted), "fact_ids": reverted},
+    )
+
+    return {"reverted_count": len(reverted), "fact_ids": reverted}
