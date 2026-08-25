@@ -1,0 +1,58 @@
+{{- if .Values.flower.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "veritasdocs.fullname" . }}-flower
+  labels:
+    {{- include "veritasdocs.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flower
+spec:
+  selector:
+    {{- include "veritasdocs.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: flower
+  ports:
+    - name: http
+      port: 5555
+      targetPort: 5555
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "veritasdocs.fullname" . }}-flower
+  labels:
+    {{- include "veritasdocs.labels" . | nindent 4 }}
+    app.kubernetes.io/component: flower
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "veritasdocs.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: flower
+  template:
+    metadata:
+      labels:
+        {{- include "veritasdocs.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: flower
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: flower
+          image: {{ include "veritasdocs.image" (dict "registry" .Values.image.registry "repository" .Values.image.backend.repository "tag" .Values.image.backend.tag) }}
+          imagePullPolicy: {{ .Values.image.backend.pullPolicy }}
+          command: ["celery", "-A", "app.tasks.worker.celery_app", "flower", "--port=5555"]
+          ports:
+            - containerPort: 5555
+          envFrom:
+            - configMapRef:
+                name: {{ include "veritasdocs.fullname" . }}-config
+          env:
+            {{- include "veritasdocs.appEnv" . | nindent 12 }}
+          resources:
+            {{- toYaml .Values.flower.resources | nindent 12 }}
+{{- end }}

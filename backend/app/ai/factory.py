@@ -1,4 +1,5 @@
 from app.config import settings
+from app.ai.airgapped import enforce_local
 from app.ai.base import LLMProvider, EmbeddingProvider, RerankerProvider, VLMProvider, Message
 from typing import List
 
@@ -54,6 +55,10 @@ def get_llm_provider() -> LLMProvider:
     primary: LLMProvider | None = None
     secondary: LLMProvider | None = None
 
+    # No local LLM provider exists yet (T90, not built) — groq/openai/anthropic
+    # are all external APIs, so air-gapped mode has nothing valid to select.
+    enforce_local('LLM', settings.ai_llm_provider)
+
     if settings.ai_llm_provider == 'groq':
         from app.ai.providers.groq_provider import GroqLLMProvider
         groq_keys = settings.get_groq_api_keys()
@@ -85,19 +90,22 @@ def get_embed_provider() -> EmbeddingProvider:
 
     primary_provider = None
     if settings.ai_embed_provider == 'openai':
+        enforce_local('embeddings', 'openai')
         from app.ai.providers.openai_provider import OpenAIEmbeddingProvider
         primary_provider = OpenAIEmbeddingProvider(
-            api_key=settings.openai_api_key, 
-            model=settings.openai_embed_model, 
+            api_key=settings.openai_api_key,
+            model=settings.openai_embed_model,
             dimensions=settings.openai_embed_dimensions
         )
     elif settings.ai_embed_provider == 'bgem3':
         from app.ai.providers.bgem3_provider import BGEM3EmbeddingProvider
         primary_provider = BGEM3EmbeddingProvider()
     elif settings.ai_embed_provider == 'gemini':
+        enforce_local('embeddings', 'gemini')
         from app.ai.providers.gemini_provider import GeminiEmbeddingProvider
         primary_provider = GeminiEmbeddingProvider(api_key=settings.google_api_key, model=settings.gemini_embed_model)
     elif settings.ai_embed_provider == 'cohere':
+        enforce_local('embeddings', 'cohere')
         from app.ai.providers.cohere_provider import CohereEmbeddingProvider
         primary_provider = CohereEmbeddingProvider(api_key=settings.cohere_api_key, model="embed-english-v3.0")
     else:
@@ -105,9 +113,11 @@ def get_embed_provider() -> EmbeddingProvider:
 
     fallback_provider = None
     if settings.ai_embed_fallback_provider == 'cohere':
+        enforce_local('embeddings fallback', 'cohere')
         from app.ai.providers.cohere_provider import CohereEmbeddingProvider
         fallback_provider = CohereEmbeddingProvider(api_key=settings.cohere_api_key, model="embed-english-v3.0")
     elif settings.ai_embed_fallback_provider == 'openai':
+        enforce_local('embeddings fallback', 'openai')
         from app.ai.providers.openai_provider import OpenAIEmbeddingProvider
         fallback_provider = OpenAIEmbeddingProvider(
             api_key=settings.openai_api_key,
@@ -125,6 +135,7 @@ def get_embed_provider() -> EmbeddingProvider:
 
 def _build_rerank_provider(name: str) -> RerankerProvider:
     if name == 'cohere':
+        enforce_local('reranker', 'cohere')
         from app.ai.providers.cohere_provider import CohereRerankerProvider
         return CohereRerankerProvider(api_key=settings.cohere_api_key, model=settings.cohere_rerank_model)
     elif name == 'bgem3':
@@ -146,7 +157,9 @@ def get_rerank_provider(override: str | None = None) -> RerankerProvider:
     """
     name = override or settings.ai_rerank_provider
     # Ensure local BGE cross-encoder is never loaded when Cohere API key is configured
-    if (name == 'bgem3' or not name) and settings.cohere_api_key:
+    # — except in air-gapped mode, where auto-upgrading to an external API is
+    # exactly the silent-fallback behavior T91 exists to prevent.
+    if (name == 'bgem3' or not name) and settings.cohere_api_key and not settings.air_gapped:
         name = 'cohere'
 
     if name not in _rerank_providers_by_name:
@@ -163,6 +176,7 @@ def get_vlm_provider() -> VLMProvider | None:
         return _vlm_provider
 
     if settings.ai_vlm_provider == 'gemini' and settings.google_api_key:
+        enforce_local('VLM', 'gemini')
         from app.ai.providers.gemini_provider import GeminiVLMProvider
         _vlm_provider = GeminiVLMProvider(api_key=settings.google_api_key, model=settings.gemini_vlm_model)
     else:

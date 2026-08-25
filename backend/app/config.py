@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     # would mean deleting and recreating a bucket that holds real data.
     s3_archive_bucket_name: str = 'docsearch-archive'
     
+    # T91 (partial) — fail-closed air-gapped toggle. When true, any AI/OCR
+    # provider that would reach an external API is refused at resolution
+    # time instead of silently calling out. Today this only genuinely gates
+    # embeddings (bgem3), reranking (bgem3) and OCR (pdfplumber), which
+    # already have local implementations — LLM and VLM have no local
+    # provider yet (T90, not built), so air-gapped mode fails closed on
+    # those rather than falsely claiming to serve them locally.
+    air_gapped: bool = False
+
     # AI Providers
     ai_llm_provider: Literal['openai', 'anthropic', 'groq'] = 'openai'
     ai_embed_provider: Literal['openai', 'bgem3', 'gemini', 'cohere'] = 'bgem3'

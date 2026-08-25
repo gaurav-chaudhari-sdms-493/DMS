@@ -1,0 +1,90 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "veritasdocs.fullname" . }}-postgres
+  labels:
+    {{- include "veritasdocs.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  annotations:
+    # Earlier than configmap/secret (-5) and the migration Job (0) — the
+    # migration Job needs Postgres to exist (not necessarily Ready yet;
+    # its own initContainer waits for that) before Helm's pre-install
+    # phase reaches it. Everything from here down (Service+StatefulSet)
+    # shares this hook so they're created together.
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+spec:
+  clusterIP: None
+  selector:
+    {{- include "veritasdocs.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "veritasdocs.fullname" . }}-postgres
+  labels:
+    {{- include "veritasdocs.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-10"
+spec:
+  serviceName: {{ include "veritasdocs.fullname" . }}-postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "veritasdocs.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: postgres
+  template:
+    metadata:
+      labels:
+        {{- include "veritasdocs.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: {{ .Values.postgres.image | quote }}
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: "veritasdocs"
+            - name: POSTGRES_DB
+              value: "veritasdocs"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "veritasdocs.fullname" . }}-secrets
+                  key: postgres-password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+              subPath: pgdata
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "veritasdocs", "-d", "veritasdocs"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "veritasdocs", "-d", "veritasdocs"]
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.postgres.resources | nindent 12 }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        {{- if .Values.global.storageClass }}
+        storageClassName: {{ .Values.global.storageClass | quote }}
+        {{- end }}
+        resources:
+          requests:
+            storage: {{ .Values.postgres.storageSize }}
