@@ -59,7 +59,13 @@ async def test_document_upload_disallowed_extension():
 
 @pytest.mark.asyncio
 async def test_document_bulk_upload_partial_failures():
-    """Verify bulk upload handles invalid files and reports failure metadata."""
+    """Verify bulk upload succeeds for allowed extensions and reports failure
+    metadata for unsupported ones, in the same batch.
+
+    .sh is a deliberately supported extension (app/config.py's
+    allowed_upload_extensions — plain-text extraction fallback, same as
+    .txt/.md), so it belongs on the succeeding side here, not the failing
+    side; .exe is never in that allowlist."""
     async with AsyncSessionLocal() as db:
         try:
             tenant_id = uuid.uuid4()
@@ -70,18 +76,19 @@ async def test_document_bulk_upload_partial_failures():
             await db.commit()
 
             files = [
-                UploadFile(filename="script.sh", file=BytesIO(b"#!/bin/bash\nrm -rf /")),
+                UploadFile(filename="script.sh", file=BytesIO(b"#!/bin/bash\necho hello")),
                 UploadFile(filename="virus.exe", file=BytesIO(b"malware")),
             ]
 
             resp = await upload_documents_bulk(files, tenant_id, user_id, db)
             assert resp.total == 2
-            assert resp.failed == 2
-            assert len(resp.failures) == 2
-            assert resp.failures[0]["filename"] == "script.sh"
+            assert resp.succeeded == 1
+            assert resp.failed == 1
+            assert len(resp.documents) == 1
+            assert resp.documents[0].title == "script.sh"
+            assert len(resp.failures) == 1
+            assert resp.failures[0]["filename"] == "virus.exe"
             assert "not supported" in resp.failures[0]["error"]
-            assert resp.failures[1]["filename"] == "virus.exe"
-            assert "not supported" in resp.failures[1]["error"]
         finally:
             await db.rollback()
             await db.close()
