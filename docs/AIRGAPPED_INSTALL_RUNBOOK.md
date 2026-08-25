@@ -13,7 +13,7 @@ This runbook installs VeritasDocs on Kubernetes using the chart at
 
 Section 11 of `build_design.txt` describes a fully local install: a local
 VLM (Qwen2.5-VL-7B) and local OCR (PaddleOCR/Surya/Docling) instead of
-cloud APIs, a fail-closed toggle, and an egress-zero CI check (backlog
+cloud APIs, a fail-closed toggle, and an egress-zero check (backlog
 T90/T91/T92). **Only part of that exists in this codebase right now:**
 
 | Surface | Local implementation? | Under `AIR_GAPPED=true` |
@@ -28,9 +28,19 @@ This chart and its `values-airgapped.yaml` profile deploy a fail-closed
 install that is honest about that gap: it will not silently call an
 external LLM/VLM API, but it also cannot serve chat, search-answer
 generation, or VLM extraction fully offline until backlog **T90** (a real
-local Qwen2.5-VL/PaddleOCR provider) is built. There is also no CI
-egress-zero check yet (**T92**) — this runbook's step 7 is a manual,
-one-time version of that check, not a substitute for it.
+local Qwen2.5-VL/PaddleOCR provider) is built.
+
+**T92** (egress-zero verification) is now partially built: `app/ai/egress_guard.py`
+patches httpx's transport when `AIR_GAPPED=true`, blocking any outbound
+request to the six known external AI provider hosts at the network layer
+— independent of, and in addition to, `enforce_local()`'s factory-level
+check. It's covered by `backend/tests/test_egress_guard.py`, which runs
+in CI on every push (`pytest tests/` in `.github/workflows/ci.yml`) —
+that's the "CI coverage" half of T92's backlog line. What's still missing
+is the *full* T92 scope build_design.txt describes: proving the complete
+pipeline (ingest, check, search) runs entirely offline, which needs T90
+to exist first. Step 7 below is a live, one-time check of both guard
+layers on your actual install, not a substitute for automated coverage.
 
 If your install must serve LLM/VLM features fully offline today, stop
 here and treat T90 as a blocking prerequisite, not this runbook.
@@ -187,12 +197,13 @@ kubectl -n veritasdocs exec -it deploy/veritasdocs-backend -- python -c \
   "import asyncio; from app.services.storage_service import ensure_archive_bucket_exists; asyncio.run(ensure_archive_bucket_exists())"
 ```
 
-## 6. Air-gapped profile: confirm the fail-closed toggle is actually live
+## 6. Air-gapped profile: confirm both fail-closed layers are actually live
 
-This is the manual equivalent of the still-unbuilt T92 egress-zero CI
-check — run it once after every air-gapped install:
+`test_egress_guard.py` covers this in CI, but run it once live on your
+actual install too, since CI can't see your real `AIR_GAPPED` env value:
 
 ```bash
+# Layer 1 — factory-level: refuses before any client is even constructed
 kubectl -n veritasdocs exec -it deploy/veritasdocs-backend -- python -c "
 from app.ai.factory import get_llm_provider
 try:
@@ -200,6 +211,21 @@ try:
     print('FAIL: no exception raised — an external LLM call would have gone through')
 except Exception as e:
     print(f'OK — refused: {e}')
+"
+
+# Layer 2 — network-level (T92): blocks the actual outbound request even
+# if something bypassed layer 1. Should return in milliseconds, not
+# time out — a real network attempt would take much longer or hang.
+kubectl -n veritasdocs exec -it deploy/veritasdocs-backend -- python -c "
+import time, httpx
+from app.ai.airgapped import AirGappedViolation  # triggers the guard install on import
+from app.ai.egress_guard import EgressBlockedError
+start = time.monotonic()
+try:
+    httpx.get('https://api.openai.com/v1/models', timeout=5)
+    print('FAIL: request was not blocked')
+except EgressBlockedError as e:
+    print(f'OK — blocked in {(time.monotonic()-start)*1000:.1f}ms: {e}')
 "
 ```
 

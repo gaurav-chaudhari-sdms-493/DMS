@@ -1,8 +1,18 @@
 from app.config import settings
+from app.ai.egress_guard import install_egress_guard
 
 
 class AirGappedViolation(RuntimeError):
     """Raised when AIR_GAPPED=true and a call site would otherwise reach an external API."""
+
+
+# T92 — install the network-level guard as a side effect of importing this
+# module. Both the API process (main.py) and the Celery worker
+# (tasks/worker.py) import through app/ai/factory.py and app/ocr/factory.py,
+# which both import this module — so this runs in both processes without
+# needing separate startup wiring in each. No-op when air_gapped is False.
+if settings.air_gapped:
+    install_egress_guard()
 
 
 def enforce_local(surface: str, provider_name: str) -> None:
