@@ -214,23 +214,17 @@ async def get_adjudication_queue(
     prompt now sets per field (and mark_fact_handwritten lets an operator
     correct after the fact). 'marginalia' filters on the field_name
     sentinel T30's extraction path writes handwritten notes under
-    ("_marginalia") — same Fact+FactRegion shape as every other queue
-    item, not a separate data source. 'join_mismatch' still isn't backed
-    by anything (it would come from Handler 1/T26's spread-join, which
-    isn't wired into extraction — T22's own documented gap, blocked on
-    A1) — requesting it raises rather than silently returning an
-    always-empty queue that looks like "nothing to review" instead of
-    "not built yet".
+    ("_marginalia"). 'join_mismatch' filters on the field_name sentinel
+    T26's spread-join path (_extract_spread_facts) writes a page pair
+    under when it can't match serials across the two halves
+    ("_join_mismatch") — same reused-Fact+FactRegion shape as every
+    other queue item, not a separate data source, and same caveat as
+    the extraction path itself: the left/right layout convention it's
+    built against is invented, not modeled on a real scanned spread.
     """
-    valid_categories = {"low_confidence", "handwritten", "marginalia"}
-    not_yet_available = {"join_mismatch"}
-    if category in not_yet_available:
-        raise HTTPException(
-            status_code=501,
-            detail=f"'{category}' queue category has no data source yet — spread-join wiring (T26 handler integration) isn't built",
-        )
+    valid_categories = {"low_confidence", "handwritten", "marginalia", "join_mismatch"}
     if category not in valid_categories:
-        raise HTTPException(status_code=400, detail=f"Unknown category '{category}'. Valid: {sorted(valid_categories | not_yet_available)}")
+        raise HTTPException(status_code=400, detail=f"Unknown category '{category}'. Valid: {sorted(valid_categories)}")
 
     conditions = [Fact.tenant_id == tenant_id, Fact.status == "in_review"]
     if category == "handwritten":
@@ -238,6 +232,8 @@ async def get_adjudication_queue(
         conditions.append(Fact.field_name != "_marginalia")
     elif category == "marginalia":
         conditions.append(Fact.field_name == "_marginalia")
+    elif category == "join_mismatch":
+        conditions.append(Fact.field_name == "_join_mismatch")
 
     from sqlalchemy import func
     count_res = await db.execute(select(func.count(Fact.id)).where(*conditions))

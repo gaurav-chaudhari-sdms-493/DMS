@@ -29,15 +29,18 @@ interface QueueFact {
   claimed_by_actor_id: string | null;
 }
 
-type Category = "low_confidence" | "handwritten" | "marginalia";
+type Category = "low_confidence" | "handwritten" | "marginalia" | "join_mismatch";
 
-const CATEGORY_TABS: { key: Category | "join_mismatch"; label: string; available: boolean }[] = [
+const CATEGORY_TABS: { key: Category; label: string; available: boolean }[] = [
   { key: "low_confidence", label: "Low Confidence", available: true },
   { key: "handwritten", label: "Handwritten", available: true },
   // T30 — marginalia now has a real capture path (VLM extraction writes
   // "_marginalia"-sentinel Facts for handwritten notes outside any field).
   { key: "marginalia", label: "Marginalia", available: true },
-  { key: "join_mismatch", label: "Join Mismatches", available: false },
+  // T26 — spread-join wiring; the left/right layout convention it reads
+  // is a best-effort guess, not modeled on a real scanned spread (no
+  // reference corpus yet, T25 stays blocked on A1).
+  { key: "join_mismatch", label: "Join Mismatches", available: true },
 ];
 
 function formatValue(value: any): string {

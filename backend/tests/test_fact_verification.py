@@ -267,13 +267,28 @@ async def test_adjudication_queue_marginalia_and_handwritten_are_disjoint():
 
 
 @pytest.mark.asyncio
-async def test_adjudication_queue_join_mismatch_still_501():
+async def test_adjudication_queue_join_mismatch_filters_on_sentinel_field():
+    """T26 — a '_join_mismatch' fact (written by the spread-join path
+    when it can't match serials across a page pair) only shows up under
+    'join_mismatch', never 'low_confidence' or 'marginalia'."""
     async with AsyncSessionLocal() as db:
         try:
             tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
-            with pytest.raises(HTTPException) as exc_info:
-                await get_adjudication_queue(db, tenant_id, category="join_mismatch")
-            assert exc_info.value.status_code == 501
+            mismatch_fact = Fact(
+                id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc_id, version_id=version_id,
+                field_name="_join_mismatch",
+                value={"reason": "left/right disagree on serials", "left_page": 3, "right_page": 4},
+                confidence=None, status="in_review", is_handwritten=False,
+            )
+            db.add(mismatch_fact)
+            await db.flush()
+
+            queue = await get_adjudication_queue(db, tenant_id, category="join_mismatch")
+            assert queue["total"] == 1
+            assert queue["facts"][0]["fact_id"] == str(mismatch_fact.id)
+
+            marginalia_queue = await get_adjudication_queue(db, tenant_id, category="marginalia")
+            assert str(mismatch_fact.id) not in {f["fact_id"] for f in marginalia_queue["facts"]}
         finally:
             await db.rollback()
             await db.close()

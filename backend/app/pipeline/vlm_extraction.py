@@ -9,12 +9,16 @@ result through the four record handlers (T26-T29) where the template says
 to, and writes one Fact + FactRegion per field per row so every value is
 click-through-able back to the exact spot it was read from (T06 contract).
 
-Two things this deliberately does NOT do yet:
-  - Two-page spread joins (Handler 1, T26). Pairing "left half / right half"
-    pages is genuinely template-specific (which pages are a spread, and in
-    what order) and no seeded template declares it yet (T25 is blocked on
-    A1 — no real reference corpus to model one on). join_spread() is wired
-    up and ready; nothing calls it until a template opts in.
+Two-page spread joins (Handler 1, T26 — a register entry split across
+facing pages, matched by serial number via join_spread()) are wired via
+Template.layout == "spread" and _extract_spread_facts(). The left/right
+field convention it reads is a best-effort invention, not modeled on a
+real scanned spread — no seeded template exists yet (T25 stays blocked
+on A1, no reference corpus) — flagged for revalidation once one is
+available, not a confirmed real-world shape. A page pair that can't be
+matched by serial writes a field_name="_join_mismatch" Fact for a human
+to look at, same reused-facts pattern T30 used for marginalia.
+
 Document classification (T23) is now a separate stage
 (app/services/classification_service.py) that runs unconditionally at
 ingest and persists its result on the document, rather than the ad-hoc
@@ -164,6 +168,149 @@ async def _get_or_create_page(
     return page
 
 
+async def _extract_spread_facts(
+    db: AsyncSession, tenant_id: UUID, document_id: UUID, version_id: UUID,
+    file_bytes: bytes, ext: str, vlm, field_schema: List[dict], max_pages: int,
+) -> int:
+    """T26 — join_spread() wiring: a spread-layout register's entry runs
+    across two facing pages, matched and merged by serial number.
+
+    The left/right convention this reads from field_schema (a field's
+    "half": "left"|"right" key; the role:"serial" field is asked on both
+    sides, since join_spread() matches on it) is an invented mechanism,
+    not modeled on a real scanned spread — no seeded template exists yet
+    (T25 stays blocked on A1, no reference corpus). Treat this as a
+    best-effort capability to revalidate against real layouts once one
+    is available, not a confirmed real-world shape.
+
+    Deliberately does not run continuation-merge, ditto-chain, or
+    blob-cell parsing on top of this — stacking those handlers on an
+    unvalidated layout guess would compound one speculative assumption
+    on another. A page-pair a template can't match by serial number
+    writes a Fact+FactRegion under the field_name="_join_mismatch"
+    sentinel (same reused-facts pattern T30 used for marginalia),
+    anchored to the left page's full extent — there's no finer-grained
+    region for a whole-pair structural mismatch.
+    """
+    from app.pipeline.handlers.spread_join import join_spread
+
+    serial_field = _find_role_field(field_schema, "serial")
+    if not serial_field:
+        logger.warning("T26 spread template has no role:'serial' field — cannot pair pages by serial, skipping")
+        return 0
+
+    left_fields = [f for f in field_schema if f.get("half") == "left" or f["name"] == serial_field]
+    right_fields = [f for f in field_schema if f.get("half") == "right" or f["name"] == serial_field]
+    left_prompt = _build_extraction_prompt(left_fields)
+    right_prompt = _build_extraction_prompt(right_fields)
+
+    def _to_plain(rows: List[dict]) -> List[dict]:
+        plain = []
+        for row in rows:
+            p = {k: (v.get("value") if isinstance(v, dict) else v) for k, v in row.items()}
+            p["no"] = p.pop(serial_field, None)
+            plain.append(p)
+        return plain
+
+    facts_written = 0
+
+    for left_page_number in range(1, max_pages, 2):
+        right_page_number = left_page_number + 1
+        if right_page_number > max_pages:
+            logger.warning(f"T26 spread template: page {left_page_number} has no matching right-hand page, skipping")
+            break
+
+        try:
+            if ext == "pdf":
+                left_rendered = _render_pdf_page_png(file_bytes, left_page_number)
+                right_rendered = _render_pdf_page_png(file_bytes, right_page_number)
+            else:
+                # A standalone image is one page — a spread needs two, so
+                # there's nothing to pair for a non-PDF upload.
+                left_rendered = right_rendered = None
+            if left_rendered is None or right_rendered is None:
+                continue
+            left_png, left_w, left_h, left_rot = left_rendered
+            right_png, right_w, right_h, right_rot = right_rendered
+
+            left_raw = await vlm.extract_structured(left_png, left_prompt)
+            right_raw = await vlm.extract_structured(right_png, right_prompt)
+            left_rows, _ = _parse_vlm_response(left_raw)
+            right_rows, _ = _parse_vlm_response(right_raw)
+            if not left_rows or not right_rows:
+                continue
+
+            left_plain = _to_plain(left_rows)
+            right_plain = _to_plain(right_rows)
+            left_by_serial_raw = {p["no"]: raw for p, raw in zip(left_plain, left_rows) if p.get("no") not in (None, "")}
+            right_by_serial_raw = {p["no"]: raw for p, raw in zip(right_plain, right_rows) if p.get("no") not in (None, "")}
+
+            result = join_spread(left_plain, right_plain)
+
+            left_page = await _get_or_create_page(db, tenant_id, document_id, version_id, left_page_number, left_w, left_h, left_rot)
+
+            if result.status == "needs_review":
+                fact = Fact(
+                    tenant_id=tenant_id, document_id=document_id, version_id=version_id,
+                    field_name="_join_mismatch",
+                    value={"reason": result.reason, "left_page": left_page_number, "right_page": right_page_number},
+                    confidence=None, is_handwritten=False, status="in_review",
+                )
+                db.add(fact)
+                await db.flush()
+                db.add(FactRegion(tenant_id=tenant_id, fact_id=fact.id, page_id=left_page.id, x0=0.0, y0=0.0, x1=1.0, y1=1.0))
+                facts_written += 1
+                continue
+
+            right_page = await _get_or_create_page(db, tenant_id, document_id, version_id, right_page_number, right_w, right_h, right_rot)
+
+            for merged_row in result.rows:
+                serial = merged_row.get("no")
+                for field_def in field_schema:
+                    field_name = field_def["name"]
+                    if field_name == serial_field:
+                        continue
+                    value = merged_row.get(field_name)
+                    if value is None or value == "":
+                        continue
+
+                    half = field_def.get("half")
+                    raw_row = (left_by_serial_raw if half == "left" else right_by_serial_raw).get(serial)
+                    if raw_row is None:
+                        continue
+                    src_field = raw_row.get(field_name)
+                    if not isinstance(src_field, dict) or not src_field.get("bbox"):
+                        continue
+
+                    src_confidence = src_field.get("confidence")
+                    src_confidence = float(src_confidence) if src_confidence is not None else None
+                    src_is_handwritten = bool(src_field.get("is_handwritten"))
+
+                    fact = Fact(
+                        tenant_id=tenant_id, document_id=document_id, version_id=version_id,
+                        field_name=field_name,
+                        value=value if isinstance(value, (dict, list)) else {"v": value},
+                        confidence=src_confidence,
+                        is_handwritten=src_is_handwritten,
+                        status=classify_confidence(field_def, src_confidence, is_handwritten=src_is_handwritten),
+                    )
+                    db.add(fact)
+                    await db.flush()
+                    x0, y0, x1, y1 = src_field["bbox"]
+                    db.add(FactRegion(
+                        tenant_id=tenant_id, fact_id=fact.id,
+                        page_id=(left_page if half == "left" else right_page).id,
+                        x0=float(x0), y0=float(y0), x1=float(x1), y1=float(y1),
+                    ))
+                    facts_written += 1
+
+        except Exception as e:
+            logger.warning(f"T26 spread extraction failed on pages {left_page_number}-{right_page_number}: {e}")
+            continue
+
+    return facts_written
+
+
 async def extract_facts_for_document(
     db: AsyncSession,
     tenant_id: UUID,
@@ -186,13 +333,17 @@ async def extract_facts_for_document(
         return 0
 
     field_schema = template.field_schema
+    max_pages = min(len(pages_text), settings.vlm_max_pages_per_document)
+
+    if template.layout == "spread":
+        return await _extract_spread_facts(db, tenant_id, document_id, version_id, file_bytes, ext, vlm, field_schema, max_pages)
+
     prompt = _build_extraction_prompt(field_schema)
     serial_field = _find_role_field(field_schema, "serial")
     continuation_text_fields = [f["name"] for f in field_schema if f.get("role") == "continuation_text"]
     ditto_fields = [f["name"] for f in field_schema if f.get("ditto_eligible")]
     blob_fields = [f["name"] for f in field_schema if f.get("type") == "blob"]
 
-    max_pages = min(len(pages_text), settings.vlm_max_pages_per_document)
     facts_written = 0
 
     for page_number in range(1, max_pages + 1):
