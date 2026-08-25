@@ -20,15 +20,17 @@ T90/T91/T92). **Only part of that exists in this codebase right now:**
 |---|---|---|
 | Embeddings | Yes — `bgem3` (in-process `sentence_transformers`) | Works |
 | Reranking | Yes — `bgem3` cross-encoder | Works |
-| OCR | Yes — `pdfplumber` | Works |
+| OCR | Yes — `pdfplumber`, and now `paddleocr` (T90) with real Devanagari/Marathi support | Works |
 | LLM (chat, search answers) | **No** — only Groq/OpenAI/Anthropic exist | Refuses to start (`AirGappedViolation`) |
-| VLM (document field extraction) | **No** — only Gemini exists | Refuses to start (`AirGappedViolation`) |
+| VLM (document field extraction) | **No** — only Gemini exists; `QwenVLMProvider` exists as unverified scaffolding (no GPU to validate it), not wired into the active config | Refuses to start (`AirGappedViolation`) |
 
 This chart and its `values-airgapped.yaml` profile deploy a fail-closed
 install that is honest about that gap: it will not silently call an
-external LLM/VLM API, but it also cannot serve chat, search-answer
-generation, or VLM extraction fully offline until backlog **T90** (a real
-local Qwen2.5-VL/PaddleOCR provider) is built.
+external LLM/VLM API, but it also cannot serve chat or search-answer
+generation fully offline, and cannot run VLM-based document field
+extraction (as opposed to plain OCR text extraction, which now works
+locally via `paddleocr`) until backlog **T90**'s VLM half — a real,
+GPU-verified local Qwen2.5-VL provider — is finished.
 
 **T92** (egress-zero verification) is now partially built: `app/ai/egress_guard.py`
 patches httpx's transport when `AIR_GAPPED=true`, blocking any outbound
@@ -38,12 +40,17 @@ check. It's covered by `backend/tests/test_egress_guard.py`, which runs
 in CI on every push (`pytest tests/` in `.github/workflows/ci.yml`) —
 that's the "CI coverage" half of T92's backlog line. What's still missing
 is the *full* T92 scope build_design.txt describes: proving the complete
-pipeline (ingest, check, search) runs entirely offline, which needs T90
-to exist first. Step 7 below is a live, one-time check of both guard
-layers on your actual install, not a substitute for automated coverage.
+pipeline (ingest, check, search) runs entirely offline, which needs
+T90's VLM half to exist. Ingestion + search *can* now run fully offline
+for OCR-only extraction (no VLM field extraction) — see step 6a below.
+Step 7 below is a live, one-time check of both guard layers on your
+actual install, not a substitute for automated coverage.
 
-If your install must serve LLM/VLM features fully offline today, stop
-here and treat T90 as a blocking prerequisite, not this runbook.
+If your install must serve chat, search-answer generation, or VLM-based
+field extraction fully offline today, stop here and treat T90's VLM half
+as a blocking prerequisite. If you only need OCR text extraction, plain
+embedding-based search, and reranking offline, this runbook already
+covers you — set `AI_OCR_PROVIDER=paddleocr` (see `values-airgapped.yaml`).
 
 ## 0. Prerequisites
 

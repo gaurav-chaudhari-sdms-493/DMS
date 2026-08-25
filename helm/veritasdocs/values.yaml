@@ -3,14 +3,16 @@
 #   helm install veritasdocs ./helm/veritasdocs -f values-airgapped.yaml
 #
 # SCOPE NOTE (T93): this chart deploys the full stack air-gapped-capable
-# for embeddings (bgem3) and OCR (pdfplumber), which already run as local
-# models. It cannot yet deploy a working *air-gapped* LLM or VLM path —
-# no local provider for those exists in this codebase (backlog T90).
-# With airGapped.enabled=true the backend/worker refuse to start any call
-# that would reach an external LLM/VLM API rather than silently calling
-# out; see backend/app/ai/airgapped.py. Closing that gap for real requires
-# T90 (a local Qwen2.5-VL / PaddleOCR provider), which is a separate,
-# large (Size L) backlog item.
+# for embeddings (bgem3), reranking (bgem3) and OCR (pdfplumber or
+# paddleocr — paddleocr has real Devanagari/Marathi support, T90), all of
+# which run as genuinely local models. It cannot yet deploy a working
+# *air-gapped* LLM or VLM path — no local provider for those exists in
+# this codebase (T90's VLM half is unverified scaffolding, no GPU
+# available to validate it). With airGapped.enabled=true the
+# backend/worker refuse to start any call that would reach an external
+# LLM/VLM API rather than silently calling out; see
+# backend/app/ai/airgapped.py. Closing that gap for real requires a
+# GPU-verified local Qwen2.5-VL provider — separate follow-up work.
 
 global:
   storageClass: ""   # "" = cluster default StorageClass

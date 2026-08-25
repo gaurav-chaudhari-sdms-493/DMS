@@ -4,8 +4,10 @@
 #     --set secrets.jwtSecretKey=... --set secrets.postgresPassword=... --set secrets.redisPassword=...
 #
 # See the SCOPE NOTE at the top of values.yaml: this profile is honest
-# about what actually runs local-only today (embeddings, OCR) versus what
-# is refused rather than faked (LLM, VLM — blocked on backlog T90).
+# about what actually runs local-only today (embeddings, reranking, and
+# now real Devanagari-capable OCR via paddleocr — T90) versus what is
+# refused rather than faked (LLM, VLM field extraction — T90's VLM half
+# is unverified scaffolding pending GPU hardware, not wired in).
 
 airGapped:
   enabled: true
@@ -20,8 +22,11 @@ app:
     embedProvider: bgem3       # local — actually works air-gapped today
     embedFallbackProvider: none
     rerankProvider: bgem3      # local — actually works air-gapped today
-    ocrProvider: pdfplumber    # local — actually works air-gapped today
-    vlmProvider: gemini        # documentation only; refused at call time (T90)
+    ocrProvider: paddleocr     # local — real Devanagari/Marathi support (T90),
+                                # live-verified through the real ingestion pipeline.
+                                # pdfplumber (with its Tesseract fallback) also
+                                # works air-gapped if you prefer it instead.
+    vlmProvider: gemini        # documentation only; refused at call time (T90 VLM half)
 
 secrets:
   # No external AI keys needed for the local-only surfaces (embed/rerank/OCR).
