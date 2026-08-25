@@ -47,3 +47,10 @@ pytest-cov==5.0.0
 
 # SFTP connector
 paramiko>=3.4.0
+
+# T90 — local OCR provider, genuine Devanagari/Marathi support (Apache-2.0,
+# no legal-review gate unlike Surya/D-6). Requires libgl1/libglib2.0-0 at
+# the OS level (see Dockerfile) — opencv-python, a paddlex dependency,
+# needs libGL.so.1 even for headless CPU inference.
+paddleocr==3.7.0
+paddlepaddle==3.3.1

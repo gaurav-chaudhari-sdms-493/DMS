@@ -175,7 +175,15 @@ def get_rerank_provider(override: str | None = None) -> RerankerProvider:
 def get_vlm_provider() -> VLMProvider | None:
     """T22 — returns None (not an error) when VLM extraction is disabled or
     unconfigured, since it's an optional enrichment step on top of chunk
-    indexing, not something ingestion should ever fail over."""
+    indexing, not something ingestion should ever fail over.
+
+    T90 note: app/ai/providers/qwen_vlm_provider.py (QwenVLMProvider)
+    exists as an UNTESTED/UNVERIFIED local-VLM scaffold — deliberately
+    NOT wired in here as a selectable ai_vlm_provider value, since no GPU
+    was available to actually validate it (see the class's own docstring
+    for why). Wiring it in is real follow-up work, not a config flip,
+    once someone with GPU hardware has run and verified it.
+    """
     global _vlm_provider
     if _vlm_provider is not False:
         return _vlm_provider
