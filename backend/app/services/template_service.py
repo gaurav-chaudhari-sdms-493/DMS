@@ -13,15 +13,22 @@ from app.models.template import Template
 DEFAULT_CONFIDENCE_BANDS = {"auto_commit": 0.85, "review_floor": 0.5}
 
 
-def classify_confidence(field_def: Dict[str, Any], confidence: Optional[float]) -> str:
+def classify_confidence(field_def: Dict[str, Any], confidence: Optional[float], is_handwritten: bool = False) -> str:
     """D-5 — apply one field's confidence_bands (or the conservative global
     default) to a reported confidence score. Returns 'machine' or
     'in_review' — never 'verified', which only the human promotion step
-    (T51, not yet built) may write.
+    (T51) may write.
 
     No reported confidence at all is treated as the lowest-trust case:
     'in_review', not an auto-commit by default.
+
+    T30 — a handwritten field never auto-commits, no matter how confident
+    the model is: "never verified without a human" starts at extraction,
+    not just at the confirm step (T55 already enforces the other half —
+    bulk_confirm_facts refuses to promote one to 'verified').
     """
+    if is_handwritten:
+        return "in_review"
     if confidence is None:
         return "in_review"
 

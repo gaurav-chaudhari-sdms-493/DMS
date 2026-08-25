@@ -8,7 +8,7 @@ from app.models.folder import Folder
 from app.models.document import Document
 from app.models.document_version import DocumentVersion
 from app.models.fact import Fact
-from app.services.fact_verification_service import confirm_fact, bulk_confirm_facts
+from app.services.fact_verification_service import confirm_fact, bulk_confirm_facts, mark_fact_handwritten, get_adjudication_queue
 from app.services.corpus_calibration_service import calibrate_corpus
 
 
@@ -171,6 +171,106 @@ async def test_bulk_confirm_never_promotes_handwritten_facts():
             await db.refresh(typed_fact)
             assert handwritten_fact.status == "in_review"  # untouched
             assert typed_fact.status == "verified"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_mark_fact_handwritten_requires_actor():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="machine")
+            db.add(fact)
+            await db.flush()
+
+            with pytest.raises(ValueError):
+                await mark_fact_handwritten(db, tenant_id, fact.id, None)
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_mark_fact_handwritten_demotes_machine_to_in_review():
+    """T30 — operator capture: a machine-committed fact discovered to be
+    handwritten can't stay in an auto-committed, never-reviewed state."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="machine", is_handwritten=False)
+            db.add(fact)
+            await db.flush()
+
+            updated = await mark_fact_handwritten(db, tenant_id, fact.id, actor_id)
+            assert updated.is_handwritten is True
+            assert updated.status == "in_review"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_mark_fact_handwritten_leaves_verified_facts_verified():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id, status="verified", is_handwritten=False)
+            db.add(fact)
+            await db.flush()
+
+            updated = await mark_fact_handwritten(db, tenant_id, fact.id, actor_id)
+            assert updated.is_handwritten is True
+            assert updated.status == "verified"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_adjudication_queue_marginalia_and_handwritten_are_disjoint():
+    """T30 — a '_marginalia' fact only shows up under 'marginalia', never
+    'handwritten', even though it's always is_handwritten=True."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            handwritten_field = Fact(
+                id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc_id, version_id=version_id,
+                field_name="owner_name", value={"v": "Illegible"}, confidence=0.6,
+                status="in_review", is_handwritten=True,
+            )
+            marginalia_note = Fact(
+                id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc_id, version_id=version_id,
+                field_name="_marginalia", value={"v": "disputed boundary"}, confidence=None,
+                status="in_review", is_handwritten=True,
+            )
+            db.add_all([handwritten_field, marginalia_note])
+            await db.flush()
+
+            handwritten_queue = await get_adjudication_queue(db, tenant_id, category="handwritten")
+            marginalia_queue = await get_adjudication_queue(db, tenant_id, category="marginalia")
+
+            handwritten_ids = {f["fact_id"] for f in handwritten_queue["facts"]}
+            marginalia_ids = {f["fact_id"] for f in marginalia_queue["facts"]}
+
+            assert str(handwritten_field.id) in handwritten_ids
+            assert str(marginalia_note.id) not in handwritten_ids
+            assert str(marginalia_note.id) in marginalia_ids
+            assert str(handwritten_field.id) not in marginalia_ids
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_adjudication_queue_join_mismatch_still_501():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            with pytest.raises(HTTPException) as exc_info:
+                await get_adjudication_queue(db, tenant_id, category="join_mismatch")
+            assert exc_info.value.status_code == 501
         finally:
             await db.rollback()
             await db.close()

@@ -10,6 +10,7 @@ import {
   Unlock,
   AlertCircle,
   Keyboard,
+  PenLine,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -25,12 +26,14 @@ interface QueueFact {
   claimed_by_actor_id: string | null;
 }
 
-type Category = "low_confidence" | "handwritten";
+type Category = "low_confidence" | "handwritten" | "marginalia";
 
-const CATEGORY_TABS: { key: Category | "marginalia" | "join_mismatch"; label: string; available: boolean }[] = [
+const CATEGORY_TABS: { key: Category | "join_mismatch"; label: string; available: boolean }[] = [
   { key: "low_confidence", label: "Low Confidence", available: true },
   { key: "handwritten", label: "Handwritten", available: true },
-  { key: "marginalia", label: "Marginalia", available: false },
+  // T30 — marginalia now has a real capture path (VLM extraction writes
+  // "_marginalia"-sentinel Facts for handwritten notes outside any field).
+  { key: "marginalia", label: "Marginalia", available: true },
   { key: "join_mismatch", label: "Join Mismatches", available: false },
 ];
 
@@ -77,7 +80,7 @@ export default function WorkbenchPage() {
 
   const selected = facts[selectedIndex] || null;
 
-  const doAction = async (action: "claim" | "release" | "confirm") => {
+  const doAction = async (action: "claim" | "release" | "confirm" | "mark_handwritten") => {
     if (!selected) return;
     setActionLoading(true);
     setError("");
@@ -89,9 +92,13 @@ export default function WorkbenchPage() {
         await api.facts.confirm(selected.fact_id);
         setNotice(`Confirmed "${selected.field_name}" — removed from queue.`);
       }
+      if (action === "mark_handwritten") {
+        await api.facts.markHandwritten(selected.fact_id);
+        setNotice(`Marked "${selected.field_name}" as handwritten — moved to the Handwritten queue.`);
+      }
       await loadQueue(category);
     } catch (e: any) {
-      setError(e?.message || `Failed to ${action} this fact`);
+      setError(e?.message || `Failed to ${action.replace("_", " ")} this fact`);
     } finally {
       setActionLoading(false);
     }
@@ -118,6 +125,8 @@ export default function WorkbenchPage() {
         doAction("release");
       } else if (e.key === "Enter" || e.key === "a" || e.key === "A") {
         doAction("confirm");
+      } else if (e.key === "h" || e.key === "H") {
+        doAction("mark_handwritten");
       }
     };
     window.addEventListener("keydown", handler);
@@ -163,7 +172,7 @@ export default function WorkbenchPage() {
         </div>
         <div className="flex items-center gap-1.5 text-xs text-[#747775]">
           <Keyboard className="w-4 h-4" />
-          <span>&uarr;/&darr; navigate &middot; C claim &middot; R release &middot; Enter/A confirm</span>
+          <span>&uarr;/&darr; navigate &middot; C claim &middot; R release &middot; Enter/A confirm &middot; H mark handwritten</span>
         </div>
       </header>
 
@@ -263,7 +272,7 @@ export default function WorkbenchPage() {
                     Handwritten source — T55 rule: cannot be bulk-confirmed
                   </div>
                 )}
-                <div className="flex gap-2 pt-2">
+                <div className="flex flex-wrap gap-2 pt-2">
                   <Button size="sm" variant="secondary" loading={actionLoading} onClick={() => doAction(selected.claimed_by_actor_id ? "release" : "claim")}>
                     {selected.claimed_by_actor_id ? <Unlock className="w-3.5 h-3.5 mr-1.5" /> : <Lock className="w-3.5 h-3.5 mr-1.5" />}
                     {selected.claimed_by_actor_id ? "Release" : "Claim"}
@@ -272,6 +281,12 @@ export default function WorkbenchPage() {
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                     Confirm
                   </Button>
+                  {!selected.is_handwritten && (
+                    <Button size="sm" variant="secondary" loading={actionLoading} onClick={() => doAction("mark_handwritten")}>
+                      <PenLine className="w-3.5 h-3.5 mr-1.5" />
+                      Mark Handwritten
+                    </Button>
+                  )}
                 </div>
               </div>
             )}

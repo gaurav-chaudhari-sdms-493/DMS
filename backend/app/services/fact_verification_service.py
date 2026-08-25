@@ -94,6 +94,38 @@ async def confirm_fact(db: AsyncSession, tenant_id: UUID, fact_id: UUID, actor_i
     return fact
 
 
+async def mark_fact_handwritten(db: AsyncSession, tenant_id: UUID, fact_id: UUID, actor_id: UUID) -> Fact:
+    """T30 — operator capture: a human notices a value is handwritten even
+    though extraction didn't flag it (or the field predates T30's prompt
+    change). Demotes 'machine' to 'in_review' — a fact now known to be
+    handwritten cannot stay in an auto-committed, never-reviewed state,
+    which is the whole point of "never verified without a human."
+    'verified' stays 'verified': a person already looked at it and
+    confirmed it; this corrects the record, it doesn't reopen a decision
+    a human already made.
+    """
+    if actor_id is None:
+        raise ValueError("marking a fact handwritten requires an actor")
+
+    fact = await db.get(Fact, fact_id)
+    if not fact or fact.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Fact not found")
+
+    previous_status = fact.status
+    fact.is_handwritten = True
+    if fact.status == "machine":
+        fact.status = "in_review"
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "fact.mark_handwritten",
+        resource_type="fact", resource_id=fact.id,
+        details={"field_name": fact.field_name, "previous_status": previous_status, "new_status": fact.status},
+    )
+
+    return fact
+
+
 async def bulk_confirm_facts(
     db: AsyncSession,
     tenant_id: UUID,
@@ -176,24 +208,25 @@ async def bulk_confirm_facts(
 async def get_adjudication_queue(
     db: AsyncSession, tenant_id: UUID, category: str = "low_confidence", limit: int = 50, offset: int = 0,
 ) -> dict:
-    """T52 — adjudication queue. Only 'low_confidence' (any in_review
-    fact) is real today. 'handwritten' filters on is_handwritten, which
-    nothing sets yet (T30 isn't built) — included so the queue's shape is
-    ready the moment something does, not to claim it's populated now.
-    'marginalia' and 'join_mismatch' aren't backed by any data source yet
-    (marginalia has no capture path; join_mismatch would come from
-    Handler 1/T26's spread-join, which isn't wired into extraction yet
-    per T22's own documented gap) — requesting either raises rather than
-    silently returning an always-empty queue that looks like "nothing to
-    review" instead of "not built yet".
+    """T52 — adjudication queue. 'low_confidence' is any in_review fact.
+    'handwritten' filters on is_handwritten, which T30's VLM extraction
+    prompt now sets per field (and mark_fact_handwritten lets an operator
+    correct after the fact). 'marginalia' filters on the field_name
+    sentinel T30's extraction path writes handwritten notes under
+    ("_marginalia") — same Fact+FactRegion shape as every other queue
+    item, not a separate data source. 'join_mismatch' still isn't backed
+    by anything (it would come from Handler 1/T26's spread-join, which
+    isn't wired into extraction — T22's own documented gap, blocked on
+    A1) — requesting it raises rather than silently returning an
+    always-empty queue that looks like "nothing to review" instead of
+    "not built yet".
     """
-    valid_categories = {"low_confidence", "handwritten"}
-    not_yet_available = {"marginalia", "join_mismatch"}
+    valid_categories = {"low_confidence", "handwritten", "marginalia"}
+    not_yet_available = {"join_mismatch"}
     if category in not_yet_available:
         raise HTTPException(
             status_code=501,
-            detail=f"'{category}' queue category has no data source yet — "
-                   f"{'marginalia capture (T30)' if category == 'marginalia' else 'spread-join wiring (T26 handler integration)'} isn't built",
+            detail=f"'{category}' queue category has no data source yet — spread-join wiring (T26 handler integration) isn't built",
         )
     if category not in valid_categories:
         raise HTTPException(status_code=400, detail=f"Unknown category '{category}'. Valid: {sorted(valid_categories | not_yet_available)}")
@@ -201,6 +234,9 @@ async def get_adjudication_queue(
     conditions = [Fact.tenant_id == tenant_id, Fact.status == "in_review"]
     if category == "handwritten":
         conditions.append(Fact.is_handwritten == True)  # noqa: E712
+        conditions.append(Fact.field_name != "_marginalia")
+    elif category == "marginalia":
+        conditions.append(Fact.field_name == "_marginalia")
 
     from sqlalchemy import func
     count_res = await db.execute(select(func.count(Fact.id)).where(*conditions))

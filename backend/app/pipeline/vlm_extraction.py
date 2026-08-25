@@ -92,7 +92,8 @@ def _build_extraction_prompt(field_schema: List[dict]) -> str:
         "You are reading one page of a scanned government register. Return ONLY valid JSON "
         "(no markdown fences) shaped exactly like this:\n"
         '{"rows": [ { "<field_name>": {"value": <string|number|null>, '
-        '"bbox": [x0,y0,x1,y1], "confidence": <0.0-1.0>}, ... } ]}\n\n'
+        '"bbox": [x0,y0,x1,y1], "confidence": <0.0-1.0>, "is_handwritten": <bool>}, ... } ], '
+        '"marginalia": [ {"text": <string>, "bbox": [x0,y0,x1,y1]}, ... ]}\n\n'
         "Rules:\n"
         "- One entry in \"rows\" per data row visible on this page (a page with a single "
         "form, not a table, still produces exactly one row).\n"
@@ -105,12 +106,19 @@ def _build_extraction_prompt(field_schema: List[dict]) -> str:
         "text from the entry above, return \"\" for that field.\n"
         "- If a field from the schema is not present anywhere on this page, omit its key "
         "from that row entirely rather than guessing a value.\n"
-        "- Never invent a row or a value that is not visibly written on the page.\n\n"
+        "- Never invent a row or a value that is not visibly written on the page.\n"
+        "- \"is_handwritten\" is true when THAT SPECIFIC VALUE is handwritten (pen/pencil "
+        "ink) rather than printed/typed — set it per field, not per page; a printed form "
+        "with one handwritten entry has is_handwritten=false on every other field.\n"
+        "- \"marginalia\": any handwritten note, stamp annotation, or remark on the page "
+        "that is NOT an answer to one of the schema's fields (e.g. a note in the margin, "
+        "an interlineation, a struck-through correction) — each with its own bbox. Do not "
+        "put marginalia text into a field's value.\n\n"
         f"Field schema:\n{json.dumps(schema_for_prompt, ensure_ascii=False)}"
     )
 
 
-def _parse_vlm_response(raw: str) -> List[Dict[str, Any]]:
+def _parse_vlm_response(raw: str) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     text = raw.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
@@ -118,7 +126,11 @@ def _parse_vlm_response(raw: str) -> List[Dict[str, Any]]:
             text = text[4:]
     data = json.loads(text.strip())
     rows = data.get("rows", [])
-    return rows if isinstance(rows, list) else []
+    marginalia = data.get("marginalia", [])
+    return (
+        rows if isinstance(rows, list) else [],
+        marginalia if isinstance(marginalia, list) else [],
+    )
 
 
 def _find_role_field(field_schema: List[dict], role: str) -> Optional[str]:
@@ -196,8 +208,8 @@ async def extract_facts_for_document(
                 png_bytes, width, height, rotation = _render_image_page_png(file_bytes)
 
             raw_response = await vlm.extract_structured(png_bytes, prompt)
-            rows = _parse_vlm_response(raw_response)
-            if not rows:
+            rows, marginalia = _parse_vlm_response(raw_response)
+            if not rows and not marginalia:
                 continue
 
             # Continuation-merge (Handler 3) needs the serial column present to know
@@ -241,6 +253,7 @@ async def extract_facts_for_document(
 
                     confidences = []
                     region_boxes = []
+                    field_is_handwritten = False
                     for src_idx in source_indices:
                         if src_idx >= len(rows):
                             continue
@@ -249,6 +262,8 @@ async def extract_facts_for_document(
                             region_boxes.append(src_field["bbox"])
                             if src_field.get("confidence") is not None:
                                 confidences.append(float(src_field["confidence"]))
+                            if src_field.get("is_handwritten"):
+                                field_is_handwritten = True
                     if not region_boxes:
                         continue
 
@@ -273,7 +288,8 @@ async def extract_facts_for_document(
                         field_name=field_name,
                         value=fact_value if isinstance(fact_value, (dict, list)) else {"v": fact_value},
                         confidence=fact_confidence,
-                        status=classify_confidence(field_def, fact_confidence),
+                        is_handwritten=field_is_handwritten,
+                        status=classify_confidence(field_def, fact_confidence, is_handwritten=field_is_handwritten),
                     )
                     db.add(fact)
                     await db.flush()
@@ -285,6 +301,36 @@ async def extract_facts_for_document(
                             x0=float(x0), y0=float(y0), x1=float(x1), y1=float(y1),
                         ))
                     facts_written += 1
+
+            # T30 — marginalia: handwritten notes that aren't an answer to any
+            # schema field. Reuses Fact+FactRegion (T06's click-through contract)
+            # rather than a separate table; field_name="_marginalia" is the
+            # sentinel get_adjudication_queue's 'marginalia' category filters on.
+            # Always in_review — there's no confidence band for "is this note
+            # important," a human reads every one.
+            for note in marginalia:
+                text = note.get("text")
+                bbox = note.get("bbox")
+                if not text or not bbox or len(bbox) != 4:
+                    continue
+                fact = Fact(
+                    tenant_id=tenant_id,
+                    document_id=document_id,
+                    version_id=version_id,
+                    field_name="_marginalia",
+                    value={"v": text},
+                    confidence=None,
+                    is_handwritten=True,
+                    status="in_review",
+                )
+                db.add(fact)
+                await db.flush()
+                x0, y0, x1, y1 = bbox
+                db.add(FactRegion(
+                    tenant_id=tenant_id, fact_id=fact.id, page_id=page.id,
+                    x0=float(x0), y0=float(y0), x1=float(x1), y1=float(y1),
+                ))
+                facts_written += 1
 
         except Exception as e:
             logger.warning(f"T22 VLM extraction failed on page {page_number} of {filename}: {e}")

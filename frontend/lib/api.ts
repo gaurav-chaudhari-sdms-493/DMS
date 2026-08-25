@@ -261,6 +261,12 @@ export const api = {
     confirm: async (factId: string): Promise<any> => {
       return await request(`/api/v1/facts/${factId}/confirm`, { method: "POST" });
     },
+    // T30 — operator capture: flag a fact as handwritten even though
+    // extraction didn't catch it. Demotes 'machine' to 'in_review' so it
+    // can't stay auto-committed and never reviewed.
+    markHandwritten: async (factId: string): Promise<any> => {
+      return await request(`/api/v1/facts/${factId}/mark-handwritten`, { method: "POST" });
+    },
     bulkConfirm: async (corpusFolderId: string, threshold: number, policyVersion: string): Promise<any> => {
       const params = new URLSearchParams({
         corpus_folder_id: corpusFolderId,
