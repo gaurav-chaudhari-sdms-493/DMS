@@ -24,11 +24,12 @@ async def lifespan(app: FastAPI):
     await ensure_bucket_exists()
     watch_task = asyncio.create_task(watch_folder_loop())
     sftp_task = asyncio.create_task(sftp_poll_loop())
-    email_task = asyncio.create_task(email_poll_loop())
+    email_task = asyncio.create_task(email_poll_loop()) if settings.email_enabled else None
     yield
     watch_task.cancel()
     sftp_task.cancel()
-    email_task.cancel()
+    if email_task:
+        email_task.cancel()
 
 def create_app() -> FastAPI:
     app = FastAPI(

@@ -117,8 +117,12 @@ class Settings(BaseSettings):
     sftp_external_host: str = 'localhost'
     sftp_external_port: int = 2222
 
-    # Email-in connector (demo scope: single fixed local mailbox, not real
-    # internet email — see docker-compose 'mailserver' service)
+    # Email-in webhook connector (Cloudflare Email Routing + Cloudflare Worker)
+    email_webhook_enabled: bool = True
+    email_webhook_secret: str = '64d229d63ce4b83a0ec981703a1be25fc256fc6a1174bc31ce8591a98ee28750'
+
+    # Legacy IMAP email connector (deprecated/disabled by default in main.py,
+    # kept for local dev/GreenMail testing in docker-compose)
     email_enabled: bool = False
     email_imap_host: str = 'mailserver'
     email_imap_port: int = 3143

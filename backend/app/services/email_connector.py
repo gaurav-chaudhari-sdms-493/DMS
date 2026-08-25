@@ -27,6 +27,7 @@ import mimetypes
 from ..config import settings
 from ..database import AsyncSessionLocal
 from .connector_ingest_service import ingest_bytes, get_connector_actor, already_ingested
+from .email_utils import extract_attachments
 
 logger = logging.getLogger(__name__)
 
@@ -68,19 +69,7 @@ def _fetch_unseen_blocking() -> list[tuple[bytes, bytes]]:
 def _extract_attachments(raw: bytes) -> list[tuple[str, bytes]]:
     """Parse a raw RFC822 message, return [(filename, content_bytes), ...] for
     every part that looks like a real file attachment (has a filename)."""
-    msg = email.message_from_bytes(raw)
-    attachments = []
-    for part in msg.walk():
-        if part.get_content_maintype() == "multipart":
-            continue
-        filename = part.get_filename()
-        if not filename:
-            continue  # inline body text, not a file
-        payload = part.get_payload(decode=True)
-        if payload is None:
-            continue
-        attachments.append((filename, payload))
-    return attachments
+    return extract_attachments(raw)
 
 
 async def poll_email_once() -> int:

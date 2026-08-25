@@ -31,6 +31,7 @@ The system includes comprehensive documentation for technical evaluation, setup,
 | 🔌 [**Backend REST API Reference**](./docs/BACKEND_ENDPOINTS.md) | Complete REST API specification covering Auth, Ingestion, Search, Chat, Folders, and Tenant Admin. |
 | 🛠️ [**Full Setup & Installation Guide**](./docs/SETUP_GUIDE.md) | Step-by-step setup guide for Docker Compose and local native development. |
 | 💰 [**Cloud Costing & Estimation**](./docs/COSTING_AND_ESTIMATION.md) | AWS cloud infrastructure hosting costs, AI API token pricing per 1,000 docs/queries, TCO tiers, and ROI strategies. |
+| 📧 [**Cloudflare Email Routing Setup**](./docs/email_routing_setup.md) | Setup guide for Cloudflare Email Routing + Worker inbound email document ingestion. |
 | 🎬 [**Demo & Presentation Guide**](./docs/DEMO_PRESENTATION_GUIDE.md) | Step-by-step script and cheat sheet for conducting a live demonstration. |
 
 

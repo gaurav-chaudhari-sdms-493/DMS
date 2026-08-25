@@ -23,16 +23,18 @@ async def get_connector_info(current_user: TokenPayload = Depends(require_tenant
                     "this folder from any SFTP client and it appears in your DMS "
                     "Drive automatically within 20-30 seconds.",
         },
-        "email": {
+        "email_webhook": {
+            "enabled": settings.email_webhook_enabled,
+            "endpoint": "/api/v1/connectors/email-inbound",
+            "note": "Cloudflare Email Routing + Cloudflare Worker inbound email webhook. "
+                    "Receives emails delivered to Cloudflare Email Routing and ingests attachments automatically.",
+        },
+        "email_imap_legacy": {
             "enabled": settings.email_enabled,
             "address": settings.email_address,
             "smtp_host": settings.email_external_smtp_host,
             "smtp_port": settings.email_external_smtp_port,
-            "note": "Send an email with a file attached to this address (any "
-                    "subject/body) using an SMTP client pointed at the host/port "
-                    "above — the attachment appears in your DMS Drive automatically "
-                    "within about 10-15 seconds. Demo mailbox, not a real internet "
-                    "email account.",
+            "note": "Legacy IMAP polling connector (for local dev/testing with GreenMail).",
         },
         "watched_folder": {
             "note": "Only available on this server's own local disk, not from "
