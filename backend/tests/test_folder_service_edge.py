@@ -1,4 +1,5 @@
 import pytest
+import time
 import uuid
 from fastapi import HTTPException
 from app.database import AsyncSessionLocal
@@ -120,6 +121,49 @@ async def test_folder_star_trash_and_tree():
             with pytest.raises(HTTPException) as exc:
                 await get_folder(db, f2.id, tenant_id)
             assert exc.value.status_code == 404
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_is_descendant_deep_chain_single_round_trip():
+    """T97 — _is_descendant must stay correct (and fast) on a chain deeper
+    than the old Python loop's implicit 100-level ceiling, since D-1 kept
+    folders arbitrarily deep rather than collapsing to a fixed two-level
+    container. Builds a 150-level chain and checks both ends of it."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id = uuid.uuid4()
+            user_id = uuid.uuid4()
+            tenant = Tenant(id=tenant_id, name=f"Deep Tenant {uuid.uuid4().hex[:6]}")
+            user = User(id=user_id, tenant_id=tenant_id, email=f"deep_{uuid.uuid4().hex[:6]}@test.com", hashed_password="pw")
+            db.add_all([tenant, user])
+            await db.commit()
+
+            DEPTH = 150
+            chain = []
+            parent_id = None
+            for i in range(DEPTH):
+                node = await create_folder(db, tenant_id, user_id, FolderCreate(name=f"level-{i}", parent_id=parent_id))
+                chain.append(node)
+                parent_id = node.id
+
+            root = chain[0]
+            deepest = chain[-1]
+
+            start = time.monotonic()
+            assert await _is_descendant(db, deepest.id, root.id) is True
+            elapsed = time.monotonic() - start
+            assert elapsed < 1.0, f"single-round-trip CTE walk of a {DEPTH}-level chain took {elapsed:.3f}s"
+
+            assert await _is_descendant(db, root.id, deepest.id) is False
+
+            # Attempting to move the root into its own deepest descendant must
+            # still be rejected — this is the actual production caller.
+            with pytest.raises(HTTPException) as exc:
+                await update_folder(db, root.id, tenant_id, FolderUpdate(parent_id=deepest.id), actor_id=user_id)
+            assert exc.value.status_code == 400
         finally:
             await db.rollback()
             await db.close()

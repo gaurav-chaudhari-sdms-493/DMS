@@ -1,5 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, update, delete, text
 from sqlalchemy.orm import selectinload
 from fastapi import HTTPException, status
 from uuid import UUID
@@ -72,18 +72,29 @@ async def get_folder(db: AsyncSession, folder_id: UUID, tenant_id: UUID) -> Fold
 
 
 async def _is_descendant(db: AsyncSession, candidate_id: Optional[UUID], ancestor_id: UUID) -> bool:
-    current = candidate_id
-    for _ in range(100):
-        if current is None:
-            return False
-        if current == ancestor_id:
-            return True
-        res = await db.execute(select(Folder.parent_id).where(Folder.id == current))
-        row = res.first()
-        if not row:
-            return False
-        current = row[0]
-    return True
+    """T97 — one recursive CTE walks the whole parent_id chain from
+    candidate_id up to the root in a single round trip, instead of the
+    old one-query-per-level Python loop (up to 100 sequential round
+    trips for a single circular-reference check on a deep hierarchy —
+    D-1 kept arbitrarily deep recursive folders rather than collapsing
+    to a fixed two-level container, so this chain is genuinely
+    unbounded in practice, not just in theory).
+    """
+    if candidate_id is None:
+        return False
+    stmt = text("""
+        WITH RECURSIVE ancestors AS (
+            SELECT id, parent_id, 1 AS depth FROM doc_dg_folders WHERE id = :candidate_id
+            UNION ALL
+            SELECT f.id, f.parent_id, a.depth + 1
+            FROM doc_dg_folders f
+            JOIN ancestors a ON f.id = a.parent_id
+            WHERE a.depth < 1000
+        )
+        SELECT EXISTS (SELECT 1 FROM ancestors WHERE id = :ancestor_id)
+    """)
+    res = await db.execute(stmt, {"candidate_id": str(candidate_id), "ancestor_id": str(ancestor_id)})
+    return bool(res.scalar())
 
 
 async def update_folder(
