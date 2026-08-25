@@ -279,6 +279,20 @@ export const api = {
       return await request(`/api/v1/governance/completeness/${corpusFolderId}/drill?category=${encodeURIComponent(category)}`, { method: "GET" });
     },
   },
+  entities: {
+    // T62 — one entity, everything about it: records (current + original
+    // state), linked entities/facts with tier and confirmation status.
+    get360: async (nodeId: string): Promise<any> => {
+      return await request(`/api/v1/entities/${nodeId}/360`, { method: "GET" });
+    },
+  },
+  records: {
+    // T60/T62 — base entry + every amendment, in order: the record's
+    // full "versions" view, each entry citing its own source page.
+    getHistory: async (recordId: string): Promise<any> => {
+      return await request(`/api/v1/records/${recordId}/history`, { method: "GET" });
+    },
+  },
   search: {
     query: async (
       query: string,

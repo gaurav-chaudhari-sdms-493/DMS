@@ -1,6 +1,6 @@
 "use client";
 import React, { useState } from "react";
-import { Sparkles, X, User, LogOut, BarChart3, ChevronDown, ShieldCheck, Settings } from "lucide-react";
+import { Sparkles, X, User, LogOut, BarChart3, ChevronDown, ShieldCheck, Settings, Network } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
@@ -223,6 +223,14 @@ export function DriveTopHeader({
                 >
                   <BarChart3 className="w-4 h-4 text-primary" />
                   <span>Completeness Dashboard</span>
+                </Link>
+                <Link
+                  href="/entities"
+                  onClick={() => setDropdownOpen(false)}
+                  className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMain hover:bg-white/5 transition-colors font-medium"
+                >
+                  <Network className="w-4 h-4 text-primary" />
+                  <span>Entity 360</span>
                 </Link>
               </div>
 

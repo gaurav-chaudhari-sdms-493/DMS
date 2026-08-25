@@ -59,3 +59,15 @@ async def get_legal_status_summary_api(
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await records_service.get_legal_status_summary(db, tenant_id)
+
+
+@router.get("/{record_id}/history")
+async def get_record_history_api(
+    record_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """T60/T62 — the base entry plus every amendment, in order: the
+    'versions' view the entity 360 page's history panel reads from."""
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await records_service.get_full_history(db, tenant_id, record_id)
