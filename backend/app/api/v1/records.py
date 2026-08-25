@@ -1,13 +1,43 @@
 import uuid
+from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...schemas.auth import TokenPayload
-from ...deps import get_db, require_tenant_access
+from ...deps import get_db, require_tenant_access, require_role
 from ...services import records_service
 from ...models.record_amendment import VALID_LEGAL_STATUSES
 
 router = APIRouter(prefix="/records", tags=["Records"])
+
+
+class RecordCreate(BaseModel):
+    subject_node_id: uuid.UUID
+    record_type: str
+    base_fields: Dict[str, Any]
+    base_evidence_fact_id: Optional[uuid.UUID] = None
+
+
+@router.post("", status_code=201)
+async def create_record_api(
+    record_in: RecordCreate,
+    current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    record = await records_service.create_record(
+        db, tenant_id, record_in.subject_node_id, record_in.record_type, record_in.base_fields,
+        base_evidence_fact_id=record_in.base_evidence_fact_id, created_by_actor_id=user_id,
+    )
+    return {
+        "id": str(record.id),
+        "subject_node_id": str(record.subject_node_id),
+        "record_type": record.record_type,
+        "base_fields": record.base_fields,
+        "retention_class": record.retention_class,
+    }
 
 
 @router.get("/by-status/{legal_status}")
