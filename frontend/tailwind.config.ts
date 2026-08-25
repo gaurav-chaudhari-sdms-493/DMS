@@ -8,6 +8,11 @@ const config: Config = {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        // T95 — CSS var set by next/font in app/layout.tsx; applied via
+        // the `font-devanagari` class, toggled at runtime by locale.
+        devanagari: ["var(--font-devanagari)", "system-ui", "sans-serif"],
+      },
       colors: {
         gdriveBg: "#f8f9fa",
         gdriveSurface: "#ffffff",

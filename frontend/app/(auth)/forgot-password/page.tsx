@@ -6,9 +6,12 @@ import { Mail, Lock, Key, AlertTriangle, CheckCircle2, ArrowLeft, ArrowRight, Ey
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 export default function ForgotPasswordPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [email, setEmail] = useState("");
   const [resetToken, setResetToken] = useState("");
@@ -66,11 +69,14 @@ export default function ForgotPasswordPage() {
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-8rem)] py-8">
       <div className="w-full max-w-md animate-fadeIn">
+        <div className="flex justify-end mb-2">
+          <LanguageSwitcher />
+        </div>
         <div className="text-center mb-8">
           <div className="flex justify-center mx-auto mb-6">
             <img src="/stark-drive.svg" alt="Stark Drive Logo" className="h-20 md:h-24 lg:h-28 w-auto object-contain drop-shadow-md" />
           </div>
-          <h1 className="text-2xl font-bold text-textMain">Password Recovery</h1>
+          <h1 className="text-2xl font-bold text-textMain">{t("auth.forgot.title", "Reset your password")}</h1>
           <p className="text-textMuted mt-2">
             {step === 1 && "Enter your email to request password reset code"}
             {step === 2 && "Enter reset token and your new password"}
@@ -95,8 +101,8 @@ export default function ForgotPasswordPage() {
                 <input
                   type="email"
                   required
-                  aria-label="Registered Email Address"
-                  placeholder="Registered Email Address"
+                  aria-label={t("auth.forgot.email_label", "Email")}
+                  placeholder={t("auth.forgot.email_label", "Email")}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full h-12 pl-10 pr-4 bg-surface/50 border border-borderDark rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
@@ -104,14 +110,14 @@ export default function ForgotPasswordPage() {
               </div>
 
               <Button type="submit" size="lg" className="w-full mt-2" loading={loading}>
-                <span>Send Reset Code</span>
+                <span>{t("auth.forgot.submit", "Send reset link")}</span>
                 <ArrowRight className="w-4 h-4 ml-2" />
               </Button>
 
               <div className="text-center mt-4">
                 <Link href="/login" className="inline-flex items-center text-sm text-textMuted hover:text-textMain transition-colors">
                   <ArrowLeft className="w-4 h-4 mr-1.5" />
-                  Back to Sign In
+                  {t("auth.forgot.back_to_login", "Back to sign in")}
                 </Link>
               </div>
             </form>
