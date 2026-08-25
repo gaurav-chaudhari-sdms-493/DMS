@@ -1,6 +1,6 @@
 import uuid as uuid_module
 from datetime import datetime
-from typing import Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.entity_edge import EntityEdge
+from app.models.entity_node import EntityNode
 from app.models.fact import Fact
 from app.models.document import Document
 from app.services.audit_service import log_action
@@ -18,6 +19,44 @@ from app.services.audit_service import log_action
 # confirms them, tier 4 always regardless of confidence (Section 6).
 AUTO_COMMIT_TIERS = {1, 2}
 ESCROW_TIERS = {3, 4}
+
+
+async def create_node(
+    db: AsyncSession,
+    tenant_id: UUID,
+    entity_type: str,
+    label: str,
+    actor_id: UUID,
+    attributes: Optional[Dict[str, Any]] = None,
+) -> EntityNode:
+    """T10 — register a real-world entity (person, property, office, ...)
+    that edges and records can then be anchored to. Always a human/API
+    action, not an automated pipeline step, so an actor is required
+    unconditionally (same T08 rule as everything else that mutates and
+    is audited)."""
+    if actor_id is None:
+        raise ValueError("creating a node requires an actor")
+    if not entity_type or not entity_type.strip():
+        raise ValueError("entity_type is required")
+    if not label or not label.strip():
+        raise ValueError("label is required")
+
+    node = EntityNode(
+        tenant_id=tenant_id,
+        entity_type=entity_type.strip(),
+        label=label.strip(),
+        attributes=attributes or {},
+    )
+    db.add(node)
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "entity_node.create",
+        resource_type="entity_node", resource_id=node.id,
+        details={"entity_type": node.entity_type, "label": node.label},
+    )
+
+    return node
 
 
 async def create_edge(
