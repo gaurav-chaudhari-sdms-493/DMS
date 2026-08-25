@@ -24,6 +24,13 @@ class Citation(BaseModel):
     opens `download_url` at `page_number` — a page-level jump, not a
     pixel-precise highlighted box (chunks only carry a page number, not a
     region; true region highlighting needs the fact/region pipeline, T22).
+
+    T73: a citation bound to an extracted Fact (not a chunk) carries
+    `fact_id` instead of `chunk_id` — the frontend uses it to open the
+    same region-highlight viewer the checking screen and Entity 360 use
+    (GET /facts/{id} already returns everything needed), a precise
+    click-through chunk citations can't offer since chunks only carry a
+    page number.
     """
     number: int
     claim: str
@@ -31,6 +38,7 @@ class Citation(BaseModel):
     document_name: str
     page_number: Optional[int]
     chunk_id: Optional[UUID] = None
+    fact_id: Optional[UUID] = None
     download_url: Optional[str] = None
 
 class SearchResponse(BaseModel):

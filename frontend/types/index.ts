@@ -110,6 +110,7 @@ export interface Citation {
   document_name: string;
   page_number: number | null;
   chunk_id?: string | null;
+  fact_id?: string | null;
   download_url?: string | null;
 }
 

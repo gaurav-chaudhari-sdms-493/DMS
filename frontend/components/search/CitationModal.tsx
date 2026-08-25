@@ -2,12 +2,14 @@
 import React from "react";
 import { X } from "lucide-react";
 import CitationPageViewer from "./CitationPageViewer";
+import RegionHighlightViewer from "../drive/RegionHighlightViewer";
 
 export interface CitationModalCitation {
   number: number;
   document_name: string;
   page_number: number | null;
   download_url?: string | null;
+  fact_id?: string | null;
 }
 
 interface CitationModalProps {
@@ -39,7 +41,12 @@ export function CitationModal({ citation, onClose }: CitationModalProps) {
         </div>
 
         <div className="px-6 py-4">
-          {citation.download_url && citation.page_number ? (
+          {citation.fact_id ? (
+            // T73 — a citation bound to an extracted field, not a chunk:
+            // same precise region-highlight viewer the checking screen
+            // and Entity 360 use, instead of a page-level jump.
+            <RegionHighlightViewer factId={citation.fact_id} renderWidth={620} />
+          ) : citation.download_url && citation.page_number ? (
             <CitationPageViewer
               downloadUrl={citation.download_url}
               pageNumber={citation.page_number}

@@ -158,6 +158,7 @@ async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: li
                 document_name=ex["document_name"],
                 page_number=ex["page_number"],
                 chunk_id=ex.get("chunk_id"),
+                fact_id=ex.get("fact_id"),
             ))
 
         markers = "".join(f" [{n}]" for n in sorted(claim_numbers))
@@ -299,17 +300,30 @@ async def search(
                 filter_clauses.append(f"AND d.id = :filter_{idx}")
                 params[f"filter_{idx}"] = str(v)
             else:
+                # T73 — a filter key can match either the generic LLM
+                # metadata pass (title/author/date/type/topics/summary) or
+                # a template-extracted structured field (area, village,
+                # status...) on doc_dg_facts. Either source satisfying it
+                # is enough — a document doesn't need both.
                 filter_clauses.append(f"""
-                    AND EXISTS (
+                    AND (
+                      EXISTS (
                         SELECT 1 FROM doc_dg_metadata_items m
-                        WHERE m.document_id = d.id 
-                          AND m.key = :filter_key_{idx} 
+                        WHERE m.document_id = d.id
+                          AND m.key = :filter_key_{idx}
                           AND (
-                            m.value->>'v' = :filter_val_{idx} 
+                            m.value->>'v' = :filter_val_{idx}
                             OR m.value->> :filter_key_{idx} = :filter_val_{idx}
                             OR m.value::text = :filter_val_{idx}
                             OR m.value::text LIKE :filter_like_val_{idx}
                           )
+                      )
+                      OR EXISTS (
+                        SELECT 1 FROM doc_dg_facts f2
+                        WHERE f2.document_id = d.id
+                          AND f2.field_name = :filter_key_{idx}
+                          AND COALESCE(f2.value->>'v', f2.value::text) = :filter_val_{idx}
+                      )
                     )
                 """)
                 params[f"filter_key_{idx}"] = str(k)
@@ -394,7 +408,49 @@ async def search(
     trgm_res = await db.execute(trgm_sql, params)
     trgm_rows = trgm_res.fetchall()
 
-    # 5. RRF Merge (Reciprocal Rank Fusion across all language vectors, keywords, and fuzzy matches)
+    # 4c. Structured-record search (T73) — extracted Fact fields, not only
+    # chunk text. A user might ask about a value that only exists as an
+    # extracted field (owner_name, valuation, survey_no...) and never
+    # verbatim as running chunk text the way OCR read the page. Marginalia
+    # (field_name="_marginalia", T30) is deliberately excluded — those are
+    # free-floating adjudication notes, not extracted record fields.
+    # Shaped identically to the chunk legs above (same column names) so it
+    # drops into the exact same RRF/rerank/results pipeline unchanged;
+    # fact_row_ids (below) is how downstream code tells a fact row from a
+    # chunk row apart, the same way vec_cids/kw_cids/trgm_cids already
+    # track each leg's origin for search_mode.
+    # The raw, un-expanded query — not q_en. Trilingual expansion is a
+    # semantic reformulation (T73's own test caught this: it turned
+    # "42/1B-Kolhapur" into "42/1B Kolhapur", hyphen to space), which is
+    # fine for vector/keyword search but wrong here — a structured field
+    # like a survey number or an ID is exactly the kind of literal text a
+    # paraphrase shouldn't be allowed to alter before matching it.
+    fact_pattern = f"%{query}%"
+    fact_sql = text(f"""
+        SELECT f.id, (f.field_name || ': ' || COALESCE(f.value->>'v', f.value::text)) as content,
+               fact_page.page_number as page_number, 0 as chunk_index,
+               d.title, d.id as doc_id, v.s3_path
+        FROM doc_dg_facts f
+        JOIN doc_dg_documents d ON f.document_id = d.id
+        LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id
+        LEFT JOIN LATERAL (
+            SELECT p.page_number FROM doc_dg_fact_regions fr
+            JOIN doc_dg_pages p ON p.id = fr.page_id
+            WHERE fr.fact_id = f.id
+            ORDER BY p.page_number ASC LIMIT 1
+        ) fact_page ON true
+        WHERE f.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false
+          AND f.field_name != '_marginalia'
+          AND (f.field_name ILIKE :fact_pattern OR COALESCE(f.value->>'v', f.value::text) ILIKE :fact_pattern)
+          {filter_str}
+        ORDER BY f.confidence DESC NULLS LAST
+        LIMIT {candidate_limit}
+    """)
+    fact_res = await db.execute(fact_sql, {**params, "fact_pattern": fact_pattern})
+    fact_rows = fact_res.fetchall()
+    fact_row_ids = {str(r.id) for r in fact_rows}
+
+    # 5. RRF Merge (Reciprocal Rank Fusion across all language vectors, keywords, fuzzy, and structured matches)
     rrf_scores = {}
     docs_map = {}
     k = await get_int("search_rrf_k", 60)
@@ -410,6 +466,11 @@ async def search(
         rrf_scores[cid] = rrf_scores.get(cid, 0) + (1.0 / (k + rank + 1))
 
     for rank, row in enumerate(trgm_rows):
+        cid = str(row.id)
+        docs_map[cid] = row
+        rrf_scores[cid] = rrf_scores.get(cid, 0) + (1.0 / (k + rank + 1))
+
+    for rank, row in enumerate(fact_rows):
         cid = str(row.id)
         docs_map[cid] = row
         rrf_scores[cid] = rrf_scores.get(cid, 0) + (1.0 / (k + rank + 1))
@@ -455,6 +516,8 @@ async def search(
                 contributing_legs.append("keyword")
             if matched_cids & trgm_cids:
                 contributing_legs.append("fuzzy")
+            if matched_cids & fact_row_ids:
+                contributing_legs.append("structured")
             search_mode = "+".join(contributing_legs) if contributing_legs else "vector+keyword"
 
     # --- Step 6: TRI-LINGUAL HYDE AUTOMATIC FALLBACK ---
@@ -699,8 +762,11 @@ async def search(
         cid, _ = merged[idx]
         row = docs_map[cid]
         
-        # Deduplicate identical document page matches
-        dedup_key = (row.doc_id, row.page_number)
+        # Deduplicate identical document page matches — except a fact
+        # result (T73), which never dedupes against a chunk (or another
+        # fact) sharing its page: it's a distinct extracted field, not a
+        # near-duplicate snippet the way two chunks on the same page are.
+        dedup_key = (row.doc_id, cid) if cid in fact_row_ids else (row.doc_id, row.page_number)
         if dedup_key in seen_dedup:
             continue
         seen_dedup.add(dedup_key)
@@ -730,14 +796,25 @@ async def search(
         cid, _ = merged[idx]
         row = docs_map[cid]
         
-        dedup_key = (row.doc_id, row.page_number)
+        # T73 — a fact result never dedupes against a chunk (or another
+        # fact) sharing its page: it's a distinct extracted field, not a
+        # near-duplicate snippet the way two chunks on the same page are.
+        dedup_key = (row.doc_id, cid) if cid in fact_row_ids else (row.doc_id, row.page_number)
         if dedup_key in seen_dedup:
             continue
         seen_dedup.add(dedup_key)
         
         s3_path = row.s3_path
         url = await generate_presigned_url(s3_path) if s3_path else ""
-        
+
+        # T73 — a fact-leg row shares docs_map/RRF with chunk rows (same
+        # column shape) but is cited by fact_id, not chunk_id: it points
+        # at one extracted field, not a page of running text.
+        is_fact = cid in fact_row_ids
+        result_metadata = dict(meta_map.get(row.doc_id, {}))
+        if is_fact:
+            result_metadata["fact_id"] = cid
+
         final_results.append(SearchResult(
             document_id=row.doc_id,
             document_name=row.title,
@@ -745,13 +822,14 @@ async def search(
             page_number=row.page_number,
             snippet=_make_snippet(row.content),
             score=rank_res.score,
-            metadata=meta_map.get(row.doc_id, {})
+            metadata=result_metadata
         ))
         excerpts.append({
             "document_id": row.doc_id,
             "document_name": row.title,
             "page_number": row.page_number,
-            "chunk_id": row.id,
+            "chunk_id": None if is_fact else row.id,
+            "fact_id": row.id if is_fact else None,
             "content": row.content,
         })
 

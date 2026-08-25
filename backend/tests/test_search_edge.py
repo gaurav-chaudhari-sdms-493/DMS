@@ -9,6 +9,9 @@ from app.models.user import User
 from app.models.document import Document
 from app.models.document_version import DocumentVersion
 from app.models.chunk import Chunk
+from app.models.fact import Fact
+from app.models.fact_region import FactRegion
+from app.models.page import DocumentPage
 
 
 def test_validate_output_summary_edge_cases():
@@ -107,5 +110,117 @@ async def test_search_fuzzy_leg_catches_misspelled_proper_noun():
             )
             assert len(res.results) >= 1
             assert "fuzzy" in res.search_mode
+        finally:
+            await db.close()
+
+
+async def _make_doc_with_fact(db, tenant_id, field_name, value, chunk_content):
+    """A document whose chunk text does NOT contain the extracted field's
+    value verbatim — the only way to find it is the structured-record leg."""
+    doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="Property Register", status="indexed")
+    version = DocumentVersion(
+        id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+        file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="reg.pdf",
+    )
+    db.add_all([doc, version])
+    await db.flush()
+    doc.current_version_id = version.id
+
+    chunk = Chunk(
+        id=uuid.uuid4(), document_id=doc.id, version_id=version.id, tenant_id=tenant_id,
+        content=chunk_content, embedding=[0.0] * 1024, chunk_metadata={}, page_number=1, chunk_index=0, s3_path="x",
+    )
+    page = DocumentPage(
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_id=version.id,
+        page_number=1, width=612, height=792,
+    )
+    db.add_all([chunk, page])
+    await db.flush()
+
+    fact = Fact(
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_id=version.id,
+        field_name=field_name, value={"v": value}, confidence=0.9, status="machine",
+    )
+    db.add(fact)
+    await db.flush()
+    db.add(FactRegion(id=uuid.uuid4(), tenant_id=tenant_id, fact_id=fact.id, page_id=page.id, x0=0.1, y0=0.1, x1=0.5, y1=0.2))
+    await db.commit()
+    return doc, fact
+
+
+@pytest.mark.asyncio
+async def test_search_structured_record_leg_finds_field_absent_from_chunk_text():
+    """T73 — a value that only exists as an extracted Fact field (never
+    verbatim in the chunk's running OCR text) is still findable and cited
+    by fact_id, with search_mode reporting the 'structured' leg."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id = uuid.uuid4()
+            user_id = uuid.uuid4()
+            tenant = Tenant(id=tenant_id, name=f"Structured Tenant {uuid.uuid4().hex[:6]}")
+            user = User(id=user_id, tenant_id=tenant_id, email=f"struct_{uuid.uuid4().hex[:6]}@test.com", hashed_password="pw")
+            db.add_all([tenant, user])
+            await db.commit()
+
+            doc, fact = await _make_doc_with_fact(
+                db, tenant_id, field_name="survey_no", value="42/1B-Kolhapur",
+                chunk_content="A register page listing property entries for the district office.",
+            )
+
+            res = await search(
+                query="42/1B-Kolhapur",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                limit=10,
+                filters=None,
+                db=db,
+                ip_address="127.0.0.1",
+                rerank_provider="bgem3",
+                generate_summary=False,
+            )
+            assert len(res.results) >= 1
+            assert "structured" in res.search_mode
+            assert any(r.metadata.get("fact_id") == str(fact.id) for r in res.results)
+        finally:
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_search_filter_matches_structured_fact_field():
+    """T73 — 'a query can filter on area, village or status': a filters
+    dict keyed on a template field name (not a generic metadata key)
+    narrows results to documents whose extracted Fact matches."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id = uuid.uuid4()
+            user_id = uuid.uuid4()
+            tenant = Tenant(id=tenant_id, name=f"FilterFact Tenant {uuid.uuid4().hex[:6]}")
+            user = User(id=user_id, tenant_id=tenant_id, email=f"filterfact_{uuid.uuid4().hex[:6]}@test.com", hashed_password="pw")
+            db.add_all([tenant, user])
+            await db.commit()
+
+            matching_doc, _ = await _make_doc_with_fact(
+                db, tenant_id, field_name="village", value="Washim",
+                chunk_content="Register entry for a plot, area five hundred square metres.",
+            )
+            other_doc, _ = await _make_doc_with_fact(
+                db, tenant_id, field_name="village", value="Basmath",
+                chunk_content="Register entry for a plot, area five hundred square metres.",
+            )
+
+            res = await search(
+                query="plot area",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                limit=10,
+                filters={"village": "Washim"},
+                db=db,
+                ip_address="127.0.0.1",
+                rerank_provider="bgem3",
+                generate_summary=False,
+            )
+            result_doc_ids = {str(r.document_id) for r in res.results}
+            assert str(matching_doc.id) in result_doc_ids
+            assert str(other_doc.id) not in result_doc_ids
         finally:
             await db.close()
