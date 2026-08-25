@@ -100,3 +100,16 @@ def test_not_air_gapped_allows_external_providers():
     settings.air_gapped = False
     provider = factory.get_llm_provider()
     assert provider is not None
+
+
+def test_explicit_bgem3_override_is_respected_even_with_cohere_key():
+    """Regression — found live during the T92 E2E pass: a user explicitly
+    picking 'Local (BGE)' in Search Settings (override='bgem3') got Cohere
+    anyway whenever a Cohere key was configured, because the
+    auto-upgrade-to-cohere heuristic didn't distinguish an explicit
+    per-request choice from the tenant-wide default. It must only apply
+    when there's no explicit override."""
+    settings.air_gapped = False
+    settings.cohere_api_key = "fake-key"
+    provider = factory.get_rerank_provider(override="bgem3")
+    assert provider.__class__.__name__ == "BGEM3RerankerProvider"

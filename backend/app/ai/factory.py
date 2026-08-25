@@ -156,10 +156,15 @@ def get_rerank_provider(override: str | None = None) -> RerankerProvider:
     an expensive model reload (notably the local BGE cross-encoder).
     """
     name = override or settings.ai_rerank_provider
-    # Ensure local BGE cross-encoder is never loaded when Cohere API key is configured
-    # — except in air-gapped mode, where auto-upgrading to an external API is
-    # exactly the silent-fallback behavior T91 exists to prevent.
-    if (name == 'bgem3' or not name) and settings.cohere_api_key and not settings.air_gapped:
+    # Ensure local BGE cross-encoder is never loaded BY DEFAULT when Cohere
+    # API key is configured — but never override an explicit per-request
+    # choice (override=...), and never in air-gapped mode, where
+    # auto-upgrading to an external API is exactly the silent-fallback
+    # behavior T91 exists to prevent. Without the `override is None` guard,
+    # a user explicitly picking "Local (BGE)" in Search Settings silently
+    # got Cohere anyway whenever a Cohere key was configured (the default) —
+    # found live during the T92 E2E pass.
+    if override is None and (name == 'bgem3' or not name) and settings.cohere_api_key and not settings.air_gapped:
         name = 'cohere'
 
     if name not in _rerank_providers_by_name:
