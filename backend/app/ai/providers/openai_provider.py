@@ -2,6 +2,7 @@ import asyncio
 from openai import AsyncOpenAI
 from typing import List
 from app.ai.base import LLMProvider, EmbeddingProvider, Message
+from app.services.config_service import get_int
 
 class OpenAILLMProvider(LLMProvider):
     def __init__(self, api_key: str, model: str):
@@ -32,7 +33,7 @@ class OpenAIEmbeddingProvider(EmbeddingProvider):
         
         client = AsyncOpenAI(api_key=self.api_key)
         # simple batching to avoid limit
-        batch_size = 100
+        batch_size = await get_int("embed_api_batch_size", 100)
         embeddings = []
         for i in range(0, len(texts), batch_size):
             batch = texts[i:i + batch_size]
