@@ -3,6 +3,7 @@ import React, { useState, useEffect } from "react";
 import { ChevronRight, ChevronDown, Folder as FolderIcon, FileText, FileSpreadsheet, Presentation, Image as ImageIcon, FileCode, Music, Video } from "lucide-react";
 import type { FolderTreeNode, DocumentListItem } from "@/types";
 import { api } from "@/lib/api";
+import { onKeyActivate } from "@/lib/a11y";
 
 const getTreeFileIcon = (title: string) => {
   const ext = title.split(".").pop()?.toLowerCase() || "";
@@ -58,10 +59,14 @@ function FolderTreeItem({
             : "hover:bg-[#edf2fc] text-[#444746] hover:text-[#1f1f1f]"
         }`}
         style={{ paddingLeft: `${depth * 12 + 6}px` }}
+        role="button"
+        tabIndex={0}
         onClick={(e) => {
           e.stopPropagation();
           onSelectFolder(node.id);
         }}
+        onKeyDown={onKeyActivate(() => onSelectFolder(node.id))}
+        aria-label={node.name}
       >
         <button
           onClick={(e) => {
@@ -97,6 +102,8 @@ function FolderTreeItem({
               key={file.id}
               className="flex items-center gap-1.5 py-1 px-2 rounded-xl cursor-pointer hover:bg-[#edf2fc] text-[#444746] hover:text-[#1f1f1f] transition-colors"
               style={{ paddingLeft: `${(depth + 1) * 12 + 18}px` }}
+              role="button"
+              tabIndex={0}
               onClick={(e) => {
                 e.stopPropagation();
                 onSelectFolder(node.id);
@@ -106,6 +113,11 @@ function FolderTreeItem({
                 e.stopPropagation();
                 if (onPreviewDoc) onPreviewDoc(file);
               }}
+              onKeyDown={onKeyActivate(() => {
+                onSelectFolder(node.id);
+                if (onSelectDoc) onSelectDoc(file);
+              })}
+              aria-label={file.title}
             >
               {getTreeFileIcon(file.title)}
               <span className="text-[11px] truncate max-w-[120px]" title={file.title}>

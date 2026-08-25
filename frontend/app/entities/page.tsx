@@ -162,6 +162,7 @@ export default function Entity360Page() {
           <div className="flex gap-2">
             <input
               type="text"
+              aria-label="Entity node ID"
               placeholder="Entity node ID"
               value={nodeId}
               onChange={(e) => setNodeId(e.target.value)}
@@ -308,8 +309,9 @@ export default function Entity360Page() {
         )}
 
         {historyRecordId && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setHistoryRecordId(null)}>
+          <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setHistoryRecordId(null)}>
             <div
+              role="presentation"
               className="w-full max-w-2xl max-h-[80vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-3xl shadow-2xl text-[#1f1f1f]"
               onClick={(e) => e.stopPropagation()}
             >
@@ -350,7 +352,7 @@ export default function Entity360Page() {
                     </div>
 
                     {history.amendments.length === 0 && (
-                      <p className="text-sm text-[#747775] text-center">No amendments — this record hasn't changed since it was entered.</p>
+                      <p className="text-sm text-[#747775] text-center">No amendments — this record hasn&apos;t changed since it was entered.</p>
                     )}
                     {history.amendments.map((a) => (
                       <div key={a.id} className="border border-amber-200 bg-amber-50/40 rounded-xl p-4">
@@ -385,8 +387,9 @@ export default function Entity360Page() {
         )}
 
         {viewingFactId && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setViewingFactId(null)}>
+          <div role="presentation" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setViewingFactId(null)}>
             <div
+              role="presentation"
               className="w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-3xl shadow-2xl text-[#1f1f1f] p-6"
               onClick={(e) => e.stopPropagation()}
             >

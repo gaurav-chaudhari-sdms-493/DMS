@@ -48,9 +48,11 @@ export function NewFolderModal({ isOpen, onClose, onCreate }: NewFolderModalProp
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-textMuted mb-2">Folder Name</label>
+            <label htmlFor="new-folder-name" className="block text-xs font-semibold text-textMuted mb-2">Folder Name</label>
             <input
+              id="new-folder-name"
               type="text"
+              // eslint-disable-next-line jsx-a11y/no-autofocus -- WAI-ARIA APG dialog pattern: move focus into a freshly opened dialog's first field, unlike page-load autofocus
               autoFocus
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -59,13 +61,15 @@ export function NewFolderModal({ isOpen, onClose, onCreate }: NewFolderModalProp
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-textMuted mb-2">Folder Color</label>
-            <div className="flex items-center gap-3">
+            <span id="folder-color-label" className="block text-xs font-semibold text-textMuted mb-2">Folder Color</span>
+            <div role="group" aria-labelledby="folder-color-label" className="flex items-center gap-3">
               {FOLDER_COLORS.map((color) => (
                 <button
                   key={color}
                   type="button"
                   onClick={() => setSelectedColor(color)}
+                  aria-label={`Folder color ${color}`}
+                  aria-pressed={selectedColor === color}
                   className="w-7 h-7 rounded-full flex items-center justify-center transition-transform hover:scale-110 shadow-sm"
                   style={{ backgroundColor: color }}
                 >
@@ -133,6 +137,8 @@ export function RenameModal({ isOpen, currentName, onClose, onRename }: RenameMo
         <form onSubmit={handleSubmit} className="space-y-4">
           <input
             type="text"
+            aria-label="New name"
+            // eslint-disable-next-line jsx-a11y/no-autofocus -- WAI-ARIA APG dialog pattern: move focus into a freshly opened dialog's first field, unlike page-load autofocus
             autoFocus
             value={name}
             onChange={(e) => setName(e.target.value)}

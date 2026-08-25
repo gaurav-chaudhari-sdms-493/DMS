@@ -80,6 +80,7 @@ export default function SignUpPage() {
               <input
                 type="text"
                 required
+                aria-label="Full Name"
                 placeholder="Full Name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
@@ -94,6 +95,7 @@ export default function SignUpPage() {
               <input
                 type="email"
                 required
+                aria-label="Email Address"
                 placeholder="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -108,6 +110,7 @@ export default function SignUpPage() {
               <input
                 type={showPassword ? "text" : "password"}
                 required
+                aria-label="Password (minimum 8 characters)"
                 placeholder="Password (min. 8 chars)"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -130,6 +133,7 @@ export default function SignUpPage() {
               <input
                 type={showConfirmPassword ? "text" : "password"}
                 required
+                aria-label="Confirm Password"
                 placeholder="Confirm Password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

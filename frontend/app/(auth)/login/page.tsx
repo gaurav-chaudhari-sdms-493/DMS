@@ -60,6 +60,7 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
+                aria-label="Email Address"
                 placeholder="Email Address"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -74,6 +75,7 @@ export default function LoginPage() {
               <input
                 type={showPassword ? "text" : "password"}
                 required
+                aria-label="Password"
                 placeholder="Password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -105,7 +107,7 @@ export default function LoginPage() {
             </Button>
 
             <div className="text-center mt-4 text-sm text-textMuted">
-              Don't have an account?{" "}
+              Don&apos;t have an account?{" "}
               <Link href="/signup" className="font-semibold text-primary hover:underline transition-all">
                 Sign Up
               </Link>

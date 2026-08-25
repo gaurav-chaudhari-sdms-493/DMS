@@ -4,6 +4,7 @@ import { Sparkles, X, User, LogOut, BarChart3, ChevronDown, ShieldCheck, Setting
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
+import { onKeyActivate } from "@/lib/a11y";
 
 interface DriveTopHeaderProps {
   onSearch: (query: string, useAi: boolean) => void;
@@ -77,9 +78,13 @@ export function DriveTopHeader({
       {/* Left: Brand Logo */}
       <div className="flex items-center flex-shrink-0 pl-1">
         <div
+          role="button"
+          tabIndex={0}
           onClick={() => {
             if (onNavigateHome) onNavigateHome();
           }}
+          onKeyDown={onKeyActivate(() => onNavigateHome && onNavigateHome())}
+          aria-label="Go to Drive home"
           className="flex items-center cursor-pointer group hover:opacity-95 transition-all"
         >
           <img
@@ -93,12 +98,13 @@ export function DriveTopHeader({
       {/* Center: Search Bar ("Search anything with Stark AI...") */}
       <form onSubmit={handleSubmit} className="flex-1 max-w-4xl">
         <div className="relative flex items-center group">
-          <button type="submit" className="absolute left-4 text-[#0b57d0] hover:text-[#0945a5] z-10 transition-transform group-hover:scale-110">
+          <button type="submit" aria-label="Search" className="absolute left-4 text-[#0b57d0] hover:text-[#0945a5] z-10 transition-transform group-hover:scale-110">
             <Sparkles className="w-5 h-5 text-[#0b57d0] animate-pulse" />
           </button>
 
           <input
             type="text"
+            aria-label="Search anything with Stark AI"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search anything with Stark AI..."
@@ -132,7 +138,7 @@ export function DriveTopHeader({
 
         {settingsOpen && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setSettingsOpen(false)} />
+            <div role="presentation" className="fixed inset-0 z-40" onClick={() => setSettingsOpen(false)} />
             <div className="absolute right-0 mt-2 w-72 bg-white border border-[#d3d7dc] rounded-xl shadow-xl z-50 p-4 space-y-4 text-[#1f1f1f]">
               <div>
                 <p className="text-xs font-semibold uppercase tracking-wider text-[#444746] mb-1">Search Settings</p>
@@ -140,8 +146,9 @@ export function DriveTopHeader({
               </div>
 
               <div>
-                <label className="text-xs font-medium text-[#444746] mb-1 block">Reranker strategy</label>
+                <label htmlFor="reranker-strategy" className="text-xs font-medium text-[#444746] mb-1 block">Reranker strategy</label>
                 <select
+                  id="reranker-strategy"
                   value={rerankProvider}
                   onChange={(e) => onChangeRerankProvider?.(e.target.value as "bgem3" | "cohere")}
                   className="w-full px-3 py-2 rounded-lg border border-[#d3d7dc] bg-[#edf2fc] text-sm font-medium focus:outline-none focus:ring-1 focus:ring-[#0b57d0]"
@@ -189,6 +196,7 @@ export function DriveTopHeader({
         {dropdownOpen && (
           <>
             <div
+              role="presentation"
               className="fixed inset-0 z-40"
               onClick={() => setDropdownOpen(false)}
             />

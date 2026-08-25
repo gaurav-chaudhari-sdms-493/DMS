@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { Folder as FolderIcon, MoreVertical, Star, Trash2, Edit2, FolderInput, RotateCcw } from "lucide-react";
 import type { Folder } from "@/types";
+import { onKeyActivate } from "@/lib/a11y";
 
 interface FolderCardProps {
   folder: Folder;
@@ -30,8 +31,12 @@ export function FolderCard({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(folder)}
       onDoubleClick={() => onOpen(folder)}
+      onKeyDown={onKeyActivate(() => onOpen(folder))}
+      aria-label={folder.name}
       className={`group relative flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer select-none ${
         isSelected
           ? "bg-primary/15 border-primary shadow-md"
@@ -70,7 +75,7 @@ export function FolderCard({
 
         {showMenu && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+            <div role="presentation" className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
             <div className="absolute right-2 top-12 z-50 w-48 glass rounded-2xl shadow-2xl border border-borderDark p-1.5 animate-fadeIn text-sm">
               <button
                 onClick={(e) => {

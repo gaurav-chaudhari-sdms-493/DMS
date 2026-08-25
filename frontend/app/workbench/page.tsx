@@ -386,6 +386,7 @@ export default function WorkbenchPage() {
             <div className="space-y-2">
               <input
                 type="text"
+                aria-label="Corpus folder ID"
                 placeholder="Corpus folder ID"
                 value={bulkFolderId}
                 onChange={(e) => setBulkFolderId(e.target.value)}
@@ -396,6 +397,7 @@ export default function WorkbenchPage() {
                 step="0.01"
                 min="0"
                 max="1"
+                aria-label="Confidence threshold, 0 to 1"
                 placeholder="Threshold (0-1)"
                 value={bulkThreshold}
                 onChange={(e) => setBulkThreshold(e.target.value)}
@@ -403,6 +405,7 @@ export default function WorkbenchPage() {
               />
               <input
                 type="text"
+                aria-label="Policy version label"
                 placeholder="Policy version label"
                 value={bulkPolicyVersion}
                 onChange={(e) => setBulkPolicyVersion(e.target.value)}
@@ -431,6 +434,7 @@ export default function WorkbenchPage() {
               </div>
               <input
                 type="text"
+                aria-label="Corrected value for selected rows"
                 placeholder="Corrected value"
                 value={editValue}
                 onChange={(e) => { setEditValue(e.target.value); setEditPreview(null); }}

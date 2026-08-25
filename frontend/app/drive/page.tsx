@@ -24,6 +24,7 @@ import { offlineStore } from "@/lib/offlineStore";
 
 import { isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
+import { onKeyActivate } from "@/lib/a11y";
 import type { Folder, FolderTreeNode, DocumentListItem, DriveStats, SearchResponse, SearchResult } from "@/types";
 import { Info, FolderSearch, Eye, Trash2, RotateCcw, Sparkles, FolderPlus, Upload, FolderUp, UploadCloud, Clock, CheckSquare, X, Star, FolderInput, Download, Edit2 } from "lucide-react";
 
@@ -1080,7 +1081,10 @@ export default function DrivePage() {
                     return (
                       <div
                         key={f.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => handleSelectFolder(f, e.ctrlKey || e.metaKey || e.shiftKey)}
+                        onKeyDown={onKeyActivate(() => handleSelectFolder(f, false))}
                         className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
                           isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
                         }`}
@@ -1131,7 +1135,10 @@ export default function DrivePage() {
                     return (
                       <div
                         key={d.id}
+                        role="button"
+                        tabIndex={0}
                         onClick={(e) => handleSelectDoc(d, e.ctrlKey || e.metaKey || e.shiftKey)}
+                        onKeyDown={onKeyActivate(() => setPreviewDoc(d))}
                         onDoubleClick={() => setPreviewDoc(d)}
                         className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
                           isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
@@ -1341,6 +1348,7 @@ export default function DrivePage() {
       {/* Right-Click Context Menu */}
       {contextMenu.visible && (
         <div
+          role="presentation"
           className="fixed inset-0 z-50 pointer-events-auto"
           onClick={() => setContextMenu((prev) => ({ ...prev, visible: false }))}
           onContextMenu={(e) => {
@@ -1349,6 +1357,7 @@ export default function DrivePage() {
           }}
         >
           <div
+            role="presentation"
             className="absolute w-56 bg-surface border border-borderDark rounded-2xl shadow-2xl py-2 text-textMain animate-fadeIn"
             style={{
               top: `${Math.min(contextMenu.y, typeof window !== "undefined" ? window.innerHeight - 160 : contextMenu.y)}px`,
@@ -1399,6 +1408,7 @@ export default function DrivePage() {
         return (
           <>
             <div
+              role="presentation"
               className="fixed inset-0 z-50"
               onClick={() => setItemContextMenu(null)}
               onContextMenu={(e) => {

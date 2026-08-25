@@ -95,6 +95,7 @@ export default function ForgotPasswordPage() {
                 <input
                   type="email"
                   required
+                  aria-label="Registered Email Address"
                   placeholder="Registered Email Address"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -131,6 +132,7 @@ export default function ForgotPasswordPage() {
                 <input
                   type="text"
                   required
+                  aria-label="Reset Code / Token"
                   placeholder="Reset Code / Token"
                   value={resetToken}
                   onChange={(e) => setResetToken(e.target.value)}
@@ -145,6 +147,7 @@ export default function ForgotPasswordPage() {
                 <input
                   type={showNewPassword ? "text" : "password"}
                   required
+                  aria-label="New Password (minimum 8 characters)"
                   placeholder="New Password (min. 8 chars)"
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
@@ -167,6 +170,7 @@ export default function ForgotPasswordPage() {
                 <input
                   type={showConfirmPassword ? "text" : "password"}
                   required
+                  aria-label="Confirm New Password"
                   placeholder="Confirm New Password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}

@@ -19,6 +19,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { onKeyActivate } from "@/lib/a11y";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 
@@ -283,7 +284,10 @@ export default function ProfilePage() {
                     return (
                       <div
                         key={idx}
+                        role="button"
+                        tabIndex={0}
                         onClick={() => handleSelectExtension(item.extension)}
+                        onKeyDown={onKeyActivate(() => handleSelectExtension(item.extension))}
                         className="space-y-1.5 p-2 rounded-xl hover:bg-surface/80 transition-all cursor-pointer group border border-transparent hover:border-primary/20"
                         title={`Click to view all .${item.extension} files`}
                       >

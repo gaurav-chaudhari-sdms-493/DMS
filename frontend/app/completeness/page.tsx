@@ -116,6 +116,7 @@ export default function CompletenessDashboardPage() {
           <div className="flex gap-2">
             <input
               type="text"
+              aria-label="Corpus folder ID"
               placeholder="Corpus folder ID"
               value={folderId}
               onChange={(e) => setFolderId(e.target.value)}
@@ -228,8 +229,9 @@ export default function CompletenessDashboardPage() {
         )}
 
         {drillCategory && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setDrillCategory(null)}>
+          <div role="presentation" className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setDrillCategory(null)}>
             <div
+              role="presentation"
               className="w-full max-w-2xl max-h-[80vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-3xl shadow-2xl text-[#1f1f1f]"
               onClick={(e) => e.stopPropagation()}
             >

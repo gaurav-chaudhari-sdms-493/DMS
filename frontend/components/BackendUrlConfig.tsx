@@ -92,6 +92,7 @@ export default function BackendUrlConfig({ className = "", compact = false }: Ba
             </div>
             <input
               type="text"
+              aria-label="Backend server URL"
               placeholder="e.g. https://1d07-103-226-171-223.ngrok-free.app or http://localhost:8000"
               value={url}
               onChange={(e) => setUrl(e.target.value)}

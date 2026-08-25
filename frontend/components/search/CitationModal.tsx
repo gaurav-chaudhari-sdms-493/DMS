@@ -23,10 +23,12 @@ export function CitationModal({ citation, onClose }: CitationModalProps) {
 
   return (
     <div
+      role="presentation"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn"
       onClick={onClose}
     >
       <div
+        role="presentation"
         className="w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-3xl shadow-2xl animate-scaleUp text-[#1f1f1f]"
         onClick={(e) => e.stopPropagation()}
       >

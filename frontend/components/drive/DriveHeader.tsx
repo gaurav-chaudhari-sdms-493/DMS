@@ -53,6 +53,7 @@ export function DriveHeader({
 
           <input
             type="text"
+            aria-label={aiMode ? "Ask AI anything about your DMS documents" : "Search in DMS"}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={aiMode ? "Ask AI anything about your DMS documents..." : "Search in DMS..."}

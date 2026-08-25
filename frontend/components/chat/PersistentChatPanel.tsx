@@ -23,6 +23,7 @@ import {
   PanelLeft
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { onKeyActivate } from "@/lib/a11y";
 import type { ChatSession, ChatSessionListItem, ChatMessage, SearchResult, DocumentListItem } from "@/types";
 import { MarkdownViewer } from "./MarkdownViewer";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -482,7 +483,11 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
             sessions.map((s) => (
               <div
                 key={s.id}
+                role="button"
+                tabIndex={0}
                 onClick={() => loadSessionDetails(s.id)}
+                onKeyDown={onKeyActivate(() => loadSessionDetails(s.id))}
+                aria-label={s.title}
                 className={`group flex items-center justify-between px-3 py-2.5 rounded-xl cursor-pointer text-sm font-medium transition-all ${
                   activeSessionId === s.id
                     ? "bg-[#c2e7ff] text-[#001d35] font-bold"
@@ -603,7 +608,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                       </div>
 
                       <p className="text-[11px] text-[#444746] line-clamp-2 italic bg-white p-1.5 rounded-lg border border-[#e1e3e1]/50">
-                        "{res.snippet}"
+                        &quot;{res.snippet}&quot;
                       </p>
 
                       <div className="flex items-center justify-between pt-0.5">
@@ -795,7 +800,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                           <span>{card.title}</span>
                         </div>
                         <p className="text-xs opacity-80 leading-relaxed font-normal">
-                          "{card.prompt}"
+                          &quot;{card.prompt}&quot;
                         </p>
                       </button>
                     );
@@ -906,6 +911,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
 
               <input
                 type="text"
+                aria-label="Ask anything or attach files to chat with documents"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Ask anything or attach file(s) to chat with documents..."

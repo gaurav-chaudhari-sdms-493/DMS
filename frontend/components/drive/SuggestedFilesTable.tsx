@@ -17,6 +17,7 @@ import {
   Eye,
 } from "lucide-react";
 import type { DocumentListItem } from "@/types";
+import { onKeyActivate } from "@/lib/a11y";
 
 interface SuggestedFilesTableProps {
   documents: DocumentListItem[];
@@ -120,7 +121,7 @@ export function SuggestedFilesTable({
           <div className="text-gray-400 border-b border-gray-700 pb-1 mb-1 font-sans text-[6px]">code.py</div>
           <p><span className="text-blue-400">import</span> os, sys</p>
           <p><span className="text-purple-400">def</span> main():</p>
-          <p className="pl-1 text-gray-300">print(<span className="text-amber-300">"DMS AI"</span>)</p>
+          <p className="pl-1 text-gray-300">print(<span className="text-amber-300">&quot;DMS AI&quot;</span>)</p>
         </div>
       </div>
     );
@@ -160,7 +161,7 @@ export function SuggestedFilesTable({
                 <div>
                   <p className="font-semibold text-[#1f1f1f] mb-0.5">Context Menu</p>
                   <p className="text-[11px] text-[#747775] leading-normal">
-                    Right-click any item and select <span className="font-semibold text-[#1f1f1f]">"Add to Starred"</span>.
+                    Right-click any item and select <span className="font-semibold text-[#1f1f1f]">&quot;Add to Starred&quot;</span>.
                   </p>
                 </div>
               </div>
@@ -177,7 +178,7 @@ export function SuggestedFilesTable({
         </div>
         <h3 className="text-sm font-semibold text-[#1f1f1f] mb-1">A place for all your files</h3>
         <p className="text-xs text-[#444746] max-w-xs">
-          Use the "+ New" button to upload documents or create folders.
+          Use the &quot;+ New&quot; button to upload documents or create folders.
         </p>
       </div>
     );
@@ -307,6 +308,7 @@ export function SuggestedFilesTable({
                           {activeMenuId === row.id && (
                             <>
                               <div
+                                role="presentation"
                                 className="fixed inset-0 z-10"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -403,6 +405,8 @@ export function SuggestedFilesTable({
                 return (
                   <div
                     key={row.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => onSelectDoc(row.raw, e.ctrlKey || e.metaKey || e.shiftKey)}
                     onDoubleClick={() => {
                       if (onPreviewDoc) onPreviewDoc(row.raw);
@@ -410,6 +414,8 @@ export function SuggestedFilesTable({
                     onContextMenu={(e) => {
                       if (onContextMenu) onContextMenu(e, row.raw);
                     }}
+                    onKeyDown={onKeyActivate(() => onPreviewDoc && onPreviewDoc(row.raw))}
+                    aria-label={row.raw.title}
                     className={`group rounded-2xl border transition-all cursor-pointer flex flex-col overflow-hidden select-none ${
                       isSelected
                         ? "bg-[#c2e7ff]/40 border-[#0b57d0] shadow-md font-semibold ring-1 ring-[#0b57d0]"

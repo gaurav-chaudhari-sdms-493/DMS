@@ -186,16 +186,44 @@ export function RightSideChatDrawer({
       style={{ width: `${drawerWidth}px` }}
       className="flex-shrink-0 bg-white border-l border-[#e1e3e1] flex flex-col h-full select-none z-30 shadow-lg animate-fadeIn relative transition-none"
     >
-      {/* Draggable Left Boundary Handle */}
+      {/* Draggable Left Boundary Handle. WAI-ARIA APG "window splitter" pattern:
+          role="separator" with tabIndex+onKeyDown is the recommended accessible
+          resize-handle widget; jsx-a11y's interactive-roles list doesn't include
+          separator, hence the block disable below. */}
+      {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
       <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize chat panel"
+        aria-valuenow={drawerWidth}
+        aria-valuemin={340}
+        aria-valuemax={typeof window !== "undefined" ? Math.min(950, window.innerWidth - 200) : 950}
+        tabIndex={0}
         onMouseDown={handleMouseDown}
+        onKeyDown={(e) => {
+          const maxWidth = typeof window !== "undefined" ? Math.min(950, window.innerWidth - 200) : 950;
+          if (e.key === "ArrowLeft") {
+            e.preventDefault();
+            setDrawerWidth((w) => Math.min(maxWidth, w + 20));
+          } else if (e.key === "ArrowRight") {
+            e.preventDefault();
+            setDrawerWidth((w) => Math.max(340, w - 20));
+          } else if (e.key === "Home") {
+            e.preventDefault();
+            setDrawerWidth(340);
+          } else if (e.key === "End") {
+            e.preventDefault();
+            setDrawerWidth(maxWidth);
+          }
+        }}
         className={`absolute left-0 top-0 bottom-0 w-2.5 -ml-1.5 cursor-col-resize z-50 flex items-center justify-center group hover:bg-[#0b57d0]/20 transition-colors ${
           isResizing ? "bg-[#0b57d0]/30" : ""
         }`}
-        title="Click and drag to extend/resize right sidebar width"
+        title="Click and drag, or use arrow keys, to resize the chat panel"
       >
         <div className="w-1 h-10 bg-[#c4c7c5] group-hover:bg-[#0b57d0] rounded-full transition-colors" />
       </div>
+      {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
 
       {/* Drawer Header */}
       <div className="p-3.5 border-b border-[#e1e3e1] flex items-center justify-between bg-[#f8fafd]">
@@ -285,7 +313,7 @@ export function RightSideChatDrawer({
                     </div>
 
                     <p className="text-[11px] text-[#444746] line-clamp-2 italic bg-[#f8fafd] p-1.5 rounded-lg border border-[#e1e3e1]/40">
-                      "{res.snippet}"
+                      &quot;{res.snippet}&quot;
                     </p>
 
                     {/* Preview button exactly to the left side of Download button */}
@@ -419,6 +447,7 @@ export function RightSideChatDrawer({
         >
           <input
             type="text"
+            aria-label="Ask anything or filter loaded docs"
             value={inputQuery}
             onChange={(e) => setInputQuery(e.target.value)}
             placeholder="Ask anything or filter loaded docs..."

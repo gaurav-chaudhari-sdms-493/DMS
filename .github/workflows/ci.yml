@@ -78,3 +78,8 @@ jobs:
         run: |
           cd frontend
           npx tsc --noEmit
+
+      - name: Accessibility Lint (WCAG 2.1 AA baseline, T96)
+        run: |
+          cd frontend
+          npx next lint

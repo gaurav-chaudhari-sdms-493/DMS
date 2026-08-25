@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { DriveStats, FolderTreeNode, DocumentListItem } from "@/types";
 import { FolderTreeSidebar } from "./FolderTreeSidebar";
+import { onKeyActivate } from "@/lib/a11y";
 
 interface DriveSidebarProps {
   currentView: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat";
@@ -72,7 +73,7 @@ export function DriveSidebar({
 
           {showNewMenu && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowNewMenu(false)} />
+              <div role="presentation" className="fixed inset-0 z-40" onClick={() => setShowNewMenu(false)} />
               <div className="absolute left-3 top-14 z-50 w-56 bg-white rounded-2xl shadow-xl border border-[#e1e3e1] p-2 animate-fadeIn text-sm text-[#1f1f1f]">
                 <button
                   onClick={() => {
@@ -146,7 +147,10 @@ export function DriveSidebar({
           {/* My Drive Node */}
           <div>
             <div
+              role="button"
+              tabIndex={0}
               onClick={() => onSelectView("my-drive")}
+              onKeyDown={onKeyActivate(() => onSelectView("my-drive"))}
               className={`flex items-center justify-between w-full px-4 py-2 rounded-r-full text-sm font-medium cursor-pointer transition-all ${currentView === "my-drive" && !activeFolderId
                 ? "bg-[#c2e7ff] text-[#001d35] font-bold"
                 : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
