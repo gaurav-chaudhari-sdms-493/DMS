@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy import ForeignKey, Boolean, DateTime
 from datetime import datetime
 import uuid
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING
 
 from app.database import Base
 
@@ -52,6 +52,12 @@ class Document(Base):
     # matches, unlike doc_dg_pages which only T22's VLM path writes to).
     pages_total_count: Mapped[int] = mapped_column(default=0, nullable=False)
     pages_failed_count: Mapped[int] = mapped_column(default=0, nullable=False)
+
+    # TS2 — data-loss audit (see app/services/data_loss_audit.py). Always
+    # populated at ingest, 0 = clean; details only holds a capped sample
+    # of missing words when the count is non-zero.
+    data_loss_words_missing: Mapped[int] = mapped_column(default=0, nullable=False)
+    data_loss_details: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="documents")
     folder: Mapped[Optional["Folder"]] = relationship("Folder", back_populates="documents")

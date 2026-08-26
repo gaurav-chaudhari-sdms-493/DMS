@@ -83,6 +83,23 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 "(set AI_OCR_PROVIDER=gcv or llamaparse)."
             )
 
+        # TS2 — data-loss audit: does every word OCR read survive into the
+        # chunks about to be stored (the search/chat/viewer-facing surface)?
+        # Best-effort, same as every other optional pipeline stage here —
+        # a failure here must never block ingestion.
+        data_loss_result = None
+        try:
+            from app.services.data_loss_audit import audit_pages_vs_chunks
+            data_loss_result = audit_pages_vs_chunks(pages, [c.content for c in chunks])
+            if not data_loss_result.passed:
+                logger.warning(
+                    f"TS2 data-loss audit: document {document_id_str} lost "
+                    f"{data_loss_result.missing_count}/{data_loss_result.total_words} words "
+                    f"({data_loss_result.loss_ratio:.2%}) between OCR and stored chunks"
+                )
+        except Exception as audit_err:
+            logger.warning(f"TS2 data-loss audit skipped for document {document_id_str}: {audit_err}")
+
         # 4. Embed chunks (batched for local BGE-M3 model / API providers)
         embed_provider = get_embed_provider()
         EMBED_BATCH_SIZE = 20
@@ -210,6 +227,12 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                     # matches (unlike doc_dg_pages, which only T22 writes to).
                     doc.pages_total_count = len(pages)
                     doc.pages_failed_count = sum(1 for p in pages if p.get("extraction_failed"))
+                    if data_loss_result:
+                        doc.data_loss_words_missing = data_loss_result.missing_count
+                        doc.data_loss_details = (
+                            {"loss_ratio": data_loss_result.loss_ratio, "missing_sample": data_loss_result.missing_sample}
+                            if data_loss_result.missing_count > 0 else None
+                        )
 
         try:
             from app.services.cache_service import invalidate_tenant_cache
