@@ -135,6 +135,37 @@ def test_join_rows_horizontally_needs_review_on_total_disagreement():
     assert "no shared" in result.reason
 
 
+def test_join_rows_horizontally_zero_anchor_structural_absence():
+    """Real-world case (a printed gazette continuation band that never
+    repeats the row-number column at all, e.g. columns 9-19 of a wide
+    government register split across two pages): no side has ANY
+    matching key, but the right side never provides a key value at all
+    (structural absence, not disagreement) — bbox position alone
+    reconciles it."""
+    left = [
+        {"no": _f("180"), "owner": _f("Priya", bbox=[0.1, 0.10, 0.5, 0.15])},
+        {"no": _f("181"), "owner": _f("Ravi", bbox=[0.1, 0.20, 0.5, 0.25])},
+    ]
+    right = [
+        {"valuation": _f("100", bbox=[0.5, 0.10, 0.9, 0.15])},  # no "no" field at all
+        {"valuation": _f("200", bbox=[0.5, 0.20, 0.9, 0.25])},  # no "no" field at all
+    ]
+    result = join_rows_horizontally(left, right, "no")
+    assert result.status == "ok"
+    assert len(result.pairs) == 2
+
+
+def test_join_rows_horizontally_explicit_conflict_never_overridden_by_position():
+    """Position must never override an explicit disagreement, even when
+    bbox data happens to be available — distinguishes real conflict from
+    structural absence."""
+    left = [{"no": _f("1"), "owner": _f("Priya", bbox=[0.1, 0.1, 0.5, 0.2])}]
+    right = [{"no": _f("2"), "valuation": _f("1000", bbox=[0.5, 0.1, 0.9, 0.2])}]
+    result = join_rows_horizontally(left, right, "no")
+    assert result.status == "needs_review"
+    assert "disagree" in result.reason
+
+
 def test_join_rows_horizontally_reconciles_uneven_leftover_by_position():
     left = [
         {"no": _f("1"), "owner": _f("Priya", bbox=[0.1, 0.1, 0.5, 0.2])},

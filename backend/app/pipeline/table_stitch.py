@@ -267,19 +267,50 @@ class HorizontalJoinResult:
     reason: str = ""
 
 
+def _any_key_value(rows: List[Dict[str, Any]], key_field: str) -> bool:
+    for row in rows:
+        v = row.get(key_field)
+        v = v.get("value") if isinstance(v, dict) else v
+        if v not in (None, ""):
+            return True
+    return False
+
+
 def join_rows_horizontally(left_rows: List[Dict[str, Any]], right_rows: List[Dict[str, Any]], key_field: str) -> HorizontalJoinResult:
     """Generalizes join_spread() (T26): exact-key matches join directly;
     leftover rows on either side (uneven counts) are reconciled by bbox
-    position rather than failing the whole page pair. Only refuses
-    (needs_review) when there's truly nothing to reconcile the leftovers
-    with — no shared keys at all, or leftovers with no usable bbox data."""
+    position rather than failing the whole page pair.
+
+    A real printed gazette register often doesn't repeat the row-number
+    column on a continuation band at all — every row on that side is
+    "keyless" by the form's own convention, not by disagreement. That's
+    a structural absence, reconciled entirely by bbox position (still
+    refusing if bbox data isn't available). It's kept strictly separate
+    from a genuine key CONFLICT (both sides have real, non-matching key
+    values, e.g. row "1" vs row "2") — position must never override
+    explicit disagreeing evidence, only ever fill in evidence that was
+    never there to begin with."""
     matched, left_only, right_only = match_rows_by_key(left_rows, right_rows, key_field)
 
     if not matched:
-        return HorizontalJoinResult(
-            status="needs_review",
-            reason=f"no shared '{key_field}' values between the two fragments — nothing to anchor a join on",
-        )
+        left_has_keys = _any_key_value(left_rows, key_field)
+        right_has_keys = _any_key_value(right_rows, key_field)
+        if left_has_keys and right_has_keys:
+            # Both sides gave real key values and none of them agree —
+            # a genuine conflict, not a structural absence. Never
+            # positionally paper over this.
+            return HorizontalJoinResult(
+                status="needs_review",
+                reason=f"'{key_field}' values on each side disagree entirely — no shared value between the two fragments",
+            )
+        groups = pair_leftovers_by_position(left_rows, right_rows)
+        if groups is None:
+            return HorizontalJoinResult(
+                status="needs_review",
+                reason=f"no shared '{key_field}' values between the two fragments and no reliable position data to pair by",
+            )
+        pairs = [(left_rows[left_idx], right_rows[right_idx]) for left_idx, right_indices in groups.items() for right_idx in right_indices]
+        return HorizontalJoinResult(status="ok", pairs=pairs)
 
     pairs = list(matched)
 

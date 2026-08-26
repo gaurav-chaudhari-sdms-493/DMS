@@ -111,7 +111,10 @@ def _build_extraction_prompt(field_schema: List[dict]) -> str:
         '"marginalia": [ {"text": <string>, "bbox": [x0,y0,x1,y1]}, ... ]}\n\n'
         "Rules:\n"
         "- One entry in \"rows\" per data row visible on this page (a page with a single "
-        "form, not a table, still produces exactly one row).\n"
+        "form, not a table, still produces exactly one row). A table row where most or all "
+        "cells just show a placeholder mark for 'not applicable' (e.g. \"..\", \"--\", \"-\") "
+        "is still a real row — include it with those literal marks as values, do not skip it. "
+        "Every printed row matters for matching this page's rows against a continuation page.\n"
         "- bbox is [x0,y0,x1,y1], each a fraction from 0.0 to 1.0 of the page's width/height. "
         "The ORIGIN is the page's TOP-LEFT corner: x grows right, y grows DOWN.\n"
         "- If a cell literally contains a ditto mark (e.g. \",,\", '\"', \"do\", \"-do-\") "
