@@ -25,6 +25,8 @@ from app.models.translation import Translation
 from app.models.subscription import Subscription
 from app.models.license import License
 from app.models.table_shape_decision import TableShapeDecision
+from app.models.ocr_archive import OCRArchive
+from app.models.vlm_archive import VLMArchive
 from app.database import Base
 
 

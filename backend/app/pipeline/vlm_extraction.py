@@ -39,6 +39,7 @@ chunk indexing must never wait on this (Section 3.5), so every call site
 wraps this module in a try/except and logs, it doesn't raise.
 """
 import base64
+import hashlib
 import io
 import json
 import logging
@@ -60,6 +61,7 @@ from app.pipeline.handlers.ditto_chain import expand_ditto_chains
 from app.pipeline import table_stitch
 from app.services.template_service import classify_confidence
 from app.services import table_shape_service
+from app.services.extraction_archive_service import compute_vlm_cache_key, get_cached_vlm_response, record_vlm_response
 
 logger = logging.getLogger(__name__)
 
@@ -158,6 +160,30 @@ def _find_role_field(field_schema: List[dict], role: str) -> Optional[str]:
     return None
 
 
+async def _call_vlm_cached(db: AsyncSession, vlm, file_hash: str, page_number: int, image_bytes: bytes, prompt: str) -> str:
+    """TS3 — a page asked with the exact same prompt (same template, same
+    field subset) never re-spends a Gemini call. The cache key includes
+    the prompt itself, so a left-half vs right-half spread call (or a
+    template's field_schema changing) naturally gets its own cache entry
+    rather than colliding."""
+    cache_key = compute_vlm_cache_key(file_hash, page_number, prompt)
+    try:
+        cached = await get_cached_vlm_response(db, cache_key)
+    except Exception as e:
+        logger.warning(f"TS3 VLM cache lookup failed for page {page_number}: {e}")
+        cached = None
+    if cached is not None:
+        logger.info(f"TS3 VLM cache hit for page {page_number} (key {cache_key[:12]}...)")
+        return cached
+
+    raw = await vlm.extract_structured(image_bytes, prompt)
+    try:
+        await record_vlm_response(db, cache_key, raw)
+    except Exception as e:
+        logger.warning(f"TS3 VLM cache write failed for page {page_number}: {e}")
+    return raw
+
+
 async def _get_or_create_page(
     db: AsyncSession, tenant_id: UUID, document_id: UUID, version_id: UUID,
     page_number: int, width: float, height: float, rotation: float,
@@ -224,6 +250,7 @@ async def _extract_spread_facts(
     right_fields = [f for f in field_schema if f.get("half") == "right" or f["name"] == serial_field]
     left_prompt = _build_extraction_prompt(left_fields)
     right_prompt = _build_extraction_prompt(right_fields)
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     facts_written = 0
 
@@ -246,8 +273,8 @@ async def _extract_spread_facts(
             left_png, left_w, left_h, left_rot = left_rendered
             right_png, right_w, right_h, right_rot = right_rendered
 
-            left_raw = await vlm.extract_structured(left_png, left_prompt)
-            right_raw = await vlm.extract_structured(right_png, right_prompt)
+            left_raw = await _call_vlm_cached(db, vlm, file_hash, left_page_number, left_png, left_prompt)
+            right_raw = await _call_vlm_cached(db, vlm, file_hash, right_page_number, right_png, right_prompt)
             left_rows, _ = _parse_vlm_response(left_raw)
             right_rows, _ = _parse_vlm_response(right_raw)
             if not left_rows or not right_rows:
@@ -431,6 +458,7 @@ async def extract_facts_for_document(
     blob_fields = [f["name"] for f in field_schema if f.get("type") == "blob"]
     full_schema_fields = frozenset(f["name"] for f in field_schema)
     stitch_exclude_fields = frozenset({serial_field}) if serial_field else frozenset()
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     facts_written = 0
 
@@ -450,7 +478,7 @@ async def extract_facts_for_document(
                     break
                 png_bytes, width, height, rotation = _render_image_page_png(file_bytes)
 
-            raw_response = await vlm.extract_structured(png_bytes, prompt)
+            raw_response = await _call_vlm_cached(db, vlm, file_hash, page_number, png_bytes, prompt)
             rows, marginalia = _parse_vlm_response(raw_response)
             if not rows and not marginalia:
                 continue

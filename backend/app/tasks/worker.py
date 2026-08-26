@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -17,6 +18,7 @@ from ..ocr.factory import get_ocr_provider
 from ..pipeline.chunker import TextChunker
 from ..services.storage_service import download_file
 from ..services.config_service import get_int, get_float
+from ..services.extraction_archive_service import get_cached_ocr, record_ocr
 from ..config import settings
 
 celery_app = Celery(
@@ -65,10 +67,29 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         # 1. Download file
         file_bytes = await download_file(s3_path)
         filename = os.path.basename(s3_path)
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
 
-        # 2. OCR
-        ocr = get_ocr_provider()
-        pages = await ocr.extract_pages(file_bytes, filename)
+        # 2. OCR — TS3: an unchanged file (by content hash) under the same
+        # OCR engine is never re-OCR'd; reprocessing the same upload after a
+        # chunking/parsing fix replays the archived response for free.
+        pages = None
+        try:
+            async with AsyncSessionLocal() as cache_db:
+                pages = await get_cached_ocr(cache_db, file_hash, settings.ai_ocr_provider)
+        except Exception as cache_err:
+            logger.warning(f"TS3 OCR cache lookup failed for {document_id_str}: {cache_err}")
+
+        if pages is not None:
+            logger.info(f"TS3 OCR cache hit for document {document_id_str} (hash {file_hash[:12]}...)")
+        else:
+            ocr = get_ocr_provider()
+            pages = await ocr.extract_pages(file_bytes, filename)
+            try:
+                async with AsyncSessionLocal() as cache_db:
+                    await record_ocr(cache_db, file_hash, settings.ai_ocr_provider, pages)
+                    await cache_db.commit()
+            except Exception as cache_err:
+                logger.warning(f"TS3 OCR cache write failed for {document_id_str}: {cache_err}")
 
         # 3. Chunk
         chunk_size = await get_int("chunk_size_tokens", 512)
