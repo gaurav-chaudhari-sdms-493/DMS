@@ -55,10 +55,72 @@ def test_ditto_chain_expands_per_column_independently():
     assert out[3]["village"] == "Kalamnuri" and "village" in out[3]["_inherited_columns"]
 
 
-def test_ditto_chain_raises_when_nothing_above_to_copy():
+def test_ditto_chain_flags_unresolved_instead_of_raising():
+    """TS5 — a broken source chain (nothing above to copy) is flagged
+    per-cell for human review rather than raising and losing the whole
+    segment's ditto resolution over one broken cell."""
     rows = [{"no": 1, "khatedar": ",,"}]
-    with pytest.raises(ValueError):
-        expand_ditto_chains(rows, columns=["khatedar"])
+    out = expand_ditto_chains(rows, columns=["khatedar"])
+    assert out[0]["_unresolved_ditto_columns"] == ["khatedar"]
+    assert out[0]["_ditto_verbatim"] == {"khatedar": ",,"}
+    assert "khatedar" not in out[0]["_inherited_columns"]
+
+
+def test_ditto_chain_matches_real_register_convention():
+    """TS5 — real bug found against an actual 1973 Maharashtra Waqf Board
+    gazette table, which writes "Do." (capitalized, trailing period), not
+    the bare lowercase "do" this only originally matched."""
+    rows = [
+        {"no": 180, "shia_or_sunni": "Sunni", "object": "Religious"},
+        {"no": 181, "shia_or_sunni": "Do.", "object": "Do."},
+        {"no": 182, "shia_or_sunni": "DO", "object": "do."},
+    ]
+    out = expand_ditto_chains(rows, columns=["shia_or_sunni", "object"])
+    assert out[1]["shia_or_sunni"] == "Sunni"
+    assert out[1]["object"] == "Religious"
+    assert out[2]["shia_or_sunni"] == "Sunni"
+    assert out[2]["object"] == "Religious"
+
+
+def test_ditto_chain_stores_verbatim_alongside_resolved_value():
+    rows = [
+        {"no": 1, "khatedar": "Ramrao Patil"},
+        {"no": 2, "khatedar": "Do."},
+    ]
+    out = expand_ditto_chains(rows, columns=["khatedar"])
+    assert out[1]["khatedar"] == "Ramrao Patil"  # resolved
+    assert out[1]["_ditto_verbatim"]["khatedar"] == "Do."  # literal reading preserved
+    assert "khatedar" in out[1]["_inherited_columns"]  # was_ditto_filled
+
+
+def test_ditto_chain_anchor_resets_all_columns_on_genuine_change():
+    """Opt-in chain_anchor_column: a genuine (non-ditto) change resets
+    EVERY column's chain, not just its own."""
+    rows = [
+        {"no": 1, "khatedar": "Ramrao Patil", "village": "Basmath"},
+        {"no": 2, "khatedar": ",,", "village": "Kalamnuri"},  # village genuinely changes
+        {"no": 3, "khatedar": ",,", "village": ",,"},  # khatedar ditto now has nothing to copy
+    ]
+    out = expand_ditto_chains(rows, columns=["khatedar", "village"], chain_anchor_column="village")
+    assert out[1]["village"] == "Kalamnuri"
+    assert "khatedar" in out[1]["_unresolved_ditto_columns"]  # reset by the anchor change
+    assert out[2]["village"] == "Kalamnuri"  # village itself still chains fine
+    assert "khatedar" in out[2]["_unresolved_ditto_columns"]  # still broken -- nothing valid since the reset
+
+
+def test_ditto_chain_without_anchor_lets_unrelated_columns_persist_across_change():
+    """Regression guard: without an explicit chain_anchor_column, a
+    village change must NOT reset other columns (see
+    test_ditto_chain_expands_per_column_independently — this is the
+    real, already-validated behavior an anchor-based rule must not
+    silently override for callers who never opted in)."""
+    rows = [
+        {"no": 1, "khatedar": "Ramrao Patil", "village": "Basmath"},
+        {"no": 2, "khatedar": ",,", "village": "Kalamnuri"},
+    ]
+    out = expand_ditto_chains(rows, columns=["khatedar", "village"])
+    assert out[1]["khatedar"] == "Ramrao Patil"
+    assert "khatedar" in out[1]["_inherited_columns"]
 
 
 # --- Handler 3: continuation-row merge -----------------------------------

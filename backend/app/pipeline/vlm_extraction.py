@@ -72,6 +72,11 @@ RENDERABLE_EXTENSIONS = {"pdf", "jpg", "jpeg", "png", "bmp", "webp", "tiff"}
 #   "role": "serial"             — the row-number column continuation-merge keys off
 #   "role": "continuation_text"  — text column(s) a continuation row's text merges into
 #   "ditto_eligible": true       — this column may carry a ditto mark to expand
+#   "role": "chain_anchor"       — TS5, opt-in and unused by any currently-registered
+#                                   template: a genuine change in this column resets
+#                                   every ditto_eligible column's chain, not just its
+#                                   own (see ditto_chain.py's own docstring for why
+#                                   this is never inferred automatically)
 #   "type": "blob"               — free-text cell to run through parse_blob_cell
 
 
@@ -501,6 +506,7 @@ async def extract_facts_for_document(
     serial_field = _find_role_field(field_schema, "serial")
     continuation_text_fields = [f["name"] for f in field_schema if f.get("role") == "continuation_text"]
     ditto_fields = [f["name"] for f in field_schema if f.get("ditto_eligible")]
+    chain_anchor_field = _find_role_field(field_schema, "chain_anchor")
     blob_fields = [f["name"] for f in field_schema if f.get("type") == "blob"]
     full_schema_fields = frozenset(f["name"] for f in field_schema)
     stitch_exclude_fields = frozenset({serial_field}) if serial_field else frozenset()
@@ -573,8 +579,8 @@ async def extract_facts_for_document(
 
         if ditto_fields:
             try:
-                merged_plain = expand_ditto_chains(merged_plain, ditto_fields)
-            except ValueError as e:
+                merged_plain = expand_ditto_chains(merged_plain, ditto_fields, chain_anchor_column=chain_anchor_field)
+            except Exception as e:
                 logger.warning(f"T22 ditto-chain expansion skipped for a segment starting at page {segment[0]['page_number']}: {e}")
 
         for merged_row in merged_plain:
@@ -620,6 +626,25 @@ async def extract_facts_for_document(
                     }
 
                 fact_confidence = (sum(confidences) / len(confidences)) if confidences else None
+                fact_status = classify_confidence(field_def, fact_confidence, is_handwritten=field_is_handwritten)
+
+                # TS5 — ditto-filled fields carry both the resolved value
+                # and the literal mark that was actually read; a mark
+                # with a broken chain (no valid value above to copy) is
+                # never silently guessed — it's forced into review instead
+                # of whatever confidence banding would otherwise apply.
+                ditto_verbatim = merged_row.get("_ditto_verbatim", {}).get(field_name)
+                is_unresolved_ditto = field_name in merged_row.get("_unresolved_ditto_columns", [])
+                if ditto_verbatim is not None:
+                    fact_value = {
+                        "v": fact_value,
+                        "verbatim": ditto_verbatim,
+                        "was_ditto_filled": not is_unresolved_ditto,
+                    }
+                    if is_unresolved_ditto:
+                        fact_value["ditto_unresolved"] = True
+                        fact_status = "in_review"
+
                 fact = Fact(
                     tenant_id=tenant_id,
                     document_id=document_id,
@@ -628,7 +653,7 @@ async def extract_facts_for_document(
                     value=fact_value if isinstance(fact_value, (dict, list)) else {"v": fact_value},
                     confidence=fact_confidence,
                     is_handwritten=field_is_handwritten,
-                    status=classify_confidence(field_def, fact_confidence, is_handwritten=field_is_handwritten),
+                    status=fact_status,
                 )
                 db.add(fact)
                 await db.flush()
