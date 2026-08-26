@@ -359,8 +359,46 @@ async def _extract_spread_facts(
 ADJUDICATION_CONFIDENCE_THRESHOLD = 0.6
 
 
+async def _write_stitch_ambiguous_fact(
+    db: AsyncSession, tenant_id: UUID, document_id: UUID, version_id: UUID,
+    shape_hash: str, prev_pe: Dict[str, Any], pe: Dict[str, Any],
+) -> None:
+    """TS4 — skips writing a duplicate review item if this exact shape is
+    already sitting unresolved in the queue (a batch of documents sharing
+    one recurring ambiguous layout shouldn't flood the queue with N
+    identical items before a human answers the first one)."""
+    existing = await db.execute(
+        select(Fact).where(
+            Fact.tenant_id == tenant_id,
+            Fact.field_name == "_stitch_ambiguous",
+            Fact.status == "in_review",
+            Fact.value["shape_hash"].astext == shape_hash,
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none():
+        return
+
+    fact = Fact(
+        tenant_id=tenant_id, document_id=document_id, version_id=version_id,
+        field_name="_stitch_ambiguous",
+        value={
+            "shape_hash": shape_hash,
+            "page_a": prev_pe["page_number"],
+            "page_b": pe["page_number"],
+            "reason": "field-set overlap is neither clearly the same table continuing nor clearly disjoint column bands, and no confident answer was available",
+        },
+        confidence=None, is_handwritten=False, status="in_review",
+    )
+    db.add(fact)
+    await db.flush()
+    db.add(FactRegion(tenant_id=tenant_id, fact_id=fact.id, page_id=prev_pe["page"].id, x0=0.0, y0=0.0, x1=1.0, y1=1.0))
+
+
 async def _stitch_vertical_segments(
     db: AsyncSession,
+    tenant_id: UUID,
+    document_id: UUID,
+    version_id: UUID,
     page_extractions: List[Dict[str, Any]],
     full_schema_fields: frozenset,
     exclude_fields: frozenset,
@@ -378,7 +416,14 @@ async def _stitch_vertical_segments(
     back to a narrow LLM adjudication call — never both attempted for the
     same shape twice. Adjudication unavailable (air-gapped, no local LLM,
     malformed response) or below-confidence defaults to NOT stitching —
-    the safe, current behavior — rather than guessing.
+    the safe, current behavior — rather than guessing, but (TS4) also
+    writes a "_stitch_ambiguous" Fact so a human can answer it via
+    POST /facts/{fact_id}/resolve-stitch-ambiguity. That answer is
+    cached with decided_by='human' (table_shape_service.py), which
+    outranks any future LLM guess for the same shape and is applied
+    automatically to every future document with it — closing the loop
+    the shape-hash cache's decided_by='human' column was built for but,
+    before TS4, had no write path to ever reach.
 
     Deliberately vertical-only: a horizontal (sideways) relation detected
     here is left as separate segments, not auto-merged. Horizontal joins
@@ -415,6 +460,7 @@ async def _stitch_vertical_segments(
                     await table_shape_service.record_shape_decision(db, s_hash, relation, decided_by="llm", confidence=verdict.confidence)
                 else:
                     relation = "unrelated"
+                    await _write_stitch_ambiguous_fact(db, tenant_id, document_id, version_id, s_hash, prev_pe, pe)
 
         if relation == "vertical":
             segments[-1].append(pe)
@@ -494,7 +540,7 @@ async def extract_facts_for_document(
     # continuing downward, so a continuation row that starts a fresh page
     # merges into the entry it actually continues rather than becoming a
     # stray half-record.
-    segments = await _stitch_vertical_segments(db, page_extractions, full_schema_fields, stitch_exclude_fields)
+    segments = await _stitch_vertical_segments(db, tenant_id, document_id, version_id, page_extractions, full_schema_fields, stitch_exclude_fields)
 
     # Phase C — per segment: concatenate its pages' rows in reading order,
     # then run the existing continuation-merge/ditto/blob-parse handlers

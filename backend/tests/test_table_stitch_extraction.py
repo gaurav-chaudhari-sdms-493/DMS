@@ -17,6 +17,7 @@ from app.models.document import Document
 from app.models.document_version import DocumentVersion
 from app.models.fact import Fact
 from app.models.fact_region import FactRegion
+from app.models.page import DocumentPage
 from app.models.table_shape_decision import TableShapeDecision
 from app.pipeline.vlm_extraction import extract_facts_for_document, _extract_spread_facts, _stitch_vertical_segments
 from sqlalchemy import select
@@ -244,6 +245,8 @@ async def test_ambiguous_shape_adjudicated_once_then_cached():
     verdict instead of asking again."""
     async with AsyncSessionLocal() as db:
         try:
+            tenant_id, doc_id, version_id = await _make_doc(db)
+
             # Unique field names per run: doc_dg_table_shape_decisions is
             # keyed on shape (not document) and rows persist across test
             # runs against this shared dev DB — a hardcoded shape would
@@ -266,7 +269,7 @@ async def test_ambiguous_shape_adjudicated_once_then_cached():
             orig_get_llm = vlm_mod.get_llm_provider
             vlm_mod.get_llm_provider = lambda: fake_llm
             try:
-                segments_1 = await _stitch_vertical_segments(db, page_extractions_1, full_schema, frozenset())
+                segments_1 = await _stitch_vertical_segments(db, tenant_id, doc_id, version_id, page_extractions_1, full_schema, frozenset())
                 await db.commit()
                 assert len(segments_1) == 1  # adjudicated "vertical" -> stitched
                 assert fake_llm.complete.call_count == 1
@@ -286,7 +289,7 @@ async def test_ambiguous_shape_adjudicated_once_then_cached():
                     {"page_number": 5, "rows": [{fa: _f("p"), fb: _f("q")}], "marginalia": [], "page": None},
                     {"page_number": 6, "rows": [{fb: _f("q2"), fc: _f("r")}], "marginalia": [], "page": None},
                 ]
-                segments_2 = await _stitch_vertical_segments(db, page_extractions_2, full_schema, frozenset())
+                segments_2 = await _stitch_vertical_segments(db, tenant_id, doc_id, version_id, page_extractions_2, full_schema, frozenset())
                 await db.commit()
                 assert len(segments_2) == 1
                 assert fake_llm.complete.call_count == 1  # unchanged — cache hit
@@ -300,27 +303,39 @@ async def test_ambiguous_shape_adjudicated_once_then_cached():
 @pytest.mark.asyncio
 async def test_adjudication_unavailable_defaults_to_not_stitching():
     """Air-gapped / no local LLM must degrade safely: ambiguous stays
-    separate segments rather than guessing."""
+    separate segments rather than guessing — and (TS4) writes a
+    _stitch_ambiguous Fact so a human can resolve it instead."""
     async with AsyncSessionLocal() as db:
         try:
+            tenant_id, doc_id, version_id = await _make_doc(db)
+            page_a = DocumentPage(tenant_id=tenant_id, document_id=doc_id, version_id=version_id, page_number=1, width=595.0, height=842.0)
+            page_b = DocumentPage(tenant_id=tenant_id, document_id=doc_id, version_id=version_id, page_number=2, width=595.0, height=842.0)
+            db.add_all([page_a, page_b])
+            await db.flush()
+
             import app.pipeline.vlm_extraction as vlm_mod
 
             def _raise_air_gapped():
                 raise RuntimeError("AIR_GAPPED=true, no local LLM provider")
 
-            fields_a = frozenset({"m", "n"})
-            fields_b = frozenset({"n", "o"})
             page_extractions = [
-                {"page_number": 1, "rows": [{"m": _f("x"), "n": _f("y")}], "marginalia": [], "page": None},
-                {"page_number": 2, "rows": [{"n": _f("y2"), "o": _f("z")}], "marginalia": [], "page": None},
+                {"page_number": 1, "rows": [{"m": _f("x"), "n": _f("y")}], "marginalia": [], "page": page_a},
+                {"page_number": 2, "rows": [{"n": _f("y2"), "o": _f("z")}], "marginalia": [], "page": page_b},
             ]
 
             orig_get_llm = vlm_mod.get_llm_provider
             vlm_mod.get_llm_provider = _raise_air_gapped
             try:
-                segments = await _stitch_vertical_segments(db, page_extractions, frozenset({"m", "n", "o", "p"}), frozenset())
+                segments = await _stitch_vertical_segments(db, tenant_id, doc_id, version_id, page_extractions, frozenset({"m", "n", "o", "p"}), frozenset())
                 await db.commit()
                 assert len(segments) == 2  # not stitched — safe default
+
+                res = await db.execute(select(Fact).where(Fact.document_id == doc_id, Fact.field_name == "_stitch_ambiguous"))
+                ambiguous_fact = res.scalar_one()
+                assert ambiguous_fact.status == "in_review"
+                assert ambiguous_fact.value["page_a"] == 1
+                assert ambiguous_fact.value["page_b"] == 2
+                assert "shape_hash" in ambiguous_fact.value
             finally:
                 vlm_mod.get_llm_provider = orig_get_llm
         finally:

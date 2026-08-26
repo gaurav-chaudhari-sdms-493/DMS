@@ -24,6 +24,7 @@ from app.models.audit_log import AuditLog
 from app.models.document import Document
 from app.models.fact import Fact
 from app.services.audit_service import log_action
+from app.services import field_trust_service, table_shape_service
 
 
 async def claim_fact(db: AsyncSession, tenant_id: UUID, fact_id: UUID, actor_id: UUID) -> Fact:
@@ -86,10 +87,60 @@ async def confirm_fact(db: AsyncSession, tenant_id: UUID, fact_id: UUID, actor_i
     fact.claimed_at = None
     await db.flush()
 
+    # TS4 — a real human just confirmed this field-shape was read
+    # correctly; accumulate it as a hint for future occurrences of the
+    # same field_name, never as a bypass of this confirmation itself.
+    if not fact.is_handwritten:
+        await field_trust_service.record_confirmation(db, fact.field_name)
+
     await log_action(
         db, actor_id, tenant_id, "fact.confirm",
         resource_type="fact", resource_id=fact.id,
         details={"field_name": fact.field_name, "is_handwritten": fact.is_handwritten},
+    )
+
+    return fact
+
+
+async def resolve_stitch_ambiguity(db: AsyncSession, tenant_id: UUID, fact_id: UUID, relation: str, actor_id: UUID) -> Fact:
+    """TS4 — completes TS1's own review loop: a "_stitch_ambiguous"
+    Fact (written by _stitch_vertical_segments when a page pair was
+    neither evidence-certain nor confidently adjudicated) gets a real
+    human answer here. That answer is written to
+    doc_dg_table_shape_decisions with decided_by='human', which
+    table_shape_service.record_shape_decision() treats as permanently
+    outranking any future LLM guess for the same shape — this is TS1's
+    existing mechanism (see app/pipeline/table_stitch.py), not a new
+    caching layer, applied automatically to every future document with
+    that same field-shape."""
+    if actor_id is None:
+        raise ValueError("resolving requires an actor")  # T08
+    if relation not in ("vertical", "horizontal", "unrelated"):
+        raise HTTPException(status_code=400, detail="relation must be 'vertical', 'horizontal', or 'unrelated'")
+
+    fact = await db.get(Fact, fact_id)
+    if not fact or fact.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Fact not found")
+    if fact.field_name != "_stitch_ambiguous":
+        raise HTTPException(status_code=409, detail="This fact is not a stitch-ambiguity item")
+    if fact.status == "verified":
+        raise HTTPException(status_code=409, detail="Already resolved")
+
+    shape_hash = (fact.value or {}).get("shape_hash")
+    if not shape_hash:
+        raise HTTPException(status_code=500, detail="Fact is missing its shape_hash")
+
+    await table_shape_service.record_shape_decision(db, shape_hash, relation, decided_by="human", actor_id=actor_id)
+
+    fact.status = "verified"
+    fact.verified_by_actor_id = actor_id
+    fact.verified_at = datetime.utcnow()
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "fact.resolve_stitch_ambiguity",
+        resource_type="fact", resource_id=fact.id,
+        details={"relation": relation, "shape_hash": shape_hash},
     )
 
     return fact
@@ -222,7 +273,7 @@ async def get_adjudication_queue(
     the extraction path itself: the left/right layout convention it's
     built against is invented, not modeled on a real scanned spread.
     """
-    valid_categories = {"low_confidence", "handwritten", "marginalia", "join_mismatch"}
+    valid_categories = {"low_confidence", "handwritten", "marginalia", "join_mismatch", "stitch_ambiguous"}
     if category not in valid_categories:
         raise HTTPException(status_code=400, detail=f"Unknown category '{category}'. Valid: {sorted(valid_categories)}")
 
@@ -234,6 +285,13 @@ async def get_adjudication_queue(
         conditions.append(Fact.field_name == "_marginalia")
     elif category == "join_mismatch":
         conditions.append(Fact.field_name == "_join_mismatch")
+    elif category == "stitch_ambiguous":
+        # TS4 — pairs _stitch_vertical_segments couldn't confidently
+        # resolve (no cached shape decision, no confident adjudication).
+        # Resolving one via POST /facts/{fact_id}/resolve-stitch-ambiguity
+        # writes a 'human' decision to doc_dg_table_shape_decisions,
+        # applied automatically to every future document with that shape.
+        conditions.append(Fact.field_name == "_stitch_ambiguous")
 
     from sqlalchemy import func
     count_res = await db.execute(select(func.count(Fact.id)).where(*conditions))
@@ -243,6 +301,18 @@ async def get_adjudication_queue(
         select(Fact).where(*conditions).order_by(Fact.confidence.asc().nulls_first()).limit(limit).offset(offset)
     )
     facts = list(res.scalars().all())
+
+    # TS4 — one trust-signal lookup per distinct field_name in this page,
+    # not per fact, so a queue page of 50 low-confidence facts sharing a
+    # handful of field names costs a handful of lookups, not fifty.
+    trust_signals: Dict[str, Any] = {}
+    for f in facts:
+        if f.field_name not in trust_signals:
+            signal = await field_trust_service.get_trust_signal(db, f.field_name)
+            trust_signals[f.field_name] = (
+                {"confirmed_count": signal.confirmed_count, "corrected_count": signal.corrected_count}
+                if signal else None
+            )
 
     return {
         "category": category,
@@ -256,6 +326,7 @@ async def get_adjudication_queue(
                 "confidence": f.confidence,
                 "is_handwritten": f.is_handwritten,
                 "claimed_by_actor_id": str(f.claimed_by_actor_id) if f.claimed_by_actor_id else None,
+                "trust_signal": trust_signals.get(f.field_name),
             }
             for f in facts
         ],
@@ -346,6 +417,12 @@ async def bulk_edit_facts(
                     "previous_status": previous_status,
                 },
             )
+
+            # TS4 — correcting a value that was flagged in_review (as
+            # opposed to a machine fact never reviewed at all) is a real
+            # signal this field-shape's low-confidence reading was wrong.
+            if previous_status == "in_review" and not fact.is_handwritten:
+                await field_trust_service.record_correction(db, fact.field_name)
 
     if not dry_run and changed_count:
         await db.flush()
