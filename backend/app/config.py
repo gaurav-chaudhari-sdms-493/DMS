@@ -56,6 +56,17 @@ class Settings(BaseSettings):
     # those rather than falsely claiming to serve them locally.
     air_gapped: bool = False
 
+    # T81 — licensing enforcement. Placeholder business model pending real
+    # sign-off (A5) — see T81_licensing_assumptions.md. deployment_mode picks
+    # which enforcement mechanism applies: 'saas' meters usage against a
+    # subscription plan (app/services/license_service.py:PLAN_DEFINITIONS);
+    # 'on_prem' verifies a signed capacity license file instead, since an
+    # air-gapped install (T92) cannot phone home to check a subscription.
+    deployment_mode: Literal['saas', 'on_prem'] = 'saas'
+    license_enforcement_enabled: bool = True
+    on_prem_license_path: str = '/etc/veritasdocs/license.lic'
+    license_grace_period_days: int = 14
+
     # AI Providers
     ai_llm_provider: Literal['openai', 'anthropic', 'groq'] = 'openai'
     ai_embed_provider: Literal['openai', 'bgem3', 'gemini', 'cohere'] = 'bgem3'

@@ -22,6 +22,7 @@ from ..schemas.document import (
 )
 from ..services.storage_service import upload_file, generate_presigned_url, delete_file
 from ..services.audit_service import log_action
+from ..services.license_service import check_upload_allowed
 from ..pipeline.ingestion import ingest_document
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,13 @@ async def upload_document(
     force: bool = False,
 ) -> DocumentUploadResponse:
     """Upload a document to MinIO S3, create DB records, and schedule async ingestion."""
+    # T81 — the metered action. Blocks new ingestion only; already-stored
+    # documents stay fully readable/searchable/exportable regardless of
+    # license state (see license_service module docstring).
+    license_check = await check_upload_allowed(db, tenant_id)
+    if not license_check.allowed:
+        raise HTTPException(status_code=402, detail=license_check.reason)
+
     if folder_id:
         folder = await db.get(Folder, folder_id)
         if not folder or folder.tenant_id != tenant_id:

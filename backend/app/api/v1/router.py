@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from . import auth, documents, search, folders, chat, admin, health, connectors, email_webhook, facts, entities, records, governance, departments, export, i18n
+from . import auth, documents, search, folders, chat, admin, health, connectors, email_webhook, facts, entities, records, governance, departments, export, i18n, billing
 
 api_router = APIRouter(prefix='/api/v1')
 api_router.include_router(health.router, tags=['health'])
@@ -18,3 +18,4 @@ api_router.include_router(records.router)
 api_router.include_router(governance.router)
 api_router.include_router(departments.router)
 api_router.include_router(export.router)
+api_router.include_router(billing.router, tags=['billing'])

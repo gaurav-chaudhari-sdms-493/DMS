@@ -10,6 +10,7 @@ from app.config import settings
 from app.schemas.auth import TokenPayload, SignUpRequest, SignUpResponse
 from app.models.user import User, UserRole
 from app.models.tenant import Tenant
+from app.services.license_service import get_or_create_subscription
 
 import bcrypt
 
@@ -43,6 +44,7 @@ async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
         role=UserRole.admin,
     )
     db.add(user)
+    await get_or_create_subscription(db, tenant.id)  # T81 — every tenant starts on a trial
     await db.commit()
     await db.refresh(user)
 
