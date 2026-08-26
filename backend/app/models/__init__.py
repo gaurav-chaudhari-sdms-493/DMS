@@ -24,6 +24,7 @@ from app.models.retention_class import RetentionClass
 from app.models.translation import Translation
 from app.models.subscription import Subscription
 from app.models.license import License
+from app.models.table_shape_decision import TableShapeDecision
 from app.database import Base
 
 

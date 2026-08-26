@@ -125,7 +125,9 @@ async def test_spread_extraction_writes_join_mismatch_fact_on_serial_disagreemen
             assert mismatch.status == "in_review"
             assert mismatch.value["left_page"] == 1
             assert mismatch.value["right_page"] == 2
-            assert "1" in mismatch.value["reason"] or "2" in mismatch.value["reason"]
+            # TS1 — join_rows_horizontally()'s reason no longer names the specific
+            # serials (see test_table_stitch.py for that), just that nothing anchored.
+            assert "no shared" in mismatch.value["reason"]
         finally:
             await db.rollback()
             await db.close()
