@@ -59,6 +59,10 @@ class Document(Base):
     data_loss_words_missing: Mapped[int] = mapped_column(default=0, nullable=False)
     data_loss_details: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
+    # TS6 — page-furniture detection (see app/services/page_furniture_service.py).
+    # Detection only, never applied to chunk content. NULL when nothing detected.
+    page_furniture_candidates: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="documents")
     folder: Mapped[Optional["Folder"]] = relationship("Folder", back_populates="documents")
     versions: Mapped[List["DocumentVersion"]] = relationship(

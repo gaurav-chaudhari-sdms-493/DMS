@@ -121,6 +121,18 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         except Exception as audit_err:
             logger.warning(f"TS2 data-loss audit skipped for document {document_id_str}: {audit_err}")
 
+        # TS6 — page-furniture detection: flags (never removes) running
+        # headers/footers by position stability. Purely informational,
+        # same best-effort contract as every other optional stage here.
+        furniture_candidates = None
+        try:
+            from app.services.page_furniture_service import detect_page_furniture
+            furniture_candidates = detect_page_furniture(pages)
+            if furniture_candidates:
+                logger.info(f"TS6 page-furniture: document {document_id_str} has {len(furniture_candidates)} candidate(s)")
+        except Exception as furniture_err:
+            logger.warning(f"TS6 page-furniture detection skipped for document {document_id_str}: {furniture_err}")
+
         # 4. Embed chunks (batched for local BGE-M3 model / API providers)
         embed_provider = get_embed_provider()
         EMBED_BATCH_SIZE = 20
@@ -254,6 +266,8 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                             {"loss_ratio": data_loss_result.loss_ratio, "missing_sample": data_loss_result.missing_sample}
                             if data_loss_result.missing_count > 0 else None
                         )
+                    if furniture_candidates:
+                        doc.page_furniture_candidates = furniture_candidates
 
         try:
             from app.services.cache_service import invalidate_tenant_cache
