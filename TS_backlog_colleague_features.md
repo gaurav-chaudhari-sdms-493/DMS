@@ -1,0 +1,66 @@
+# New scope: features ported from colleague's waqf feature-stitching project
+
+Source: `Waqf_Project-feature-stitching_using_llm.zip`, provided by the user 2026-08-26, analyzed in full (code + docs, not just README claims).
+
+This is **new scope, not in the original SoW-derived `backlog.txt`**. Per D-9's own logic (scope additions need explicit sign-off, not silent inclusion), these are tracked separately here rather than inserted into `backlog.txt`. IDs use a `TS` prefix (table-stitching project origin) to keep them visually distinct from the SoW's `T`-numbered tasks. Nothing here is ported as code — each item is a *concept* re-implemented against our own Postgres/PaddleOCR/RLS/air-gapped architecture, since the source project is cloud-API-based (Chandra/Claude/Gemini/Sarvam via OpenRouter) and SQLite/flat-file-backed, both of which conflict with our T92 egress-zero posture and multi-tenant Postgres design.
+
+Build order below reflects dependency and payoff, not just the order the user asked about them.
+
+---
+
+### TS1 — Two-axis table stitching engine (vertical column-merge + horizontal row-merge)
+The feature the user explicitly asked about. A three-layer decision hierarchy for reconstructing a logical table from OCR'd fragments split across pages: (1) **evidence layer** — read printed column numbers directly off headers where present, zero-cost; (2) **decision layer** — deterministic, unit-tested rules: vertical "continues downward" by fuzzy header-similarity (≥70%, OCR-noise tolerant) or matching column-count with no headers; horizontal "joins sideways" by column-span adjacency against the document's own widest printed column number; (3) **adjudication layer** — narrow, structure-only local-model call for the remaining ambiguous cases, cached per table-*shape* hash (not per document), with a **hard pre-veto**: a join is refused outright when row counts disagree, regardless of what the model says — this is the load-bearing safety property, added after a real regression where the model mislabeled a downward continuation as a sideways split.
+Also includes: position-based row pairing via cell bbox y-coordinates for uneven left/right row counts (falls back to strict parity + flag-for-review when no bbox exists).
+**Depends on:** T73 (structured-record extraction) as the natural integration point; benefits from TS3 (OCR raw-response caching) existing first so iteration doesn't re-run OCR each time.
+**Size:** L — the largest, most novel item here.
+
+### TS2 — Data-loss audit script
+Word-level (not block-level) diff verifying every word the OCR engine returned is present somewhere in the viewer, the Markdown export, and the xlsx/report export. Deliberately word-level because stitching/merging legitimately moves text between blocks — a block-count check would false-positive on correct restructuring. Runs against archived raw OCR output, not a re-OCR.
+**Why it matters here specifically:** VeritasDocs has an audit-hash-chain requirement (T63) and a Section 63 evidentiary certificate (T65) — a "nothing OCR read is silently dropped downstream" guarantee is directly on-brand for an evidence system, and there's no equivalent check today.
+**Depends on:** none functionally, but most useful once TS1 lands (stitching is exactly the kind of restructuring that could silently drop content).
+**Size:** S–M.
+
+### TS3 — OCR raw-response archival + content-hash caching
+Archive each page's raw OCR/VLM response to storage keyed by page content-hash. An unchanged page is never re-OCR'd on reprocessing; reconstruction/parsing bugs can be fixed and replayed against the archived raw response for free. Check first whether PaddleOCR/Tesseract in the current pipeline already does this — if not, this is high-leverage before iterating further on TS1.
+**Depends on:** none.
+**Size:** M.
+
+### TS4 — Shape-keyed human-answer caching, generalized to the verification workbench
+The general pattern behind TS1's reviewer-decision cache ("ask once per *kind* of ambiguity, apply to every future instance of that shape") applied beyond table stitching to other HITL review flows already in the verification workbench. Reduces reviewer repeat-work as more documents of a known form/layout are ingested.
+**Depends on:** TS1 (reuses/extends its shape-hash caching mechanism rather than building a second one).
+**Size:** M.
+
+### TS5 — Ditto-chain forward-fill with explicit break rules
+Store both the literal OCR reading (`verbatim`, e.g. "Do.") and a resolved/forward-filled value per cell, with a `was_ditto_filled` flag. Forward-fill is explicitly refused (and flagged for review instead) across a village change, a table restart, or a broken source chain.
+**Needs verification first:** confirm our actual Marathi/Devanagari waqf registers use the same "Do."-style ditto convention before committing effort — this is a scoped, concrete win only if the source documents match.
+**Depends on:** none functionally; sequence after TS1 since both touch cell-level table structure.
+**Size:** M.
+
+### TS6 — Page-furniture detection by position-stability
+Flag (never delete) repeated running headers/footers by checking they sit at a stable vertical position across pages (spread < 5% of page height, within the top/bottom 12% margin) rather than by content-repetition alone. Repetition-only filtering has a documented failure mode (deleted 25% of a 100-page file where legitimate content — a repeated cause-title — was mistaken for furniture).
+**Depends on:** none. Relevant only if/where our ingestion pipeline currently does any repeated-content suppression — confirm first.
+**Size:** S.
+
+### TS7 — Cross-script glossary-first search expansion
+Hand-curated EN/Devanagari synonym table for domain vocabulary (waqf/wakf/वक्फ, kabrastan/qabrastan/graveyard/कब्रस्तान, etc.), checked first and free; only unseen terms fall through to a cached translation call. Complements existing T72 (pg_trgm fuzzy match) and BGE/Cohere reranking rather than replacing either.
+**Depends on:** none.
+**Size:** S.
+
+### TS8 — OCR engine comparison / bake-off harness
+Structured head-to-head scoring of OCR engines on table-row capture, cell-bbox coverage, and a "degenerate table" detector (>90% empty cells = not a real table). Since T90 already gives us Tesseract/pdfplumber/llamaparse/PaddleOCR as interchangeable providers, this would inform provider defaults per document type/language instead of one hardcoded default.
+**Depends on:** T90 (already done).
+**Size:** M.
+
+### TS9 — Verify per-cell provenance survives table stitching
+Not a build item — a verification/audit task. Confirm the verification workbench's existing click-to-source (page + bbox) survives cell merges the same way it does pre-stitch, once TS1 exists. Also confirm T73's record extraction keeps each register form's own column structure (no forced canonical schema across differing form layouts), matching the source project's explicit design stance.
+**Depends on:** TS1.
+**Size:** S (verification only).
+
+---
+
+## Explicitly not porting
+Cloud OCR/VLM providers (Chandra/Claude/Gemini/Sarvam) — conflicts with T92 egress-zero. SQLite + flat-JSON storage — regression vs. our Postgres + RLS. Their search stack (SQLite FTS5 + rapidfuzz) — smaller-scale version of what T72/BGE/Cohere already provide, except TS7. Their flat audit trail — regression vs. T63's hash-chained audit. RBAC/multi-tenancy — already built here (D-1, T50), explicitly out of scope in the source project itself.
+
+## Suggested execution order
+TS1 → TS3 → TS2 → TS9 → TS5 → TS4 → TS7 → TS6 → TS8.
+(TS1 first since it's the explicit ask; TS3 right after since it de-risks TS1 iteration; TS2 and TS9 close the loop verifying TS1 didn't lose or orphan data; the remainder are independent, lower-effort additions taken in roughly descending value order.)
