@@ -13,17 +13,20 @@ import {
   Upload,
   Sparkles,
   Server,
+  Camera,
+  AlertTriangle,
 } from "lucide-react";
 import type { DriveStats, FolderTreeNode, DocumentListItem } from "@/types";
 import { FolderTreeSidebar } from "./FolderTreeSidebar";
 import { onKeyActivate } from "@/lib/a11y";
 
 interface DriveSidebarProps {
-  currentView: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat";
-  onSelectView: (view: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat") => void;
+  currentView: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat" | "needs-review";
+  onSelectView: (view: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat" | "needs-review") => void;
   onOpenNewFolderModal: () => void;
   onTriggerFileUpload: () => void;
   onOpenConnectorModal: () => void;
+  onOpenWebScannerModal?: () => void;
   stats: DriveStats | null;
   folderTree?: FolderTreeNode[];
   activeFolderId?: string | null;
@@ -38,6 +41,7 @@ export function DriveSidebar({
   onOpenNewFolderModal,
   onTriggerFileUpload,
   onOpenConnectorModal,
+  onOpenWebScannerModal,
   stats,
   folderTree = [],
   activeFolderId = null,
@@ -75,6 +79,23 @@ export function DriveSidebar({
             <>
               <div role="presentation" className="fixed inset-0 z-40" onClick={() => setShowNewMenu(false)} />
               <div className="absolute left-3 top-14 z-50 w-56 bg-white rounded-2xl shadow-xl border border-[#e1e3e1] p-2 animate-fadeIn text-sm text-[#1f1f1f]">
+                {onOpenWebScannerModal && (
+                  <>
+                    <button
+                      onClick={() => {
+                        setShowNewMenu(false);
+                        onOpenWebScannerModal();
+                      }}
+                      className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[#f0f4f9] font-bold text-left text-primary"
+                    >
+                      <Camera className="w-4 h-4 text-purple-600" />
+                      <span>Scan Document 📸</span>
+                    </button>
+
+                    <div className="h-px bg-[#e1e3e1] my-1" />
+                  </>
+                )}
+
                 <button
                   onClick={() => {
                     setShowNewMenu(false);
@@ -199,6 +220,18 @@ export function DriveSidebar({
           >
             <Star className="w-4 h-4" />
             <span>Starred</span>
+          </button>
+
+          {/* Needs Review */}
+          <button
+            onClick={() => onSelectView("needs-review")}
+            className={`flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "needs-review"
+              ? "bg-[#c2e7ff] text-[#001d35] font-bold"
+              : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+              }`}
+          >
+            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <span>Needs Review</span>
           </button>
 
           {/* Bin */}

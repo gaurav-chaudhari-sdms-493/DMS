@@ -22,6 +22,7 @@ import {
   Table,
   Presentation,
   FileSpreadsheet,
+  AlertCircle,
 } from "lucide-react";
 import { MarkdownViewer } from "../chat/MarkdownViewer";
 import type { DocumentListItem } from "@/types";
@@ -278,6 +279,18 @@ export function DocumentPreviewModal({
     return <FileText className="w-5 h-5 text-blue-400" />;
   };
 
+  const formatQualityWarnings = (warnings?: string[]) => {
+    if (!warnings || warnings.length === 0) return "scan quality warning";
+    const map: Record<string, string> = {
+      blurry: "Image is blurry",
+      underexposed: "Too dark",
+      overexposed: "Too bright",
+      possible_blank_page: "May be a blank page",
+      low_resolution: "Resolution too low",
+    };
+    return warnings.map((w) => map[w] || w).join(", ");
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-[#111111]/95 backdrop-blur-md animate-fadeIn select-none">
       {/* Google Drive Dark Header Bar */}
@@ -356,6 +369,20 @@ export function DocumentPreviewModal({
           )}
         </div>
       </header>
+
+      {/* Scan Quality Warning Banner Notice */}
+      {doc.quality_flag === "needs_review" && (
+        <div className="bg-amber-500/20 border-b border-amber-500/40 px-6 py-2.5 flex items-center justify-between text-xs text-amber-200 font-medium select-none z-10 shadow-xs backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+            <span>
+              <strong>Quality Notice:</strong> This scan may have quality issues (
+              <span className="font-semibold text-amber-300">{formatQualityWarnings(doc.quality_warnings)}</span>
+              ). Consider re-scanning for optimal OCR accuracy.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Pending Indexing Banner Notice */}
       {(doc.status === "pending" || doc.status === "processing") && (

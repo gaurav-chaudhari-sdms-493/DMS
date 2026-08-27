@@ -11,6 +11,7 @@ import { DriveDetailPanel } from "@/components/drive/DriveDetailPanel";
 import { DocumentPreviewModal } from "@/components/drive/DocumentPreviewModal";
 import { NewFolderModal, RenameModal, MoveModal } from "@/components/drive/Modals";
 import { ConnectorModal } from "@/components/drive/ConnectorModal";
+import { WebScannerModal } from "@/components/drive/WebScannerModal";
 import { UploadWidget, UploadItem } from "@/components/drive/UploadWidget";
 import { AISummary } from "@/components/search/AISummary";
 import { ResultCard } from "@/components/search/ResultCard";
@@ -54,7 +55,7 @@ export default function DrivePage() {
   const [aiWarningFeature, setAiWarningFeature] = useState("AI Assistant");
 
   // Navigation View & Hierarchy State
-  const [currentView, setCurrentView] = useState<"home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat">("home");
+  const [currentView, setCurrentView] = useState<"home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat" | "needs-review">("home");
   const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
   const [currentFolder, setCurrentFolder] = useState<Folder | null>(null);
   const [folderPath, setFolderPath] = useState<Folder[]>([]);
@@ -150,6 +151,7 @@ export default function DrivePage() {
   // Modals State
   const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
   const [isConnectorModalOpen, setIsConnectorModalOpen] = useState(false);
+  const [isWebScannerOpen, setIsWebScannerOpen] = useState(false);
   const [itemToRename, setItemToRename] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
   const [itemToMove, setItemToMove] = useState<{ type: "folder" | "doc"; item: Folder | DocumentListItem } | null>(null);
 
@@ -306,6 +308,10 @@ export default function DrivePage() {
         ]);
         setFolders(fList);
         setDocuments(dList);
+      } else if (currentView === "needs-review") {
+        const dList = await api.documents.list({ include_all: true, is_trashed: false });
+        setFolders([]);
+        setDocuments(dList.filter((d) => d.quality_flag === "needs_review"));
       } else if (currentView === "home" || currentView === "recent") {
         const dList = await api.documents.list({ include_all: true, is_trashed: false });
         setFolders([]);
@@ -912,6 +918,7 @@ export default function DrivePage() {
           onOpenNewFolderModal={() => setIsNewFolderOpen(true)}
           onTriggerFileUpload={() => fileInputRef.current?.click()}
           onOpenConnectorModal={() => setIsConnectorModalOpen(true)}
+          onOpenWebScannerModal={() => setIsWebScannerOpen(true)}
           stats={driveStats}
           folderTree={folderTree}
           activeFolderId={currentFolderId}
@@ -1314,6 +1321,13 @@ export default function DrivePage() {
       <ConnectorModal
         isOpen={isConnectorModalOpen}
         onClose={() => setIsConnectorModalOpen(false)}
+        onLaunchScanner={() => setIsWebScannerOpen(true)}
+      />
+
+      <WebScannerModal
+        isOpen={isWebScannerOpen}
+        onClose={() => setIsWebScannerOpen(false)}
+        onSuccess={loadContents}
       />
 
       <RenameModal

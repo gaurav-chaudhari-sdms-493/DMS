@@ -114,18 +114,32 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
             if batch_start + EMBED_BATCH_SIZE < len(chunk_texts):
                 await asyncio.sleep(EMBED_BATCH_DELAY)
 
-        # 5. Extract metadata
+        # 5. Extract metadata & scan quality assessment
         full_text = " ".join([p.get("text", "") for p in pages])
         meta_dict = await extract_metadata(full_text)
+
+        quality_report = None
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in [".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".webp"] or (len(file_bytes) > 4 and file_bytes[:4] in [b"\xff\xd8\xff\xe0", b"\xff\xd8\xff\xe1", b"\x89PNG"]):
+            try:
+                from app.services.scanner_connector import assess_scan_quality
+                quality_report = assess_scan_quality(file_bytes)
+            except Exception as q_err:
+                logger.warning(f"Scan quality check failed during worker ingestion: {q_err}")
 
         # 6. ATOMIC DATABASE TRANSACTION (All-or-Nothing Commit)
         # All database writes (chunks, metadata, document status) occur inside a single atomic transaction.
         async with AsyncSessionLocal() as db:
             async with db.begin():
                 await db.execute(text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": tenant_id_str})
-                # Purge any pre-existing partial chunks or metadata for this version/document
+                # Purge pre-existing chunks and non-quality metadata for this version/document
                 await db.execute(delete(DBChunk).where(DBChunk.version_id == version_id))
-                await db.execute(delete(MetadataItem).where(MetadataItem.document_id == document_id))
+                await db.execute(
+                    delete(MetadataItem).where(
+                        MetadataItem.document_id == document_id,
+                        MetadataItem.key.not_in(["quality_flag", "quality_report"]),
+                    )
+                )
 
                 # Insert chunks
                 for idx, chunk in enumerate(chunks):
@@ -141,6 +155,29 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                         s3_path=s3_path
                     )
                     db.add(db_chunk)
+
+                # Insert quality metadata items if quality check failed
+                if quality_report and not quality_report.get("passed", True):
+                    db.add(
+                        MetadataItem(
+                            id=uuid.uuid4(),
+                            document_id=document_id,
+                            key="quality_flag",
+                            value={"flag": "needs_review", "warnings": quality_report.get("warnings", [])},
+                            source="scanner_connector",
+                            confidence_score=0.9,
+                        )
+                    )
+                    db.add(
+                        MetadataItem(
+                            id=uuid.uuid4(),
+                            document_id=document_id,
+                            key="quality_report",
+                            value=quality_report,
+                            source="scanner_connector",
+                            confidence_score=1.0,
+                        )
+                    )
 
                 # Insert metadata items
                 if meta_dict:

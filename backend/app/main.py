@@ -13,10 +13,14 @@ from .services.storage_service import ensure_bucket_exists
 from .services.watched_folder_connector import watch_folder_loop
 from .services.sftp_connector import sftp_poll_loop
 from .services.email_connector import email_poll_loop
+from .services.scanner_connector import scanner_poll_loop
 from .api_logging_middleware import ApiLoggingMiddleware
 
 from .limiter import limiter
 import asyncio
+import logging
+
+logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -25,11 +29,21 @@ async def lifespan(app: FastAPI):
     watch_task = asyncio.create_task(watch_folder_loop())
     sftp_task = asyncio.create_task(sftp_poll_loop())
     email_task = asyncio.create_task(email_poll_loop()) if settings.email_enabled else None
+    
+    if settings.scanner_enabled and settings.scanner_webhook_secret == "change_me_scanner_secret":
+        logger.warning(
+            "SECURITY WARNING: scanner_enabled is True but scanner_webhook_secret "
+            "is using default value ('change_me_scanner_secret'). Please update it in production!"
+        )
+        
+    scanner_task = asyncio.create_task(scanner_poll_loop()) if settings.scanner_enabled else None
     yield
     watch_task.cancel()
     sftp_task.cancel()
     if email_task:
         email_task.cancel()
+    if scanner_task:
+        scanner_task.cancel()
 
 def create_app() -> FastAPI:
     app = FastAPI(

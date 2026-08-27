@@ -34,6 +34,8 @@ export function DriveBreadcrumbs({
         return "Bin";
       case "shared":
         return "Shared with me";
+      case "needs-review":
+        return "Needs Review ⚠️";
       default:
         return "My Drive";
     }

@@ -55,31 +55,55 @@ export function DocumentCard({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
   };
 
+  const formatQualityWarnings = (warnings?: string[]) => {
+    if (!warnings || warnings.length === 0) return "Scan quality warning — review recommended";
+    const map: Record<string, string> = {
+      blurry: "Image is blurry",
+      underexposed: "Too dark",
+      overexposed: "Too bright",
+      possible_blank_page: "May be a blank page",
+      low_resolution: "Resolution too low",
+    };
+    return warnings.map((w) => map[w] || w).join(", ");
+  };
+
   const renderStatusBadge = () => {
-    if (doc.status === "indexed") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-          <CheckCircle className="w-3 h-3 text-emerald-400" />
-          <span>Indexed</span>
-        </span>
-      );
-    }
-    if (doc.status === "failed") {
-      return (
-        <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
-          <AlertCircle className="w-3 h-3 text-red-400" />
-          <span>Failed</span>
-        </span>
-      );
-    }
+    const isQualityFlagged = doc.quality_flag === "needs_review";
+    const qualityTooltip = isQualityFlagged
+      ? `Quality Issues: ${formatQualityWarnings(doc.quality_warnings)}`
+      : "";
+
     return (
-      <span
-        className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse"
-        title="Generating OCR, text chunks, & 1024d vector embeddings..."
-      >
-        <Sparkles className="w-3 h-3 text-amber-300 animate-spin" />
-        <span>Indexing AI</span>
-      </span>
+      <div className="flex items-center gap-1.5">
+        {isQualityFlagged && (
+          <span
+            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 cursor-help"
+            title={qualityTooltip}
+          >
+            <AlertCircle className="w-3 h-3 text-amber-400" />
+            <span>Needs Review</span>
+          </span>
+        )}
+        {doc.status === "indexed" ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <CheckCircle className="w-3 h-3 text-emerald-400" />
+            <span>Indexed</span>
+          </span>
+        ) : doc.status === "failed" ? (
+          <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-red-500/10 text-red-400 border border-red-500/20">
+            <AlertCircle className="w-3 h-3 text-red-400" />
+            <span>Failed</span>
+          </span>
+        ) : (
+          <span
+            className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-amber-500/15 text-amber-300 border border-amber-500/30 animate-pulse"
+            title="Generating OCR, text chunks, & 1024d vector embeddings..."
+          >
+            <Sparkles className="w-3 h-3 text-amber-300 animate-spin" />
+            <span>Indexing AI</span>
+          </span>
+        )}
+      </div>
     );
   };
 

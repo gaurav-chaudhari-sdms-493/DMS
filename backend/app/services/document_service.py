@@ -163,6 +163,8 @@ async def upload_documents_bulk(
     )
 
 
+from ..models.metadata_item import MetadataItem
+
 async def list_documents(
     db: AsyncSession,
     tenant_id: UUID,
@@ -174,7 +176,10 @@ async def list_documents(
     stmt = (
         select(Document)
         .where(Document.tenant_id == tenant_id, Document.is_trashed == is_trashed)
-        .options(selectinload(Document.versions))
+        .options(
+            selectinload(Document.versions),
+            selectinload(Document.metadata_items.and_(MetadataItem.key.in_(["quality_flag", "quality_report"]))),
+        )
     )
 
     if is_starred is not None:
@@ -195,6 +200,17 @@ async def list_documents(
         s3_path = curr_v.s3_path if curr_v else None
         url = await generate_presigned_url(s3_path) if s3_path else None
 
+        q_flag = None
+        q_warnings = []
+        for m in doc.metadata_items:
+            if m.key == "quality_flag" and isinstance(m.value, dict):
+                q_flag = m.value.get("flag")
+                if not q_warnings:
+                    q_warnings = m.value.get("warnings", [])
+            elif m.key == "quality_report" and isinstance(m.value, dict):
+                if not q_warnings:
+                    q_warnings = m.value.get("warnings", [])
+
         items.append(
             DocumentListItem(
                 id=doc.id,
@@ -210,6 +226,8 @@ async def list_documents(
                 current_version_id=doc.current_version_id,
                 s3_path=s3_path,
                 download_url=url,
+                quality_flag=q_flag,
+                quality_warnings=q_warnings,
             )
         )
     return items
@@ -256,15 +274,23 @@ async def get_document(
         versions[-1] if versions else None,
     )
 
-    meta = [
-        {
+    q_flag = None
+    q_warnings = []
+    meta = []
+    for m in doc.metadata_items:
+        meta.append({
             "key": m.key,
             "value": m.value,
             "source": m.source,
             "confidence_score": m.confidence_score,
-        }
-        for m in doc.metadata_items
-    ]
+        })
+        if m.key == "quality_flag" and isinstance(m.value, dict):
+            q_flag = m.value.get("flag")
+            if not q_warnings:
+                q_warnings = m.value.get("warnings", [])
+        elif m.key == "quality_report" and isinstance(m.value, dict):
+            if not q_warnings:
+                q_warnings = m.value.get("warnings", [])
 
     await log_action(db, actor_id, tenant_id, "document.view", resource_type="document", resource_id=doc.id)
 
@@ -281,6 +307,8 @@ async def get_document(
         current_version=curr_version,
         metadata=meta,
         versions=versions,
+        quality_flag=q_flag,
+        quality_warnings=q_warnings,
     )
 
 

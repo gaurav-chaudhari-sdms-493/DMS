@@ -40,6 +40,8 @@ class DocumentListItem(BaseModel):
     current_version_id: Optional[UUID] = None
     s3_path: Optional[str] = None
     download_url: Optional[str] = None
+    quality_flag: Optional[str] = None
+    quality_warnings: List[str] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -58,6 +60,8 @@ class DocumentDetailResponse(BaseModel):
     current_version: Optional[Dict[str, Any]]
     metadata: List[Dict[str, Any]]
     versions: List[Dict[str, Any]]
+    quality_flag: Optional[str] = None
+    quality_warnings: List[str] = Field(default_factory=list)
 
 
 class DriveStatsResponse(BaseModel):

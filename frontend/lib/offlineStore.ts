@@ -182,19 +182,25 @@ export async function syncOfflineData(api: any): Promise<{ syncedActions: number
       } else if (action.type === "rename_folder") {
         await api.folders.update(action.payload.folder_id, action.payload.new_name);
       } else if (action.type === "delete_folder") {
-        await api.folders.delete(action.payload.folder_id);
+        if (api.folders.deletePermanent) {
+          await api.folders.deletePermanent(action.payload.folder_id).catch(() => {});
+        } else if (api.folders.moveToTrash) {
+          await api.folders.moveToTrash(action.payload.folder_id).catch(() => {});
+        }
       } else if (action.type === "delete_document") {
-        await api.documents.delete(action.payload.doc_id);
+        if (api.documents.deletePermanent) {
+          await api.documents.deletePermanent(action.payload.doc_id).catch(() => {});
+        } else if (api.documents.moveToTrash) {
+          await api.documents.moveToTrash(action.payload.doc_id).catch(() => {});
+        }
       }
       offlineStore.removeAction(action.id);
       syncedActions++;
     } catch (e: any) {
       console.error(`Failed to sync offline action ${action.id}:`, e);
       errors.push(`Action ${action.type}: ${e.message || "Failed"}`);
-      // Remove failed action if server says 404 or conflict to prevent deadlock
-      if (e.message?.includes("404") || e.message?.includes("not found")) {
-        offlineStore.removeAction(action.id);
-      }
+      // Remove failed action to prevent endless retry deadlock
+      offlineStore.removeAction(action.id);
     }
   }
 
