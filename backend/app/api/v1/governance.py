@@ -1,13 +1,20 @@
 import uuid
+from typing import Optional
 from fastapi import APIRouter, Depends, Response
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...deps import get_db, require_tenant_access, require_role
 from ...schemas.auth import TokenPayload
 from ...services.audit_service import verify_chain_integrity
-from ...services import completeness_service, certificate_service
+from ...services import completeness_service, certificate_service, corpus_calibration_service
 
 router = APIRouter(prefix="/governance", tags=["Governance"])
+
+
+class CorpusCalibrationRequest(BaseModel):
+    sample_size: Optional[int] = None
+    notes: Optional[str] = None
 
 
 @router.get("/audit-integrity")
@@ -53,6 +60,34 @@ async def get_corpus_completeness_api(
     """T76 — completeness/reconciliation dashboard, gap-scored per corpus."""
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await completeness_service.get_corpus_completeness(db, tenant_id, corpus_folder_id)
+
+
+@router.post("/calibrate-corpus/{corpus_folder_id}")
+async def calibrate_corpus_api(
+    corpus_folder_id: uuid.UUID,
+    body: CorpusCalibrationRequest,
+    current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
+    db: AsyncSession = Depends(get_db),
+):
+    """T59 — certify a corpus's confidence scores as human-validated,
+    unlocking bulk-confirm (T57) for it. Was implemented in
+    corpus_calibration_service but never reachable through the API —
+    found while testing bulk-confirm end-to-end, since without this
+    bulk_confirm_edges/bulk_confirm_facts could never leave the
+    'uncalibrated corpus' 409 in real use, only in unit tests that call
+    the service function directly."""
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    calibration = await corpus_calibration_service.calibrate_corpus(
+        db, tenant_id, corpus_folder_id, user_id, sample_size=body.sample_size, notes=body.notes,
+    )
+    return {
+        "id": str(calibration.id),
+        "corpus_folder_id": str(calibration.corpus_folder_id),
+        "calibrated_by_actor_id": str(calibration.calibrated_by_actor_id),
+        "sample_size": calibration.sample_size,
+        "notes": calibration.notes,
+    }
 
 
 @router.get("/completeness/{corpus_folder_id}/drill")
