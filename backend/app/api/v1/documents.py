@@ -169,7 +169,12 @@ async def cleanup_trashed_items_api(
     current_user: TokenPayload = Depends(require_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    return await document_service.cleanup_expired_trashed_items(db, retention_days=retention_days)
+    # A single tenant's "Empty Bin" must never touch another tenant's
+    # trash — always pass the caller's own tenant_id here. Only the
+    # scheduled worker task (app/tasks/worker.py) is meant to sweep
+    # every tenant, by calling the service function with tenant_id=None.
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await document_service.cleanup_expired_trashed_items(db, retention_days=retention_days, tenant_id=tenant_id)
 
 
 @router.delete('/{document_id}', status_code=status.HTTP_204_NO_CONTENT)
