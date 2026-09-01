@@ -19,7 +19,21 @@ async def _stub_async_handle(self, request):
 
 @pytest.fixture(autouse=True)
 def _isolate_guard():
-    """Ensures no test leaks a patched httpx transport into another."""
+    """Ensures no test leaks a patched httpx transport into another — and,
+    found via T92's real AIR_GAPPED=true CI run, ensures no test STARTS
+    with a leftover install either. app.ai.airgapped installs the real
+    guard as an import-time side effect whenever AIR_GAPPED=true (by
+    design, so the API/worker processes are protected without extra
+    startup wiring) — every test in this file previously assumed it was
+    the one calling install_egress_guard() from a clean slate, which was
+    only ever true because CI never actually ran with AIR_GAPPED=true.
+    The moment it did, the real import-time install had already wrapped
+    httpx.HTTPTransport.handle_request BEFORE a test's own monkeypatch +
+    install_egress_guard() ran — monkeypatch overwrote the guard with the
+    test's stub, and the test's install_egress_guard() call was a no-op
+    (idempotency check saw _installed=True from the real one), so no
+    guard was actually protecting the stubbed client at all."""
+    uninstall_egress_guard()
     yield
     uninstall_egress_guard()
 

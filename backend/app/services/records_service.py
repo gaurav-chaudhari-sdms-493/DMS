@@ -46,6 +46,16 @@ async def create_record(
             details={"record_type": record_type, "fields": list(base_fields.keys())},
         )
 
+    # T64/T66 — the source document backing this record's evidence graduates
+    # to WORM-archived + statutory_record retention (see
+    # document_service.archive_document_as_statutory_record's docstring).
+    if base_evidence_fact_id is not None:
+        fact_res = await db.execute(text("SELECT document_id FROM doc_dg_facts WHERE id = :fid AND tenant_id = :tid"), {"fid": str(base_evidence_fact_id), "tid": str(tenant_id)})
+        fact_row = fact_res.first()
+        if fact_row:
+            from app.services.document_service import archive_document_as_statutory_record
+            await archive_document_as_statutory_record(db, tenant_id, fact_row[0])
+
     return record
 
 

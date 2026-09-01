@@ -14,6 +14,17 @@ import {
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import type { FolderTreeNode } from "@/types";
+
+function flattenFolders(nodes: FolderTreeNode[], depth = 0): { id: string; name: string; depth: number }[] {
+  const out: { id: string; name: string; depth: number }[] = [];
+  for (const n of nodes) {
+    out.push({ id: n.id, name: n.name, depth });
+    const kids = n.subfolders || n.children || [];
+    if (kids.length) out.push(...flattenFolders(kids, depth + 1));
+  }
+  return out;
+}
 
 interface Completeness {
   corpus_folder_id: string;
@@ -54,18 +65,39 @@ export default function CompletenessDashboardPage() {
   const [drillRows, setDrillRows] = useState<any[] | null>(null);
   const [drillLoading, setDrillLoading] = useState(false);
 
-  const loadDashboard = async () => {
-    if (!folderId.trim()) {
+  const [folders, setFolders] = useState<{ id: string; name: string; depth: number }[] | null>(null);
+  const [foldersLoading, setFoldersLoading] = useState(false);
+  const [showFolderPicker, setShowFolderPicker] = useState(false);
+
+  const openFolderPicker = async () => {
+    setShowFolderPicker((v) => !v);
+    if (folders) return;
+    setFoldersLoading(true);
+    try {
+      const tree = await api.folders.getTree();
+      setFolders(flattenFolders(tree));
+    } catch (e: any) {
+      setError(e?.message || "Failed to load folders");
+    } finally {
+      setFoldersLoading(false);
+    }
+  };
+
+  const loadDashboard = async (id?: string) => {
+    const target = (id ?? folderId).trim();
+    if (!target) {
       setError("Enter a corpus folder ID first.");
       return;
     }
+    setFolderId(target);
+    setShowFolderPicker(false);
     setLoading(true);
     setError("");
     setData(null);
     setDrillCategory(null);
     setDrillRows(null);
     try {
-      const result = await api.governance.getCompleteness(folderId.trim());
+      const result = await api.governance.getCompleteness(target);
       setData(result);
     } catch (e: any) {
       setError(e?.message || "Failed to load the completeness dashboard for this corpus");
@@ -123,10 +155,28 @@ export default function CompletenessDashboardPage() {
               onKeyDown={(e) => e.key === "Enter" && loadDashboard()}
               className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
             />
-            <Button size="sm" loading={loading} onClick={loadDashboard}>
+            <Button variant="secondary" size="sm" loading={foldersLoading} onClick={openFolderPicker}>
+              Browse folders
+            </Button>
+            <Button size="sm" loading={loading} onClick={() => loadDashboard()}>
               Load
             </Button>
           </div>
+          {showFolderPicker && folders && (
+            <div className="mt-3 max-h-64 overflow-y-auto flex flex-col gap-1">
+              {folders.length === 0 && <p className="text-sm text-[#747775]">No folders found.</p>}
+              {folders.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => loadDashboard(f.id)}
+                  style={{ paddingLeft: `${12 + f.depth * 16}px` }}
+                  className="text-left text-sm py-1.5 pr-3 rounded-lg hover:bg-[#f0f4f9]"
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
 
         {error && (

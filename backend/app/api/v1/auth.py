@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy import func
@@ -16,7 +16,7 @@ from ...models.document_version import DocumentVersion
 from ...models.chunk import Chunk
 from ...models.folder import Folder
 
-from ...deps import get_db, get_current_user, get_request_ip, require_tenant_access
+from ...deps import get_db, get_request_ip, require_tenant_access
 from ...services.auth_service import (
     verify_password, create_access_token, create_refresh_token, sign_up,
     create_password_reset_token, reset_password_with_token

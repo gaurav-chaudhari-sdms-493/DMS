@@ -22,7 +22,6 @@ import logging
 import mimetypes
 import stat
 import time
-from typing import Optional
 
 import paramiko
 

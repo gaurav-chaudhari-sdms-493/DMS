@@ -1,5 +1,6 @@
 "use client";
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { X } from "lucide-react";
 import CitationPageViewer from "./CitationPageViewer";
 import RegionHighlightViewer from "../drive/RegionHighlightViewer";
@@ -17,11 +18,25 @@ interface CitationModalProps {
   onClose: () => void;
 }
 
-/** T71 — modal shown when a [N] citation marker is clicked. */
+/** T71 — modal shown when a [N] citation marker is clicked.
+ *
+ * Portaled to document.body rather than rendered inline: this modal is
+ * always opened from inside AISummary's glowing Card, and clicking the
+ * citation button necessarily hovers the Card underneath the cursor —
+ * which activates its `hover:-translate-y-1` lift. A CSS `transform` on
+ * any ancestor turns it into the containing block for `position: fixed`
+ * descendants (CSS Transforms spec), so without the portal this modal's
+ * "fixed inset-0" backdrop was sized/positioned relative to the Card
+ * instead of the viewport — it rendered as a tiny clipped box instead of
+ * a full-screen dialog. Reproduces on every real click, not just here.
+ */
 export function CitationModal({ citation, onClose }: CitationModalProps) {
-  if (!citation) return null;
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  return (
+  if (!citation || !mounted) return null;
+
+  return createPortal(
     <div
       role="presentation"
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn"
@@ -65,6 +80,7 @@ export function CitationModal({ citation, onClose }: CitationModalProps) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

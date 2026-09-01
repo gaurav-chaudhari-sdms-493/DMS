@@ -14,10 +14,23 @@ import {
   Pencil,
   Undo2,
   Eye,
+  X,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import RegionHighlightViewer from "@/components/drive/RegionHighlightViewer";
+import type { FolderTreeNode } from "@/types";
+
+function flattenFolders(nodes: FolderTreeNode[], depth = 0): { id: string; name: string; depth: number }[] {
+  const out: { id: string; name: string; depth: number }[] = [];
+  for (const n of nodes) {
+    out.push({ id: n.id, name: n.name, depth });
+    const kids = n.subfolders || n.children || [];
+    if (kids.length) out.push(...flattenFolders(kids, depth + 1));
+  }
+  return out;
+}
 
 interface QueueFact {
   fact_id: string;
@@ -58,8 +71,27 @@ export default function WorkbenchPage() {
   const [actionLoading, setActionLoading] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  // T53 — click-through from a fact to its highlighted source region.
+  const [viewingSourceFactId, setViewingSourceFactId] = useState<string | null>(null);
 
   const [bulkFolderId, setBulkFolderId] = useState("");
+  const [bulkFolders, setBulkFolders] = useState<{ id: string; name: string; depth: number }[] | null>(null);
+  const [bulkFoldersLoading, setBulkFoldersLoading] = useState(false);
+  const [showBulkFolderPicker, setShowBulkFolderPicker] = useState(false);
+
+  const openBulkFolderPicker = async () => {
+    setShowBulkFolderPicker((v) => !v);
+    if (bulkFolders) return;
+    setBulkFoldersLoading(true);
+    try {
+      const tree = await api.folders.getTree();
+      setBulkFolders(flattenFolders(tree));
+    } catch (e: any) {
+      setError(e?.message || "Failed to load folders");
+    } finally {
+      setBulkFoldersLoading(false);
+    }
+  };
   const [bulkThreshold, setBulkThreshold] = useState("0.8");
   const [bulkPolicyVersion, setBulkPolicyVersion] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
@@ -358,6 +390,10 @@ export default function WorkbenchPage() {
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2 pt-2">
+                  <Button size="sm" variant="secondary" onClick={() => setViewingSourceFactId(selected.fact_id)}>
+                    <Eye className="w-3.5 h-3.5 mr-1.5" />
+                    View Source
+                  </Button>
                   <Button size="sm" variant="secondary" loading={actionLoading} onClick={() => doAction(selected.claimed_by_actor_id ? "release" : "claim")}>
                     {selected.claimed_by_actor_id ? <Unlock className="w-3.5 h-3.5 mr-1.5" /> : <Lock className="w-3.5 h-3.5 mr-1.5" />}
                     {selected.claimed_by_actor_id ? "Release" : "Claim"}
@@ -384,14 +420,37 @@ export default function WorkbenchPage() {
               calibrated first (T59) — handwritten facts are always excluded regardless of confidence.
             </p>
             <div className="space-y-2">
-              <input
-                type="text"
-                aria-label="Corpus folder ID"
-                placeholder="Corpus folder ID"
-                value={bulkFolderId}
-                onChange={(e) => setBulkFolderId(e.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
-              />
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  aria-label="Corpus folder ID"
+                  placeholder="Corpus folder ID"
+                  value={bulkFolderId}
+                  onChange={(e) => setBulkFolderId(e.target.value)}
+                  className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
+                />
+                <Button variant="secondary" size="sm" loading={bulkFoldersLoading} onClick={openBulkFolderPicker}>
+                  Browse
+                </Button>
+              </div>
+              {showBulkFolderPicker && bulkFolders && (
+                <div className="max-h-48 overflow-y-auto flex flex-col gap-1 border border-[#e1e3e1] rounded-lg p-2">
+                  {bulkFolders.length === 0 && <p className="text-sm text-[#747775]">No folders found.</p>}
+                  {bulkFolders.map((f) => (
+                    <button
+                      key={f.id}
+                      onClick={() => {
+                        setBulkFolderId(f.id);
+                        setShowBulkFolderPicker(false);
+                      }}
+                      style={{ paddingLeft: `${8 + f.depth * 16}px` }}
+                      className="text-left text-sm py-1 pr-3 rounded hover:bg-[#f0f4f9]"
+                    >
+                      {f.name}
+                    </button>
+                  ))}
+                </div>
+              )}
               <input
                 type="number"
                 step="0.01"
@@ -487,6 +546,24 @@ export default function WorkbenchPage() {
           </Card>
         </div>
       </main>
+
+      {viewingSourceFactId && (
+        <div role="presentation" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setViewingSourceFactId(null)}>
+          <div
+            role="presentation"
+            className="w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-3xl shadow-2xl text-[#1f1f1f] p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold">Source</h3>
+              <button onClick={() => setViewingSourceFactId(null)} className="p-1.5 text-[#747775] hover:text-[#1f1f1f] rounded-full hover:bg-[#f0f4f9]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <RegionHighlightViewer factId={viewingSourceFactId} renderWidth={640} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

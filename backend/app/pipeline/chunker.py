@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import List, Optional
 import tiktoken
 
@@ -9,6 +9,10 @@ class Chunk:
     chunk_index: int
     token_count: int
     bbox: Optional[dict] = None
+    # T05 — every word region pdfplumber found on this chunk's page,
+    # carried through instead of discarded (see extractor.py). Page-level
+    # granularity, same reasoning as there.
+    word_regions: List[dict] = field(default_factory=list)
 
 class TextChunker:
     def __init__(self, chunk_size: int = 512, chunk_overlap: int = 64, model: str = 'gpt-4o-mini'):
@@ -43,7 +47,8 @@ class TextChunker:
                     page_number=page.get("page_number", 1),
                     chunk_index=global_index,
                     token_count=len(chunk_tokens),
-                    bbox=page.get("bbox")
+                    bbox=page.get("bbox"),
+                    word_regions=page.get("words") or []
                 ))
                 
                 global_index += 1

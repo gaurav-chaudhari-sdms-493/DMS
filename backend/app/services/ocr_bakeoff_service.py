@@ -37,7 +37,7 @@ would be its own feature (T06 fact regions already exist for VLM
 output), out of scope for a comparison harness.
 """
 import re
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 _DEVANAGARI_RE = re.compile(r"[ऀ-ॿ]")
 _PLACEHOLDER_CELLS = {"", ".", "..", "-", "—", "do", "do."}

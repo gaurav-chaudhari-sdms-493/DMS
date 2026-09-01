@@ -15,7 +15,6 @@ Create Date: 2026-08-24 00:00:12.000000
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 revision: str = '0024_retention_classes'
 down_revision: Union[str, None] = '0023_fact_confidence_status'

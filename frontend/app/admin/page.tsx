@@ -23,6 +23,7 @@ import {
   AlertCircle,
   RefreshCw,
   Trash2,
+  LayoutTemplate,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -294,15 +295,23 @@ export default function AdminPage() {
           </h1>
         </div>
 
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => fetchData(true)}
-          className={`${refreshing ? "animate-pulse" : ""}`}
-        >
-          <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
-          <span>Refresh</span>
-        </Button>
+        <div className="flex items-center gap-2">
+          <Link href="/admin/templates">
+            <Button variant="secondary" size="sm">
+              <LayoutTemplate className="w-4 h-4 mr-2" />
+              <span>Form Templates</span>
+            </Button>
+          </Link>
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => fetchData(true)}
+            className={`${refreshing ? "animate-pulse" : ""}`}
+          >
+            <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? "animate-spin" : ""}`} />
+            <span>Refresh</span>
+          </Button>
+        </div>
       </header>
 
       <main className="max-w-[1400px] mx-auto p-6 md:p-8 space-y-6 overflow-auto" style={{ maxHeight: "calc(100vh - 64px)" }}>

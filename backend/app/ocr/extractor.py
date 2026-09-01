@@ -119,7 +119,32 @@ def _extract_pdf(file_bytes: bytes, filename: str = "", ocr_engine: str = "tesse
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             for i, page in enumerate(pdf.pages):
                 text = page.extract_text() or ""
-                words = page.extract_words() or []
+                raw_words = page.extract_words() or []
+
+                # T05 — carry word-level regions from the extractor to the
+                # fact writer instead of discarding them here. Normalised
+                # to 0-1 page fractions, top-left origin, per T06's signed
+                # coordinate contract (pdfplumber's top/bottom are already
+                # top-down, so no y-flip needed). Page-level granularity
+                # (every word on the page, not sliced per-chunk) — chunking
+                # re-tokenizes page text and doesn't preserve a reliable
+                # char-offset mapping back to pdfplumber's word list, so a
+                # per-chunk slice would be a guess; the full per-page list
+                # is exact and still a real, usable region source (T04's
+                # own FactRegion works at page granularity too).
+                pw = float(page.width) or 1.0
+                ph = float(page.height) or 1.0
+                words = [
+                    {
+                        "text": w.get("text", ""),
+                        "x0": max(0.0, min(1.0, w["x0"] / pw)),
+                        "y0": max(0.0, min(1.0, w["top"] / ph)),
+                        "x1": max(0.0, min(1.0, w["x1"] / pw)),
+                        "y1": max(0.0, min(1.0, w["bottom"] / ph)),
+                    }
+                    for w in raw_words
+                    if "x0" in w and "top" in w and "x1" in w and "bottom" in w
+                ]
 
                 # OCR Fallback for scanned/image PDF pages
                 if not text.strip():

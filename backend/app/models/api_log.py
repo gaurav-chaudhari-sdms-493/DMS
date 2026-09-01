@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy import ForeignKey, Float, Integer, String, Text, DateTime
+from sqlalchemy import Float, Integer, String, Text, DateTime
 from datetime import datetime
 import uuid
 from typing import Optional

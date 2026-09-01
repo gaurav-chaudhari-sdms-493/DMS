@@ -1,4 +1,4 @@
-from typing import List, Optional, Set
+from typing import Optional, Set
 from uuid import UUID
 
 from fastapi import HTTPException

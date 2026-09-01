@@ -1,9 +1,10 @@
 import httpx
 
 # T92 — every external AI/OCR provider SDK in this codebase (openai, groq,
-# anthropic, cohere) as well as the direct httpx usage in gemini_provider.py
-# and llamaparse_provider.py all route through httpx's transport layer.
-# Patching it here is a single interception point covering all of them.
+# anthropic, cohere) as well as the direct httpx usage in gemini_provider.py,
+# openrouter_provider.py, and llamaparse_provider.py all route through
+# httpx's transport layer. Patching it here is a single interception point
+# covering all of them.
 BLOCKED_AI_HOSTS = {
     "api.openai.com",
     "api.anthropic.com",
@@ -11,6 +12,7 @@ BLOCKED_AI_HOSTS = {
     "generativelanguage.googleapis.com",
     "api.cohere.ai",
     "api.cloud.llamaindex.ai",
+    "openrouter.ai",
 }
 
 

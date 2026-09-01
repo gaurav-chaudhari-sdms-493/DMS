@@ -38,7 +38,6 @@ Best-effort by design: a VLM failure never fails ingestion. Search and
 chunk indexing must never wait on this (Section 3.5), so every call site
 wraps this module in a try/except and logs, it doesn't raise.
 """
-import base64
 import hashlib
 import io
 import json
@@ -62,6 +61,7 @@ from app.pipeline import table_stitch
 from app.services.template_service import classify_confidence
 from app.services import table_shape_service
 from app.services.extraction_archive_service import compute_vlm_cache_key, get_cached_vlm_response, record_vlm_response
+from app.services.config_service import get_float
 
 logger = logging.getLogger(__name__)
 
@@ -143,13 +143,38 @@ def _build_extraction_prompt(field_schema: List[dict]) -> str:
     )
 
 
+def _valid_bbox(bbox: Any) -> bool:
+    """A field the VLM has no value for should have its key omitted
+    entirely (the prompt says so), but a model doesn't always comply —
+    observed live on a real 1973 gazette's right-hand page: a field with
+    no value came back as {"bbox": [null, null, null, null], ...} instead
+    of being omitted. `not src_field.get("bbox")` treats a 4-null list as
+    truthy (it's a non-empty list), so the null slips past that guard and
+    crashes float(None) downstream with an empty exception message. Every
+    coordinate must be present and a real number, not just the list."""
+    return (
+        isinstance(bbox, (list, tuple))
+        and len(bbox) == 4
+        and all(isinstance(v, (int, float)) for v in bbox)
+    )
+
+
 def _parse_vlm_response(raw: str) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
     text = raw.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
         if text.startswith("json"):
             text = text[4:]
-    data = json.loads(text.strip())
+    # strict=False — observed live on a real multi-line register cell
+    # ("Trees\nValuation Rs. 30."): the model emitted a literal raw
+    # newline byte inside the JSON string instead of escaping it as \n.
+    # That's invalid per the JSON spec, and Python's default strict mode
+    # rejects it outright — one un-escaped newline in one cell then loses
+    # every row on the page, not just that cell. strict=False is the
+    # documented, narrow escape hatch for exactly this: it still requires
+    # valid JSON structure everywhere else, it only stops treating a raw
+    # control character inside a string as a hard parse error.
+    data = json.loads(text.strip(), strict=False)
     rows = data.get("rows", [])
     marginalia = data.get("marginalia", [])
     return (
@@ -245,6 +270,27 @@ async def _extract_spread_facts(
     failing the whole page pair. A pair with genuinely no shared serials
     at all — or leftovers with no usable bbox to place them by — still
     goes to _join_mismatch exactly as before.
+
+    T26 real-scan validation checklist (blocked on A1 — no reference
+    corpus exists yet; written so validation is a slot-in, not a re-design,
+    once one real spread-layout document is available):
+      1. Does a template's field_schema actually need per-field "half"
+         tagging, or does the real register put every field on a
+         predictable side (e.g. "left" = columns 1-N, "right" = the
+         rest) that could be inferred from column order instead?
+      2. Is role:"serial" really printed on BOTH halves of a real spread,
+         or only once (e.g. left page only, right page continues
+         wordlessly) — if the latter, the current "ask serial on both
+         sides" assumption is wrong and needs a different pairing key.
+      3. Does bbox vertical position (the TS1 fallback) actually line up
+         between two facing pages in a real bound-register scan, given
+         that the left/right pages are photographed separately and may
+         have different skew/crop/margin — or does it need a per-page
+         normalisation step first?
+      4. Sample size: one confirmed real spread is enough to catch a
+         structurally wrong assumption, but not enough to trust the
+         _join_mismatch rate as a real-world number — treat an initial
+         validation as "does this break," not "is this accurate."
     """
     serial_field = _find_role_field(field_schema, "serial")
     if not serial_field:
@@ -326,7 +372,7 @@ async def _extract_spread_facts(
                         continue
                     written_ids.add((field_name, row_identity))
                     src_field = raw_row.get(field_name)
-                    if not isinstance(src_field, dict) or not src_field.get("bbox"):
+                    if not isinstance(src_field, dict) or not _valid_bbox(src_field.get("bbox")):
                         continue
                     value = src_field.get("value")
                     if value is None or value == "":
@@ -440,12 +486,24 @@ async def _stitch_vertical_segments(
     if len(page_extractions) <= 1:
         return [[pe] for pe in page_extractions]
 
+    # T03 — sourced from sys_dg_config (migration 0041), falling back to
+    # table_stitch's own module constants if the row is ever missing.
+    vertical_threshold = await get_float(
+        "table_stitch_vertical_similarity_threshold", table_stitch.VERTICAL_FIELD_SET_SIMILARITY_THRESHOLD
+    )
+    horizontal_min_coverage = await get_float(
+        "table_stitch_horizontal_min_coverage", table_stitch.HORIZONTAL_MIN_COMBINED_COVERAGE
+    )
+    adjudication_confidence_threshold = await get_float(
+        "table_stitch_adjudication_confidence_threshold", ADJUDICATION_CONFIDENCE_THRESHOLD
+    )
+
     segments: List[List[Dict[str, Any]]] = [[page_extractions[0]]]
     for pe in page_extractions[1:]:
         prev_pe = segments[-1][-1]
         fields_a = table_stitch.field_set(prev_pe["rows"], exclude=exclude_fields)
         fields_b = table_stitch.field_set(pe["rows"], exclude=exclude_fields)
-        decision = table_stitch.decide_relation(fields_a, fields_b, full_schema_fields)
+        decision = table_stitch.decide_relation(fields_a, fields_b, full_schema_fields, vertical_threshold, horizontal_min_coverage)
         relation = decision.relation
 
         if not decision.certain:
@@ -460,7 +518,7 @@ async def _stitch_vertical_segments(
                 except Exception as e:
                     logger.info(f"TS1 adjudication unavailable, treating page {pe['page_number']} as a new segment: {e}")
                 verdict = await table_stitch.adjudicate_structure(llm, fields_a, fields_b, full_schema_fields) if llm else None
-                if verdict and verdict.relation != "unrelated" and verdict.confidence >= ADJUDICATION_CONFIDENCE_THRESHOLD:
+                if verdict and verdict.relation != "unrelated" and verdict.confidence >= adjudication_confidence_threshold:
                     relation = verdict.relation
                     await table_shape_service.record_shape_decision(db, s_hash, relation, decided_by="llm", confidence=verdict.confidence)
                 else:
@@ -603,7 +661,7 @@ async def extract_facts_for_document(
                     if src_idx >= len(rows_all):
                         continue
                     src_field = rows_all[src_idx].get(field_name)
-                    if isinstance(src_field, dict) and src_field.get("bbox"):
+                    if isinstance(src_field, dict) and _valid_bbox(src_field.get("bbox")):
                         region_boxes.append((src_field["bbox"], region_page_map[src_idx]))
                         if src_field.get("confidence") is not None:
                             confidences.append(float(src_field["confidence"]))
@@ -678,7 +736,7 @@ async def extract_facts_for_document(
             for note in pe["marginalia"]:
                 text = note.get("text")
                 bbox = note.get("bbox")
-                if not text or not bbox or len(bbox) != 4:
+                if not text or not _valid_bbox(bbox):
                     continue
                 fact = Fact(
                     tenant_id=tenant_id,

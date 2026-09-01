@@ -81,6 +81,13 @@ export interface DocumentDetailResponse {
     download_url: string;
     created_at: string;
   }>;
+  // T79 — fuzzy-duplicate candidates found at ingest (embedding similarity
+  // on chunk 0). Informational only; null/absent when nothing above threshold.
+  possible_duplicate_candidates?: Array<{
+    document_id: string;
+    title: string;
+    similarity: number;
+  }> | null;
 }
 
 export interface DriveStats {
@@ -155,5 +162,29 @@ export interface ChatSession {
   created_at: string;
   updated_at: string;
   messages: ChatMessage[];
+}
+
+export interface TemplateFieldDef {
+  name: string;
+  type: string;
+  required?: boolean;
+  role?: string | null;
+}
+
+export interface TemplateResponse {
+  id: string;
+  form_type: string;
+  era_label: string;
+  field_schema: TemplateFieldDef[];
+  layout: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateCreatePayload {
+  form_type: string;
+  era_label: string;
+  field_schema: TemplateFieldDef[];
+  layout: string;
 }
 

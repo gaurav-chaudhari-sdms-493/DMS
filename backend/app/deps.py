@@ -1,11 +1,9 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
-from .database import get_db, AsyncSessionLocal
+from .database import AsyncSessionLocal, get_db  # noqa: F401 — re-exported; 13 API route files import get_db from here, not from .database directly
 from .services.auth_service import verify_token
 from .schemas.auth import TokenPayload
-import uuid
 
 bearer_scheme = HTTPBearer()
 

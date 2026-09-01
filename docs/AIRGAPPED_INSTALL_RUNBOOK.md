@@ -193,16 +193,15 @@ Sign up a user, create a folder, upload a document, and confirm search
 returns results — this exercises Postgres, Redis, MinIO and the AI
 provider path end to end.
 
-**Known gap to check manually:** the WORM archive bucket
-(`ensure_archive_bucket_exists()` in `backend/app/services/storage_service.py`)
-is defined but not called anywhere at startup, unlike the main documents
-bucket. If your install relies on the T64 retention/archival path, create
-it once by hand until that gap is closed:
-
-```bash
-kubectl -n veritasdocs exec -it deploy/veritasdocs-backend -- python -c \
-  "import asyncio; from app.services.storage_service import ensure_archive_bucket_exists; asyncio.run(ensure_archive_bucket_exists())"
-```
+The WORM archive bucket (`ensure_archive_bucket_exists()`) now runs
+automatically on backend startup, alongside the main documents bucket —
+no manual step needed. It creates the bucket with Object Lock enabled if
+it doesn't already exist (best-effort: a failure here is logged, not
+fatal, since WORM archival is an auxiliary evidence feature — see T64).
+Object Lock can only be set at bucket-creation time, so if you ever see
+`get_object_lock_configuration` report disabled on an existing
+`s3ArchiveBucketName`, the fix is to recreate that bucket (it can't be
+retrofitted), not to change code.
 
 ## 6. Air-gapped profile: confirm both fail-closed layers are actually live
 

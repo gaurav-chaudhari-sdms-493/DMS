@@ -1,10 +1,10 @@
 import uuid as uuid_module
 from datetime import datetime
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.entity_edge import EntityEdge
@@ -12,6 +12,7 @@ from app.models.entity_node import EntityNode
 from app.models.fact import Fact
 from app.models.document import Document
 from app.services.audit_service import log_action
+from app.services.config_service import get_float
 
 # Tier 1 (structural) and tier 2 (mention) auto-commit as machine — low-risk,
 # mechanical facts ("this page contains this row", "this row names X").
@@ -57,6 +58,80 @@ async def create_node(
     )
 
     return node
+
+
+async def find_similar_nodes(
+    db: AsyncSession,
+    tenant_id: UUID,
+    entity_type: str,
+    label: str,
+    exclude_node_id: Optional[UUID] = None,
+    threshold: Optional[float] = None,
+    limit: int = 5,
+) -> List[Dict[str, Any]]:
+    """Entity-graph accuracy — the biggest real risk here isn't the tier/
+    escrow logic (that's deterministic), it's silent fragmentation: OCR/
+    handwriting variance reads the same real-world entity as different
+    text on different pages ("Shri Juni Masjid, Hirpur" vs "Shri Juni
+    Masjid, Village. Hirpur, Taluka. Murtizapur" — both seen for the same
+    masjid in one real document this session), and create_node() has no
+    way to know that. Never auto-merges anything — same "surface for
+    operator resolution, do not silently discard/decide" contract as the
+    document fuzzy-duplicate leg (duplicate_service.find_fuzzy_duplicates,
+    T79), just for entity labels instead of document content. Scoped to
+    the same entity_type: a person and a property sharing trigrams is
+    meaningless, never a duplicate candidate.
+
+    pg_trgm's similarity() (not word_similarity(), which finds the best-
+    matching substring of a long text against a short query — T72's
+    search-leg use case) is the right function for two short, comparable
+    labels compared head-to-head.
+    """
+    if threshold is None:
+        threshold = await get_float("entity_dedup_similarity_threshold", 0.45)
+
+    stmt = text("""
+        SELECT id, entity_type, label, similarity(:label, label) AS score
+        FROM entity_dg_nodes
+        WHERE tenant_id = :tenant_id
+          AND entity_type = :entity_type
+          AND id != COALESCE(:exclude_node_id, '00000000-0000-0000-0000-000000000000'::uuid)
+          AND similarity(:label, label) >= :threshold
+        ORDER BY score DESC
+        LIMIT :limit
+    """)
+    res = await db.execute(stmt, {
+        "label": label.strip(),
+        "tenant_id": str(tenant_id),
+        "entity_type": entity_type.strip(),
+        "exclude_node_id": str(exclude_node_id) if exclude_node_id else None,
+        "threshold": threshold,
+        "limit": limit,
+    })
+    return [
+        {"id": str(row.id), "entity_type": row.entity_type, "label": row.label, "similarity": round(float(row.score), 4)}
+        for row in res.fetchall()
+    ]
+
+
+async def search_nodes(
+    db: AsyncSession,
+    tenant_id: UUID,
+    query: str,
+    limit: int = 20,
+) -> list[EntityNode]:
+    """Name-based lookup so a user can find a node's ID from a person/
+    property name instead of needing the raw UUID already in hand — the
+    Entity 360 page previously only accepted a pasted ID with no way to
+    discover one from the UI."""
+    stmt = (
+        select(EntityNode)
+        .where(EntityNode.tenant_id == tenant_id, EntityNode.label.ilike(f"%{query.strip()}%"))
+        .order_by(EntityNode.label)
+        .limit(limit)
+    )
+    result = await db.execute(stmt)
+    return list(result.scalars().all())
 
 
 async def create_edge(

@@ -18,7 +18,6 @@ subfolder mapping from email structure), messages marked \\Seen after
 handling so they're never reprocessed.
 """
 import asyncio
-import email
 import hashlib
 import imaplib
 import logging

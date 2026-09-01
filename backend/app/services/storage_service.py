@@ -1,12 +1,58 @@
 import boto3
 import asyncio
 import logging
+import os
+import subprocess
+import tempfile
 from datetime import datetime, timedelta
 from typing import Optional
 from botocore.exceptions import ClientError
 from app.config import settings
 
 logger = logging.getLogger(__name__)
+
+
+async def convert_to_pdfa(file_bytes: bytes, timeout_seconds: int = 60) -> Optional[bytes]:
+    """T41 — mandatory-on-ingest PDF/A-2b rendition, original kept alongside
+    (this returns the rendition only; callers decide storage layout).
+
+    Ghostscript is the standard tool for real PDF/A conversion (colour-space
+    remapping, font embedding, XMP metadata) — pikepdf/PyPDF2 can only
+    *tag* a file as PDF/A without doing that transformation, which would
+    be a lie, not a conversion. Returns None (never raises) on any failure
+    — a rendition that couldn't be produced must never block ingestion of
+    the original, which is still stored and searchable either way.
+    """
+    def _convert() -> Optional[bytes]:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            src_path = os.path.join(tmpdir, "in.pdf")
+            out_path = os.path.join(tmpdir, "out.pdf")
+            with open(src_path, "wb") as f:
+                f.write(file_bytes)
+            try:
+                result = subprocess.run(
+                    [
+                        "gs", "-dPDFA=2", "-dBATCH", "-dNOPAUSE", "-dNOOUTERSAVE",
+                        "-dPDFACompatibilityPolicy=1",
+                        "-sColorConversionStrategy=RGB",
+                        "-sDEVICE=pdfwrite",
+                        f"-sOutputFile={out_path}",
+                        src_path,
+                    ],
+                    capture_output=True,
+                    timeout=timeout_seconds,
+                    check=False,
+                )
+            except (subprocess.TimeoutExpired, FileNotFoundError) as e:
+                logger.warning(f"T41 PDF/A conversion unavailable: {e}")
+                return None
+            if result.returncode != 0 or not os.path.exists(out_path):
+                logger.warning(f"T41 PDF/A conversion failed (exit {result.returncode}): {result.stderr.decode(errors='replace')[:500]}")
+                return None
+            with open(out_path, "rb") as f:
+                return f.read()
+
+    return await asyncio.to_thread(_convert)
 
 def _get_s3_client():
     kwargs = {

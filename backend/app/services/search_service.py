@@ -104,22 +104,26 @@ async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: li
         "You are an enterprise multilingual document intelligence assistant. "
         "Answer strictly and only from the numbered excerpts below — never from outside knowledge.\n"
         f"Respond in the user's detected query language ({detected_lang}).\n\n"
+        "The user's query may be a natural-language question (\"what is the salary of X\") OR a short "
+        "keyword/name/phrase search (\"Aurangabad-Shia\", a document title, a place or person name). For a "
+        "keyword/phrase query, treat it as \"summarize what these excerpts say that is relevant to this topic\" "
+        "rather than requiring a literal question to be answered.\n\n"
         'Respond with ONLY a single JSON object, no markdown fences, no other text, in this exact shape:\n'
         '{"answerable": true, "claims": [{"text": "one factual statement", "sources": [1, 2]}]}\n\n'
         "Rules:\n"
         "- Break your answer into individual factual claims. Each claim's \"sources\" must list every excerpt "
         "number that actually supports it. Never cite an excerpt that does not contain the stated fact.\n"
-        '- If the excerpts do not contain information that answers the question, respond with '
-        '{"answerable": false, "claims": []} and nothing else. Do not answer from outside knowledge and do not '
-        "guess — this is a hard rule, not a style preference.\n"
+        '- Respond with {"answerable": false, "claims": []} ONLY if the excerpts are unrelated to the query '
+        "topic — not merely because the query isn't phrased as a question. Do not answer from outside knowledge "
+        "and do not guess — this is a hard rule, not a style preference.\n"
         "- Keep claim text natural and complete; bold key numbers/names/dates with **markdown** where useful."
     )
-    user_msg = f"Question: {query}\n\nNumbered excerpts:\n{numbered}"
+    user_msg = f"User query: {query}\n\nNumbered excerpts:\n{numbered}"
 
     raw = await llm.complete([
         Message(role="system", content=sys_msg),
         Message(role="user", content=user_msg),
-    ])
+    ], max_tokens=2500)
 
     parsed = _parse_claims_json(raw)
     if not parsed or not parsed.get("answerable") or not parsed.get("claims"):

@@ -1,11 +1,17 @@
 import re
+import uuid
 from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
+from fastapi import HTTPException
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.template import Template
+from app.services.audit_service import log_action
+
+VALID_LAYOUTS = ("single_page", "spread")
 
 # D-5 — conservative default for any field that doesn't declare its own
 # confidence_bands: a template nobody has calibrated yet should default
@@ -56,6 +62,101 @@ async def list_templates(db: AsyncSession, form_type: Optional[str] = None) -> L
         stmt = stmt.where(Template.form_type == form_type)
     res = await db.execute(stmt.order_by(Template.form_type, Template.era_label))
     return list(res.scalars().all())
+
+
+async def get_template_by_id(db: AsyncSession, template_id: uuid.UUID) -> Template:
+    template = await db.get(Template, template_id)
+    if not template:
+        raise HTTPException(status_code=404, detail="Template not found")
+    return template
+
+
+def _validate_field_schema(field_schema: List[Dict[str, Any]]) -> None:
+    if not field_schema:
+        raise HTTPException(status_code=400, detail="field_schema must have at least one field")
+    seen = set()
+    for field_def in field_schema:
+        name = field_def.get("name") if isinstance(field_def, dict) else None
+        if not name:
+            raise HTTPException(status_code=400, detail="every field in field_schema needs a non-empty 'name'")
+        if name in seen:
+            raise HTTPException(status_code=400, detail=f"duplicate field name '{name}' in field_schema")
+        seen.add(name)
+
+
+async def create_template(
+    db: AsyncSession, form_type: str, era_label: str, field_schema: List[Dict[str, Any]],
+    layout: str, actor_id: uuid.UUID, tenant_id: uuid.UUID,
+) -> Template:
+    """Template is a global resource (no tenant_id column, T24) — any tenant's
+    it_admin can register a form type. The audit entry still needs a
+    tenant_id, so it's logged against the creating actor's own tenant."""
+    if layout not in VALID_LAYOUTS:
+        raise HTTPException(status_code=400, detail=f"layout must be one of {VALID_LAYOUTS}")
+    _validate_field_schema(field_schema)
+
+    template = Template(form_type=form_type, era_label=era_label, field_schema=field_schema, layout=layout)
+    db.add(template)
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"A template for '{form_type} | {era_label}' already exists")
+
+    await log_action(
+        db, actor_id, tenant_id, "template.create",
+        resource_type="template", resource_id=template.id,
+        details={"form_type": form_type, "era_label": era_label, "layout": layout},
+    )
+    await db.commit()
+    return template
+
+
+async def update_template(
+    db: AsyncSession, template_id: uuid.UUID, actor_id: uuid.UUID, tenant_id: uuid.UUID,
+    form_type: Optional[str] = None, era_label: Optional[str] = None,
+    field_schema: Optional[List[Dict[str, Any]]] = None, layout: Optional[str] = None,
+) -> Template:
+    template = await get_template_by_id(db, template_id)
+
+    if layout is not None:
+        if layout not in VALID_LAYOUTS:
+            raise HTTPException(status_code=400, detail=f"layout must be one of {VALID_LAYOUTS}")
+        template.layout = layout
+    if field_schema is not None:
+        _validate_field_schema(field_schema)
+        template.field_schema = field_schema
+    if form_type is not None:
+        template.form_type = form_type
+    if era_label is not None:
+        template.era_label = era_label
+
+    try:
+        await db.flush()
+    except IntegrityError:
+        await db.rollback()
+        raise HTTPException(status_code=409, detail=f"A template for '{template.form_type} | {template.era_label}' already exists")
+
+    await log_action(
+        db, actor_id, tenant_id, "template.update",
+        resource_type="template", resource_id=template.id,
+        details={"form_type": template.form_type, "era_label": template.era_label, "layout": template.layout},
+    )
+    await db.commit()
+    return template
+
+
+async def delete_template(db: AsyncSession, template_id: uuid.UUID, actor_id: uuid.UUID, tenant_id: uuid.UUID) -> None:
+    template = await get_template_by_id(db, template_id)
+    form_type, era_label = template.form_type, template.era_label
+    await db.delete(template)
+
+    await log_action(
+        db, actor_id, tenant_id, "template.delete",
+        resource_type="template", resource_id=template_id,
+        details={"form_type": form_type, "era_label": era_label},
+    )
+    await db.commit()
 
 
 def validate_fields(template: Template, extracted_fields: Dict[str, Any]) -> List[ValidationError]:

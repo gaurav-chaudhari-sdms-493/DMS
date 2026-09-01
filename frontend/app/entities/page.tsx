@@ -97,6 +97,29 @@ export default function Entity360Page() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
+  const [nameQuery, setNameQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<{ id: string; entity_type: string; label: string }[] | null>(null);
+  const [searching, setSearching] = useState(false);
+
+  const searchByName = async () => {
+    const q = nameQuery.trim();
+    if (!q) {
+      setError("Type a name to search first.");
+      return;
+    }
+    setSearching(true);
+    setError("");
+    setSearchResults(null);
+    try {
+      const result = await api.entities.search(q);
+      setSearchResults(result.results);
+    } catch (e: any) {
+      setError(e?.message || "Search failed");
+    } finally {
+      setSearching(false);
+    }
+  };
+
   const [historyRecordId, setHistoryRecordId] = useState<string | null>(null);
   const [history, setHistory] = useState<RecordHistory | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -158,21 +181,37 @@ export default function Entity360Page() {
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-6">
-        <Card className="bg-white border border-[#e1e3e1] mb-6">
+        <Card className="bg-white border border-[#e1e3e1] mb-4">
+          <p className="text-xs font-bold text-[#747775] mb-2">Find by name</p>
           <div className="flex gap-2">
             <input
               type="text"
-              aria-label="Entity node ID"
-              placeholder="Entity node ID"
-              value={nodeId}
-              onChange={(e) => setNodeId(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && load()}
+              aria-label="Search entities by name"
+              placeholder="e.g. Kunal"
+              value={nameQuery}
+              onChange={(e) => setNameQuery(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && searchByName()}
               className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
             />
-            <Button size="sm" loading={loading} onClick={() => load()}>
-              Load
+            <Button size="sm" loading={searching} onClick={searchByName}>
+              Search
             </Button>
           </div>
+          {searchResults && (
+            <div className="mt-3 flex flex-col gap-1.5">
+              {searchResults.length === 0 && <p className="text-sm text-[#747775]">No entities match that name.</p>}
+              {searchResults.map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => load(r.id)}
+                  className="text-left text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] hover:bg-[#f0f4f9] flex items-center justify-between"
+                >
+                  <span className="font-medium">{r.label}</span>
+                  <span className="text-[10px] uppercase tracking-wide text-[#747775]">{r.entity_type}</span>
+                </button>
+              ))}
+            </div>
+          )}
         </Card>
 
         {error && (

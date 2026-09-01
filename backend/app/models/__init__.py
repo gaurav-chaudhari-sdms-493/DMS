@@ -31,4 +31,19 @@ from app.models.field_trust_signal import FieldTrustSignal
 from app.models.search_glossary import SearchGlossaryTerm
 from app.database import Base
 
+# Every model must be imported here so SQLAlchemy's declarative registry
+# (and Alembic's autogenerate) can see it — that's the whole purpose of
+# this file, even though nothing in it calls these names directly.
+# __all__ tells pyflakes that on purpose, instead of ~30 false-positive
+# "imported but unused" warnings breaking CI's syntax/import check.
+__all__ = [
+    "Tenant", "User", "UserRole", "Folder", "Document", "DocumentVersion",
+    "Chunk", "MetadataItem", "AuditLog", "ChatSession", "ChatMessage",
+    "ApiLog", "SysConfig", "DocumentPage", "Fact", "FactRegion", "Template",
+    "EntityNode", "EntityEdge", "Record", "RecordAmendment", "CorpusCalibration",
+    "Department", "DepartmentMember", "DepartmentFolder", "RetentionClass",
+    "Translation", "Subscription", "License", "TableShapeDecision",
+    "OCRArchive", "VLMArchive", "FieldTrustSignal", "SearchGlossaryTerm", "Base",
+]
+
 

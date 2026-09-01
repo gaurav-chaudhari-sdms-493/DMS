@@ -58,6 +58,7 @@ class DocumentDetailResponse(BaseModel):
     current_version: Optional[Dict[str, Any]]
     metadata: List[Dict[str, Any]]
     versions: List[Dict[str, Any]]
+    possible_duplicate_candidates: Optional[List[Dict[str, Any]]] = None
 
 
 class DriveStatsResponse(BaseModel):
