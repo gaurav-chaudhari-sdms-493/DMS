@@ -38,6 +38,16 @@ the source project's documented regression (an LLM asked about a
 headerless continuation once guessed "sideways" and corrupted a downward
 continuation into bogus columns) by never asking the question in a
 context where a wrong answer could touch row pairing at all.
+
+2026-08-28 — adjudicate_structure() additionally ports one narrow,
+implementation-level fix directly from that source project's stitch_llm.py
+(explicitly authorized by the user for this one piece, after a structural
+comparison of both codebases showed the rest doesn't transfer — see
+[[feedback_colleague_project_inspiration_only]]): retrying a failed/
+unparseable adjudication call up to ADJUDICATION_ATTEMPTS times, and
+stripping a reasoning model's <think> preamble before parsing JSON. Our
+adjudication LLM (groq_llm_model, currently openai/gpt-oss-120b) is exactly
+the class of model their comment documents hitting this failure mode on.
 """
 import hashlib
 import json
@@ -90,10 +100,22 @@ class DecisionResult:
     reason: str
 
 
-def decide_relation(fields_a: FrozenSet[str], fields_b: FrozenSet[str], full_schema_fields: FrozenSet[str]) -> DecisionResult:
+def decide_relation(
+    fields_a: FrozenSet[str],
+    fields_b: FrozenSet[str],
+    full_schema_fields: FrozenSet[str],
+    vertical_threshold: float = VERTICAL_FIELD_SET_SIMILARITY_THRESHOLD,
+    horizontal_min_coverage: float = HORIZONTAL_MIN_COMBINED_COVERAGE,
+) -> DecisionResult:
     """The decision layer. Pure and deterministic — never guesses; returns
     "ambiguous" rather than picking a side when the evidence doesn't
-    clearly settle it, leaving that case for adjudicate_structure()."""
+    clearly settle it, leaving that case for adjudicate_structure().
+
+    `vertical_threshold`/`horizontal_min_coverage` default to this module's
+    constants so every existing caller and test is unaffected; T03's async
+    caller (vlm_extraction.py) passes the live sys_dg_config values instead
+    — kept as parameters rather than an in-module config lookup so this
+    stays a pure, synchronous, DB-free function."""
     if not fields_b:
         # A fragment with no field values at all (every cell blank/omitted)
         # can't be distinguished from a genuine continuation by field-set
@@ -104,13 +126,13 @@ def decide_relation(fields_a: FrozenSet[str], fields_b: FrozenSet[str], full_sch
         return DecisionResult("vertical", certain=True, reason="second fragment has no field evidence — treated as a headerless continuation")
 
     similarity = jaccard(fields_a, fields_b)
-    if similarity >= VERTICAL_FIELD_SET_SIMILARITY_THRESHOLD:
+    if similarity >= vertical_threshold:
         return DecisionResult("vertical", certain=True, reason=f"field sets {similarity:.0%} similar — same table continuing")
 
     overlap = fields_a & fields_b
     combined = fields_a | fields_b
     coverage = (len(combined) / len(full_schema_fields)) if full_schema_fields else 0.0
-    if not overlap and coverage >= HORIZONTAL_MIN_COMBINED_COVERAGE:
+    if not overlap and coverage >= horizontal_min_coverage:
         return DecisionResult("horizontal", certain=True, reason=f"disjoint field sets together cover {coverage:.0%} of the template — column bands of one row")
 
     return DecisionResult("ambiguous", certain=False, reason=f"field sets partially overlap ({similarity:.0%} similar, {coverage:.0%} combined template coverage) — not clearly either")
@@ -142,33 +164,75 @@ def build_adjudication_prompt(fields_a: FrozenSet[str], fields_b: FrozenSet[str]
     )
 
 
+ADJUDICATION_ATTEMPTS = 3
+
+
+def _braced(text: str) -> str:
+    start, end = text.find("{"), text.rfind("}")
+    return text[start:end + 1] if start >= 0 and end > start else ""
+
+
+def _parse_adjudication_response(raw: str) -> Optional[dict]:
+    """Our adjudication LLM (groq_llm_model, currently openai/gpt-oss-120b)
+    is a reasoning model: it sometimes prefixes its reply with a <think>
+    block or other preamble, which makes the whole reply invalid JSON even
+    when the answer inside it is perfectly good. Try the reply as-is, then
+    fall back to the last brace-delimited JSON object in it, same pattern
+    the source project's stitch_llm.py uses for the identical failure mode
+    on the identical class of model."""
+    text = (raw or "").strip()
+    if "</think>" in text:
+        text = text.split("</think>")[-1].strip()
+    if text.startswith("```"):
+        text = text.split("```")[1]
+        if text.startswith("json"):
+            text = text[4:]
+        text = text.strip()
+    for candidate in (text, _braced(text)):
+        if not candidate:
+            continue
+        try:
+            parsed = json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+        if isinstance(parsed, dict) and parsed.get("relation") in ("vertical", "horizontal", "unrelated"):
+            return parsed
+    return None
+
+
 async def adjudicate_structure(llm, fields_a: FrozenSet[str], fields_b: FrozenSet[str], full_schema_fields: FrozenSet[str]) -> Optional[AdjudicationVerdict]:
     """Structure-only adjudication via the local-model factory. Returns
     None (never raises) on any failure — including AirGappedViolation,
     since a missing local LLM must degrade to 'leave ambiguous, flag for
     review' rather than take down extraction (T22's existing best-effort
-    contract: a VLM/LLM failure never fails ingestion)."""
+    contract: a VLM/LLM failure never fails ingestion).
+
+    Retries up to ADJUDICATION_ATTEMPTS times: the same question doesn't
+    always come back readable even at temperature 0 (a reasoning model can
+    return unparseable chatter on one attempt and a clean verdict on the
+    next) — a single try silently turns a flaky reply into "ambiguous,
+    ask a human" for a case a retry would have resolved on its own."""
     from app.ai.base import Message
 
-    try:
-        prompt = build_adjudication_prompt(fields_a, fields_b, full_schema_fields)
-        raw = await llm.complete(
-            [Message(role="system", content=ADJUDICATION_SYSTEM_PROMPT), Message(role="user", content=prompt)],
-            temperature=0.0,
-            max_tokens=200,
-        )
-        text = raw.strip()
-        if text.startswith("```"):
-            text = text.split("```")[1]
-            if text.startswith("json"):
-                text = text[4:]
-        data = json.loads(text.strip())
-        relation = data.get("relation")
-        if relation not in ("vertical", "horizontal", "unrelated"):
-            return None
-        return AdjudicationVerdict(relation=relation, confidence=float(data.get("confidence", 0.0)), raw_reason=str(data.get("reason", "")))
-    except Exception:
-        return None
+    prompt = build_adjudication_prompt(fields_a, fields_b, full_schema_fields)
+    for attempt in range(ADJUDICATION_ATTEMPTS):
+        try:
+            raw = await llm.complete(
+                [Message(role="system", content=ADJUDICATION_SYSTEM_PROMPT), Message(role="user", content=prompt)],
+                temperature=0.0,
+                max_tokens=200,
+            )
+            data = _parse_adjudication_response(raw)
+            if data is None:
+                continue
+            return AdjudicationVerdict(
+                relation=data["relation"],
+                confidence=float(data.get("confidence", 0.0)),
+                raw_reason=str(data.get("reason", "")),
+            )
+        except Exception:
+            continue
+    return None
 
 
 def match_rows_by_key(left_rows: List[Dict[str, Any]], right_rows: List[Dict[str, Any]], key_field: str) -> Tuple[List[Tuple[Dict, Dict]], List[Dict], List[Dict]]:
@@ -205,13 +269,20 @@ def match_rows_by_key(left_rows: List[Dict[str, Any]], right_rows: List[Dict[str
 
 
 def _row_vertical_span(row: Dict[str, Any]) -> Optional[Tuple[float, float]]:
+    # A field the VLM has no value for should omit its key entirely, but
+    # a model doesn't always comply — observed live on a real 1973
+    # gazette page: a null-value field came back as
+    # {"bbox": [null, null, null, null], ...} instead of being omitted.
+    # A 4-null list is still a truthy, length-4 list, so it must be
+    # checked for real numbers, not just presence/length.
     y0s, y1s = [], []
     for field_data in row.values():
-        if isinstance(field_data, dict) and field_data.get("bbox"):
-            bbox = field_data["bbox"]
-            if len(bbox) == 4:
-                y0s.append(float(bbox[1]))
-                y1s.append(float(bbox[3]))
+        if not isinstance(field_data, dict):
+            continue
+        bbox = field_data.get("bbox")
+        if isinstance(bbox, (list, tuple)) and len(bbox) == 4 and all(isinstance(v, (int, float)) for v in bbox):
+            y0s.append(float(bbox[1]))
+            y1s.append(float(bbox[3]))
     if not y0s:
         return None
     return min(y0s), max(y1s)

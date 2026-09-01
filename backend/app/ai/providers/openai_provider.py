@@ -1,4 +1,3 @@
-import asyncio
 from openai import AsyncOpenAI
 from typing import List
 from app.ai.base import LLMProvider, EmbeddingProvider, Message

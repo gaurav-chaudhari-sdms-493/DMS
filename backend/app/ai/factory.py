@@ -192,6 +192,10 @@ def get_vlm_provider() -> VLMProvider | None:
         enforce_local('VLM', 'gemini')
         from app.ai.providers.gemini_provider import GeminiVLMProvider
         _vlm_provider = GeminiVLMProvider(api_key=settings.google_api_key, model=settings.gemini_vlm_model)
+    elif settings.ai_vlm_provider == 'openrouter' and settings.openrouter_api_key:
+        enforce_local('VLM', 'openrouter')
+        from app.ai.providers.openrouter_provider import OpenRouterVLMProvider
+        _vlm_provider = OpenRouterVLMProvider(api_key=settings.openrouter_api_key, model=settings.openrouter_vlm_model)
     else:
         _vlm_provider = None
 

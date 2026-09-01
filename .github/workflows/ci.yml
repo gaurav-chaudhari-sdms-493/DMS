@@ -41,12 +41,21 @@ jobs:
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyflakes
+          pip install flake8
           pip install -r backend/requirements.txt
 
       - name: Pyflakes Syntax & Import Check
         run: |
-          pyflakes backend/app backend/migrations
+          # flake8 --select=F, not bare pyflakes: the codebase already has
+          # `# noqa: F401`/`# noqa: E712` comments (migrations/env.py's
+          # registry import, several `== False`/`== True` SQLAlchemy column
+          # comparisons) that only flake8 honors — bare pyflakes has no
+          # noqa mechanism at all, silently failing every one of these,
+          # every push, since this check was added. --select=F keeps this
+          # step's actual scope identical to plain pyflakes (import/name
+          # bugs only, no style/E-code linting) while making the existing
+          # suppressions real.
+          flake8 --select=F backend/app backend/migrations
 
       - name: Run Backend Pytest Suite
         env:
@@ -56,7 +65,59 @@ jobs:
           JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
         run: |
           cd backend
-          pytest tests/
+          pytest tests/ --cov-report=json
+
+      - name: Coverage Ratchet Check (T98)
+        run: |
+          cd backend
+          python scripts/check_coverage_ratchet.py
+
+  egress-verification:
+    # T92 — the app-level egress_guard (T91) is a hardcoded host allowlist
+    # inside httpx's transport; it only catches what it knows to check. This
+    # job proves air-gapped mode holds at the OS network layer too, so a bug
+    # like "a new provider uses `requests` instead of `httpx`" or "a new host
+    # was added to a provider but not to BLOCKED_AI_HOSTS" gets caught here
+    # even though the app-level guard would silently miss it.
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Dependencies must be installed BEFORE the network is blocked below —
+      # this step is the last one in the job allowed to reach the network.
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Block all outbound network except loopback
+        run: |
+          sudo iptables -P OUTPUT DROP
+          sudo iptables -A OUTPUT -o lo -j ACCEPT
+          sudo iptables -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+          sudo iptables -L OUTPUT -v
+
+      - name: Verify the OS-level block actually holds (must fail to connect)
+        run: |
+          if curl --max-time 5 -sS https://api.openai.com > /dev/null 2>&1; then
+            echo "::error::Outbound request to api.openai.com SUCCEEDED — the network block is not actually in effect."
+            exit 1
+          fi
+          echo "Confirmed: outbound network is genuinely blocked at the OS level."
+
+      - name: Run egress-guard test suite under a real network block
+        env:
+          AIR_GAPPED: "true"
+          JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
+        run: |
+          cd backend
+          pytest tests/test_egress_guard.py tests/test_air_gapped_toggle.py -v --no-cov
 
   frontend-checks:
     runs-on: ubuntu-latest

@@ -1,6 +1,6 @@
 import { getAccessToken, getUserProfile, setUserProfile, clearTokens } from "./auth";
 import { offlineStore } from "./offlineStore";
-import type { Folder, FolderTreeNode, DocumentListItem, DocumentDetailResponse, DriveStats, SearchResponse, ChatSession, ChatMessage, ChatSessionListItem } from "@/types";
+import type { Folder, FolderTreeNode, DocumentListItem, DocumentDetailResponse, DriveStats, SearchResponse, ChatSession, ChatMessage, ChatSessionListItem, TemplateResponse, TemplateCreatePayload } from "@/types";
 
 export const getBaseUrl = (): string => {
   if (typeof window !== "undefined") {
@@ -14,6 +14,15 @@ export const getBaseUrl = (): string => {
     // If in browser and URL points to internal docker service name 'backend', use default ngrok URL
     if (url.includes("backend:8000")) {
       url = "https://aa0d-103-226-171-223.ngrok-free.app";
+    }
+    // The build bakes in "localhost:8000", which only resolves correctly
+    // when the page itself is viewed from the Docker host machine. Viewed
+    // from any other device (phone, another laptop on the same network),
+    // "localhost" means that device's own loopback, not the Docker host —
+    // fall back to whatever host actually served this page, same port 8000.
+    const isLocalhostPage = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (url.includes("localhost:8000") && !isLocalhostPage) {
+      url = `${window.location.protocol}//${window.location.hostname}:8000`;
     }
   }
   return url.replace(/\/+$/, "");
@@ -158,7 +167,15 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
     let errorDetail = "Request failed";
     try {
       const errJson = await response.json();
-      errorDetail = errJson.detail || JSON.stringify(errJson);
+      const { detail } = errJson;
+      if (typeof detail === "string" && detail) {
+        errorDetail = detail;
+      } else if (Array.isArray(detail) && detail.length > 0) {
+        // FastAPI validation errors: [{loc, msg, type}, ...]
+        errorDetail = detail.map((d: any) => d?.msg || JSON.stringify(d)).join("; ");
+      } else {
+        errorDetail = JSON.stringify(errJson);
+      }
     } catch (_) {
       try {
         errorDetail = await response.text();
@@ -315,6 +332,9 @@ export const api = {
     // state), linked entities/facts with tier and confirmation status.
     get360: async (nodeId: string): Promise<any> => {
       return await request(`/api/v1/entities/${nodeId}/360`, { method: "GET" });
+    },
+    search: async (q: string): Promise<{ results: { id: string; entity_type: string; label: string }[] }> => {
+      return await request(`/api/v1/entities/search?q=${encodeURIComponent(q)}`, { method: "GET" });
     },
   },
   records: {
@@ -543,6 +563,30 @@ export const api = {
     },
     getApiAnalytics: async (): Promise<any> => {
       return await request("/api/v1/admin/api-analytics");
+    },
+  },
+  templates: {
+    list: async (formType?: string): Promise<TemplateResponse[]> => {
+      const qs = formType ? `?form_type=${encodeURIComponent(formType)}` : "";
+      return await request(`/api/v1/templates${qs}`, { method: "GET" });
+    },
+    get: async (templateId: string): Promise<TemplateResponse> => {
+      return await request(`/api/v1/templates/${templateId}`, { method: "GET" });
+    },
+    create: async (body: TemplateCreatePayload): Promise<TemplateResponse> => {
+      return await request("/api/v1/templates", {
+        method: "POST",
+        body: JSON.stringify(body),
+      });
+    },
+    update: async (templateId: string, body: Partial<TemplateCreatePayload>): Promise<TemplateResponse> => {
+      return await request(`/api/v1/templates/${templateId}`, {
+        method: "PATCH",
+        body: JSON.stringify(body),
+      });
+    },
+    delete: async (templateId: string): Promise<null> => {
+      return await request(`/api/v1/templates/${templateId}`, { method: "DELETE" });
     },
   },
 };

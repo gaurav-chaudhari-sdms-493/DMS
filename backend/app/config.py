@@ -74,13 +74,16 @@ class Settings(BaseSettings):
     ai_rerank_provider: Literal['cohere', 'bgem3', 'none'] = 'cohere'
     ai_ocr_provider: Literal['pdfplumber', 'llamaparse', 'paddleocr'] = 'pdfplumber'
 
-    # T22 — VLM extraction path. Only Gemini is wired up today: it's the one
-    # already-configured provider with real vision support (google_api_key is
-    # shared with the T09 embedding path). 'none' disables T22 outright and
-    # ingestion falls back to chunk-only indexing, same as before this task.
-    ai_vlm_provider: Literal['gemini', 'none'] = 'gemini'
+    # T22 — VLM extraction path. Gemini (direct) and OpenRouter (proxying any
+    # OpenRouter-hosted vision model, openrouter_vlm_model) are wired up.
+    # 'none' disables T22 outright and ingestion falls back to chunk-only
+    # indexing, same as before this task.
+    ai_vlm_provider: Literal['gemini', 'openrouter', 'none'] = 'gemini'
     gemini_vlm_model: str = 'gemini-3.6-flash'
     vlm_max_pages_per_document: int = 25
+
+    openrouter_api_key: str = ''
+    openrouter_vlm_model: str = 'google/gemini-2.5-flash'
 
     openai_api_key: str = ''
     openai_llm_model: str = 'gpt-4o-mini'
@@ -172,7 +175,21 @@ class Settings(BaseSettings):
     # to poll it).
     email_external_smtp_host: str = 'localhost'
     email_external_smtp_port: int = 3025
-    
+
+    # Outbound transactional email (password reset, etc). Defaults point at
+    # the local GreenMail container so dev/demo works with zero config;
+    # point these at a real relay (Gmail SMTP, SendGrid, etc.) to deliver to
+    # real inboxes. smtp_use_tls=False + smtp_use_ssl=False is GreenMail's
+    # plaintext test SMTP; a real relay will need one of those true.
+    smtp_host: str = 'mailserver'
+    smtp_port: int = 3025
+    smtp_username: str = 'connector'
+    smtp_password: str = 'connector123'
+    smtp_use_tls: bool = False
+    smtp_use_ssl: bool = False
+    smtp_from_email: str = 'noreply@dms.local'
+    smtp_from_name: str = 'VeritasDocs'
+
     @field_validator('cors_origins', mode='before')
     @classmethod
     def parse_cors_origins(cls, v):

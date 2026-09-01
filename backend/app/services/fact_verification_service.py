@@ -13,7 +13,7 @@ regardless of a fact's verification status.
 """
 import uuid as uuid_module
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from uuid import UUID
 
 from fastapi import HTTPException

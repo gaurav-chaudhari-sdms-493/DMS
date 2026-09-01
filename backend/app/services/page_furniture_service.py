@@ -26,7 +26,6 @@ text) looks identical to a stable running header by content alone, but
 its position is unstable — checking for stable position, not just
 repeated content, is what tells them apart.
 """
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Tuple
 
 DEFAULT_MIN_OCCURRENCES = 3

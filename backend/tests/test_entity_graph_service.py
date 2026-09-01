@@ -11,6 +11,7 @@ from app.models.fact import Fact
 from app.models.entity_node import EntityNode
 from app.services.entity_graph_service import (
     create_node, create_edge, confirm_edge, revert_edge, bulk_confirm_edges, revert_bulk_batch,
+    find_similar_nodes,
 )
 from app.services.corpus_calibration_service import calibrate_corpus
 
@@ -88,6 +89,63 @@ async def test_create_node_happy_path_logs_audit_event():
             assert node.label == "Jane Doe"
             assert node.attributes == {"role": "clerk"}
             assert node.tenant_id == tenant_id
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_find_similar_nodes_flags_a_real_ocr_variant_pair():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, node_id, fact_id = await _make_corpus(db)
+            first = await create_node(db, tenant_id, "trust", "Shri Juni Masjid, Hirpur", actor_id)
+            second = await create_node(
+                db, tenant_id, "trust", "Shri Juni Masjid, Village. Hirpur, Taluka. Murtizapur", actor_id,
+            )
+            candidates = await find_similar_nodes(db, tenant_id, "trust", second.label, exclude_node_id=second.id)
+            assert any(c["id"] == str(first.id) for c in candidates)
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_find_similar_nodes_does_not_flag_an_unrelated_label():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, node_id, fact_id = await _make_corpus(db)
+            await create_node(db, tenant_id, "trust", "Shri Juni Masjid, Hirpur", actor_id)
+            candidates = await find_similar_nodes(db, tenant_id, "trust", "Anjuman Islamia Trust, Nagpur")
+            assert candidates == []
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_find_similar_nodes_never_crosses_entity_type():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, node_id, fact_id = await _make_corpus(db)
+            await create_node(db, tenant_id, "person", "Shri Juni Masjid, Hirpur", actor_id)
+            # Same label, different entity_type — a person and a trust
+            # sharing text is never a duplicate candidate.
+            candidates = await find_similar_nodes(db, tenant_id, "trust", "Shri Juni Masjid, Hirpur")
+            assert candidates == []
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_find_similar_nodes_excludes_the_node_itself():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, node_id, fact_id = await _make_corpus(db)
+            node = await create_node(db, tenant_id, "trust", "Shri Juni Masjid, Hirpur", actor_id)
+            candidates = await find_similar_nodes(db, tenant_id, "trust", node.label, exclude_node_id=node.id)
+            assert candidates == []
         finally:
             await db.rollback()
             await db.close()

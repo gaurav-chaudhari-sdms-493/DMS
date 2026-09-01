@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query, status, HTTPException
+from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import uuid
@@ -70,7 +70,8 @@ async def get_folder(
     db: AsyncSession = Depends(get_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
-    folder = await folder_service.get_folder(db, folder_id, tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    folder = await folder_service.get_folder(db, folder_id, tenant_id, actor_id=user_id)
     return FolderResponse.model_validate(folder)
 
 

@@ -1,6 +1,5 @@
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, text
-from sqlalchemy.orm import selectinload
+from sqlalchemy import select, text
 from fastapi import HTTPException, status
 from uuid import UUID
 from datetime import datetime
@@ -62,12 +61,17 @@ async def list_folders(
     return [FolderResponse.model_validate(f) for f in folders]
 
 
-async def get_folder(db: AsyncSession, folder_id: UUID, tenant_id: UUID) -> Folder:
+async def get_folder(db: AsyncSession, folder_id: UUID, tenant_id: UUID, actor_id: Optional[UUID] = None) -> Folder:
     stmt = select(Folder).where(Folder.id == folder_id, Folder.tenant_id == tenant_id)
     res = await db.execute(stmt)
     folder = res.scalar_one_or_none()
     if not folder:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Folder not found")
+    # T07 — the document-detail path already logs "document.view"; folder
+    # detail was the one asymmetric gap (list_folders/list_documents are
+    # both deliberately unlogged — same noise tradeoff either way).
+    if actor_id is not None:
+        await log_action(db, actor_id, tenant_id, "folder.view", resource_type="folder", resource_id=folder.id)
     return folder
 
 

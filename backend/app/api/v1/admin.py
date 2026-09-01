@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, case, extract, cast, String, Float
+from sqlalchemy import select, func, case, extract, cast, Numeric
 from datetime import datetime, timedelta
 import uuid
 
@@ -266,7 +266,7 @@ async def get_api_analytics(
             ApiLog.method,
             ApiLog.path,
             func.count(ApiLog.id).label("call_count"),
-            func.round(cast(func.avg(ApiLog.response_time_ms), Float), 2).label("avg_time_ms"),
+            func.round(cast(func.avg(ApiLog.response_time_ms), Numeric), 2).label("avg_time_ms"),
         )
         .where(ApiLog.tenant_id == tenant_id)
         .group_by(ApiLog.method, ApiLog.path)
@@ -305,8 +305,8 @@ async def get_api_analytics(
             ApiLog.method,
             ApiLog.path,
             func.count(ApiLog.id).label("call_count"),
-            func.round(cast(func.avg(ApiLog.response_time_ms), Float), 2).label("avg_time_ms"),
-            func.round(cast(func.max(ApiLog.response_time_ms), Float), 2).label("max_time_ms"),
+            func.round(cast(func.avg(ApiLog.response_time_ms), Numeric), 2).label("avg_time_ms"),
+            func.round(cast(func.max(ApiLog.response_time_ms), Numeric), 2).label("max_time_ms"),
         )
         .where(ApiLog.tenant_id == tenant_id)
         .group_by(ApiLog.method, ApiLog.path)

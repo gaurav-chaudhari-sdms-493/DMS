@@ -342,7 +342,9 @@ async def send_chat_message(
                 "CRITICAL RULE: Answer the user's question accurately using ONLY the listed document excerpts below.\n"
                 "- Do NOT invent details outside these listed documents.\n"
                 "- Clearly reference document names, pages, scores, or metadata where relevant.\n"
-                "- Organize your answer with clear headers, bold text, or bullet points."
+                "- Organize your answer with clear headers, bold text, or bullet points.\n"
+                "- Respond in the language of the user's CURRENT message below, even if earlier turns in "
+                "this conversation were in a different language — do not carry a prior turn's language forward."
             )
 
             context_block = "\n\n---\n\n".join(excerpts)

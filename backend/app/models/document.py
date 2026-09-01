@@ -63,6 +63,11 @@ class Document(Base):
     # Detection only, never applied to chunk content. NULL when nothing detected.
     page_furniture_candidates: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
+    # T79 — fuzzy-duplicate candidates (see app/services/duplicate_service.py),
+    # computed at ingest instead of only on-demand. Informational only, never
+    # blocks upload or auto-merges. NULL when nothing above threshold found.
+    possible_duplicate_candidates: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="documents")
     folder: Mapped[Optional["Folder"]] = relationship("Folder", back_populates="documents")
     versions: Mapped[List["DocumentVersion"]] = relationship(

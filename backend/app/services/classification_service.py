@@ -13,7 +13,7 @@ manually assign a template the automatic match missed, or dismiss a
 document as genuinely not needing one — either way it stops sitting in
 'unclassified' forever.
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from fastapi import HTTPException

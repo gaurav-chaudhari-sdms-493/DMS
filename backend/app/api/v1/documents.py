@@ -54,7 +54,7 @@ async def get_drive_stats_api(
 @router.get('/{document_id}/fuzzy-duplicates')
 async def get_fuzzy_duplicates_api(
     document_id: uuid.UUID,
-    threshold: float = 0.92,
+    threshold: Optional[float] = None,
     current_user: TokenPayload = Depends(require_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):

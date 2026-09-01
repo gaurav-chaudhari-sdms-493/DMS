@@ -19,16 +19,26 @@ not silently discard" (backlog). Nothing here blocks or auto-merges
 anything — it just answers "does this document semantically resemble
 something already in the tenant."
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.services.config_service import get_float
+
+DEFAULT_FUZZY_SIMILARITY_THRESHOLD = 0.92
+
 
 async def find_fuzzy_duplicates(
-    db: AsyncSession, tenant_id: UUID, document_id: UUID, threshold: float = 0.92, limit: int = 10,
+    db: AsyncSession, tenant_id: UUID, document_id: UUID, threshold: Optional[float] = None, limit: int = 10,
 ) -> List[Dict[str, Any]]:
+    # T03 — sourced from sys_dg_config (migration 0041) when the caller
+    # doesn't explicitly override it; falls back to this module's own
+    # constant if the config row is ever missing.
+    if threshold is None:
+        threshold = await get_float("duplicate_fuzzy_similarity_threshold", DEFAULT_FUZZY_SIMILARITY_THRESHOLD)
+
     target_res = await db.execute(
         text("""
             SELECT c.embedding FROM doc_dg_chunks c

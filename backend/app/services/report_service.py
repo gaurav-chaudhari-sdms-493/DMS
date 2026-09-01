@@ -16,7 +16,6 @@ T78's exports.
 import hashlib
 import io
 import json
-from datetime import datetime
 from typing import Any, Dict, List, Tuple
 from uuid import UUID
 
@@ -102,7 +101,6 @@ def _to_pdf_bytes(lines: List[str], node_label: str) -> bytes:
     from reportlab.lib.units import cm
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
-    from reportlab.lib import colors
 
     buf = io.BytesIO()
     doc = SimpleDocTemplate(buf, pagesize=A4, topMargin=2 * cm, bottomMargin=2 * cm)

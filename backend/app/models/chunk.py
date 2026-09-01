@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy import ForeignKey, TEXT, INTEGER, Index
+from sqlalchemy import ForeignKey, TEXT, INTEGER
 from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import uuid

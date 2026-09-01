@@ -204,3 +204,32 @@ async def test_adjudicate_structure_returns_none_when_llm_raises():
     fake_llm.complete.side_effect = RuntimeError("no local LLM provider")
     verdict = await adjudicate_structure(fake_llm, frozenset({"owner"}), frozenset({"area"}), frozenset({"owner", "area"}))
     assert verdict is None
+
+
+@pytest.mark.asyncio
+async def test_adjudicate_structure_retries_past_an_unparseable_reasoning_model_reply():
+    # A reasoning model (our groq_llm_model is openai/gpt-oss-120b) can
+    # return unreadable chatter on one attempt and a clean verdict on the
+    # next for the identical question — the retry must recover instead of
+    # silently treating the flaky first reply as "ambiguous, ask a human".
+    fake_llm = AsyncMock()
+    fake_llm.complete.side_effect = [
+        "hmm, thinking about this one...",
+        '{"relation": "horizontal", "confidence": 0.77, "reason": "disjoint columns"}',
+    ]
+    verdict = await adjudicate_structure(fake_llm, frozenset({"owner"}), frozenset({"area"}), frozenset({"owner", "area"}))
+    assert verdict.relation == "horizontal"
+    assert verdict.confidence == 0.77
+    assert fake_llm.complete.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_adjudicate_structure_strips_a_think_block_before_parsing():
+    fake_llm = AsyncMock()
+    fake_llm.complete.return_value = (
+        "<think>column sets barely overlap, leaning vertical</think>\n"
+        '```json\n{"relation": "vertical", "confidence": 0.6, "reason": "mostly the same"}\n```'
+    )
+    verdict = await adjudicate_structure(fake_llm, frozenset({"owner"}), frozenset({"owner", "area"}), frozenset({"owner", "area"}))
+    assert verdict.relation == "vertical"
+    assert verdict.confidence == 0.6

@@ -39,7 +39,33 @@ async def create_entity_node_api(
     node = await entity_graph_service.create_node(
         db, tenant_id, node_in.entity_type, node_in.label, user_id, attributes=node_in.attributes,
     )
-    return {"id": str(node.id), "entity_type": node.entity_type, "label": node.label, "attributes": node.attributes}
+    # Never blocks or auto-merges (same contract as the document fuzzy-
+    # duplicate leg, T79) — just surfaced alongside the node the caller
+    # asked to create, so a possible fragmentation is visible at the one
+    # moment it's cheapest to fix: right when the duplicate is created.
+    possible_duplicates = await entity_graph_service.find_similar_nodes(
+        db, tenant_id, node.entity_type, node.label, exclude_node_id=node.id,
+    )
+    return {
+        "id": str(node.id), "entity_type": node.entity_type, "label": node.label, "attributes": node.attributes,
+        "possible_duplicates": possible_duplicates,
+    }
+
+
+@router.get("/check-duplicate")
+async def check_entity_duplicate_api(
+    entity_type: str,
+    label: str,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """Same check as create_entity_node_api's possible_duplicates, but
+    before creating anything — for a UI to warn a user while they're still
+    typing a label, or for an operator to check without registering a
+    node at all."""
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    candidates = await entity_graph_service.find_similar_nodes(db, tenant_id, entity_type, label)
+    return {"candidates": candidates}
 
 
 @router.post("/edges", status_code=201)
@@ -77,6 +103,17 @@ async def create_entity_edge_api(
         "target_fact_id": str(edge.target_fact_id) if edge.target_fact_id else None,
         "confidence": edge.confidence,
     }
+
+
+@router.get("/search")
+async def search_entity_nodes_api(
+    q: str,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    nodes = await entity_graph_service.search_nodes(db, tenant_id, q)
+    return {"results": [{"id": str(n.id), "entity_type": n.entity_type, "label": n.label} for n in nodes]}
 
 
 @router.get("/{node_id}/360")

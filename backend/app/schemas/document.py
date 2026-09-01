@@ -62,6 +62,7 @@ class DocumentDetailResponse(BaseModel):
     versions: List[Dict[str, Any]]
     quality_flag: Optional[str] = None
     quality_warnings: List[str] = Field(default_factory=list)
+    possible_duplicate_candidates: Optional[List[Dict[str, Any]]] = None
 
 
 class DriveStatsResponse(BaseModel):

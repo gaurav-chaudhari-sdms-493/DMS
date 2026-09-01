@@ -222,6 +222,14 @@
       animation-delay: 0.54s;
     }
 
+    .slide.active .whats-new-item:nth-child(5) {
+      animation-delay: 0.62s;
+    }
+
+    .slide.active .whats-new-item:nth-child(6) {
+      animation-delay: 0.70s;
+    }
+
     .slide.active .metric-col {
       animation: fadeInUp 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
     }
@@ -420,7 +428,7 @@
 
     .whats-new-header-center {
       font-family: 'Outfit', sans-serif;
-      font-size: 1.25rem;
+      font-size: 1.5rem;
       font-weight: 800;
       color: var(--stark-orange);
       text-align: center;
@@ -439,7 +447,7 @@
     .whats-new-item {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 24px;
       background: var(--surface);
       border: 1px solid var(--border);
       padding: 14px 20px;
@@ -532,7 +540,7 @@
       padding: 28px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 24px;
       text-align: left;
       transition: all 0.25s ease;
     }
@@ -656,7 +664,7 @@
     }
 
     .metric-card-desc {
-      font-size: 0.92rem;
+      font-size: 1.1rem;
       color: var(--text-muted);
       line-height: 1.4;
       text-align: center;
@@ -666,7 +674,7 @@
     .flow-container {
       display: flex;
       flex-direction: column;
-      gap: 14px;
+      gap: 24px;
       width: 100%;
     }
 
@@ -799,7 +807,7 @@
       padding: 10px 24px;
       border-radius: 9999px;
       font-weight: 700;
-      font-size: 0.95rem;
+      font-size: 1.2rem;
       cursor: pointer;
       display: flex;
       align-items: center;
@@ -815,7 +823,7 @@
     }
 
     .slide-counter {
-      font-size: 0.95rem;
+      font-size: 1.2rem;
       color: var(--text-muted);
       font-weight: 700;
       font-family: 'JetBrains Mono', monospace;
@@ -860,23 +868,24 @@
           <div class="whats-new-grid-center">
             <div class="whats-new-item" onclick="goToSlide(2)">
               <div class="item-icon">⚡</div>
-              <div class="item-title">1. 100% Free Local AI Search Engine</div>
+              <div class="item-title">1. 100% Free Local AI Search</div>
             </div>
             <div class="whats-new-item" onclick="goToSlide(3)">
               <div class="item-icon">🌐</div>
-              <div class="item-title">2. Multi-Language Search (English, Hindi, Marathi, Hinglish)</div>
+              <div class="item-title">2. Multi-Language Intelligence</div>
             </div>
             <div class="whats-new-item" onclick="goToSlide(4)">
               <div class="item-icon">🛡️</div>
-              <div class="item-title">3. Enterprise Data Security & Privacy</div>
+              <div class="item-title">3. Secure & Intuitive Design</div>
             </div>
             <div class="whats-new-item" onclick="goToSlide(5)">
-              <div class="item-icon">✨</div>
-              <div class="item-title">4. Redesigned Drive UI & PDF Viewer</div>
+              <div class="item-icon">📥</div>
+              <div class="item-title">4. Effortless Data Collection</div>
             </div>
-            <div class="whats-new-item" onclick="goToSlide(6)" style="grid-column: span 2; max-width: 480px; justify-self: center; width: 100%;">
-              <div class="item-icon">🐧</div>
-              <div class="item-title">5. Native Linux Desktop App Integration</div>
+            <div class="whats-new-item" onclick="goToSlide(6)"
+              style="grid-column: span 2; justify-self: center; width: 100%; max-width: 480px;">
+              <div class="item-icon">💰</div>
+              <div class="item-title">5. Massive Cost Reductions</div>
             </div>
           </div>
         </div>
@@ -886,76 +895,77 @@
     <!-- SLIDE 2: CHANGE 1 - 100% FREE LOCAL AI SEARCH ENGINE -->
     <div class="slide" id="slide-2">
       <div class="slide-header">
-        <div class="slide-title">1. 100% Free Local AI Search Engine</div>
-        <div class="slide-subtitle">On-premise vector embeddings • Zero API costs • Zero latency</div>
+        <div class="slide-title">1. Total Data Privacy & Zero Ongoing Costs</div>
+        <div class="slide-subtitle">Run powerful AI search on your own infrastructure without paying per-search fees
+        </div>
       </div>
 
       <div class="slide-body" style="flex-direction: column; gap: 20px;">
         <div class="grid-4">
           <div class="metric-col">
             <div class="metric-card">
-              <div class="metric-card-num color-green">100%</div>
-              <div class="metric-card-title">Zero API Costs</div>
-              <div class="metric-card-desc">Local Execution</div>
+              <div class="metric-card-num color-green">$0</div>
+              <div class="metric-card-title">Usage Fees</div>
+              <div class="metric-card-desc">No API limits</div>
             </div>
             <div class="metric-bottom-badge badge-green">COST SAVINGS</div>
           </div>
 
           <div class="metric-col">
             <div class="metric-card">
-              <div class="metric-card-num color-blue">1024d</div>
-              <div class="metric-card-title">Dense Vectors</div>
-              <div class="metric-card-desc">FastEmbed Model</div>
+              <div class="metric-card-num color-blue">100%</div>
+              <div class="metric-card-title">Data Privacy</div>
+              <div class="metric-card-desc">Never leaves network</div>
             </div>
-            <div class="metric-bottom-badge badge-blue">HIGH ACCURACY</div>
+            <div class="metric-bottom-badge badge-blue">ENTERPRISE SECURE</div>
           </div>
 
           <div class="metric-col">
             <div class="metric-card">
-              <div class="metric-card-num color-orange">&lt;50ms</div>
-              <div class="metric-card-title">Instant Search</div>
-              <div class="metric-card-desc">pgvector HNSW</div>
+              <div class="metric-card-num color-orange">Instant</div>
+              <div class="metric-card-title">Search Speed</div>
+              <div class="metric-card-desc">Find answers instantly</div>
             </div>
-            <div class="metric-bottom-badge badge-orange">ZERO LATENCY</div>
+            <div class="metric-bottom-badge badge-orange">MAXIMUM PRODUCTIVITY</div>
           </div>
 
           <div class="metric-col">
             <div class="metric-card">
-              <div class="metric-card-num color-purple">0 Limits</div>
-              <div class="metric-card-title">Unlimited Scale</div>
-              <div class="metric-card-desc">Zero Token Caps</div>
+              <div class="metric-card-num color-purple">Infinite</div>
+              <div class="metric-card-title">Scalability</div>
+              <div class="metric-card-desc">Grows with your business</div>
             </div>
-            <div class="metric-bottom-badge badge-purple">UNLIMITED QUERIES</div>
+            <div class="metric-bottom-badge badge-purple">FUTURE PROOF</div>
           </div>
         </div>
 
         <div class="grid-2" style="flex: 1; gap: 20px;">
-          <div class="card" style="padding: 28px 36px; justify-content: center; gap: 16px;">
+          <div class="card" style="padding: 40px 48px; min-height: 300px; justify-content: center; gap: 24px;">
             <div class="card-title"
               style="font-size: 1.4rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--primary);">
-              On-Premise Local AI Architecture
+              Own Your Intelligence
             </div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.2rem; font-weight: 700; color: var(--text-main);">
-                <div>• Zero Third-Party API Fees</div>
-                <div>• FastEmbed ONNX Engine (1024d)</div>
-                <div>• 100% Data Sovereignty & Privacy</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.35rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Runs locally via FastEmbed</div>
+                <div>• Zero API calls</div>
+                <div>• Fast pgvector retrieval</div>
               </div>
             </div>
           </div>
 
-          <div class="card" style="padding: 28px 36px; justify-content: center; gap: 16px;">
+          <div class="card" style="padding: 40px 48px; min-height: 300px; justify-content: center; gap: 24px;">
             <div class="card-title"
               style="font-size: 1.4rem; border-bottom: 2px solid var(--border); padding-bottom: 10px; color: var(--primary);">
-              High-Throughput Vector Pipeline
+              Built for Scale & Performance
             </div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.2rem; font-weight: 700; color: var(--text-main);">
-                <div>• PostgreSQL + pgvector (Sub-ms HNSW)</div>
-                <div>• Asynchronous Celery Queues</div>
-                <div>• Resource Optimized CPU Footprint</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.35rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Sub-ms HNSW indexing</div>
+                <div>• Celery queue processing</div>
+                <div>• Low CPU footprint</div>
               </div>
             </div>
           </div>
@@ -974,7 +984,7 @@
       <div class="slide-body" style="flex-direction: column; gap: 20px; justify-content: center;">
         <!-- DEMO SECTION -->
         <div
-          style="padding: 24px 32px; display: flex; flex-direction: column; gap: 16px; width: 100%; background: #ffffff; border-radius: 24px; box-shadow: 0 12px 40px rgba(11,87,208,0.07);">
+          style="padding: 40px 48px; display: flex; flex-direction: column; gap: 24px; width: 100%; background: #ffffff; border-radius: 24px; box-shadow: 0 12px 40px rgba(11,87,208,0.07);">
           <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 2px;">
             <div style="display: flex; align-items: center; gap: 10px;">
               <div
@@ -988,11 +998,11 @@
 
           <!-- Search Bar -->
           <div
-            style="background: #f0f4f9; border-radius: 40px; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 16px;">
-            <div style="display: flex; align-items: center; gap: 14px; flex: 1;">
-              <span style="font-size: 1.15rem;">🔎</span>
+            style="background: #f0f4f9; border-radius: 40px; padding: 12px 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px;">
+            <div style="display: flex; align-items: center; gap: 24px; flex: 1;">
+              <span style="font-size: 1.3rem; line-height: 1.6;">🔎</span>
               <div
-                style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.25rem; font-weight: 800; color: var(--primary);">
+                style="font-family: 'Plus Jakarta Sans', sans-serif; font-size: 1.5rem; font-weight: 800; color: var(--primary);">
                 "आपल्याकडे गौरव चौधरी नावाने कोणते रेझ्युमे आहे का?"
               </div>
             </div>
@@ -1002,14 +1012,15 @@
           <div
             style="background: #f8faff; border-radius: 18px; padding: 16px 22px; display: flex; flex-direction: column; gap: 10px;">
             <div style="display: flex; align-items: center; justify-content: space-between;">
-              <div style="display: flex; align-items: center; gap: 14px;">
+              <div style="display: flex; align-items: center; gap: 24px;">
                 <div
                   style="background: #ffffff; width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 1.5rem; box-shadow: 0 4px 12px rgba(0,0,0,0.04);">
                   📄
                 </div>
                 <div>
                   <div style="display: flex; align-items: center; gap: 8px;">
-                    <span style="font-weight: 800; font-size: 1.2rem; color: var(--text-main);">Resume.docx</span>
+                    <span
+                      style="font-weight: 800; font-size: 1.35rem; line-height: 1.6; color: var(--text-main);">Resume.docx</span>
                     <span style="color: #059669; font-size: 1.1rem; font-weight: 800;">✓</span>
                   </div>
                   <div style="font-size: 0.88rem; color: var(--text-muted); margin-top: 1px;">
@@ -1030,12 +1041,12 @@
 
             <!-- Content Preview Box -->
             <div
-              style="background: #ffffff; border-radius: 14px; padding: 14px 18px; font-size: 0.92rem; color: var(--text-muted); box-shadow: 0 4px 14px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 8px;">
+              style="background: #ffffff; border-radius: 14px; padding: 14px 18px; font-size: 1.1rem; color: var(--text-muted); box-shadow: 0 4px 14px rgba(0,0,0,0.03); display: flex; flex-direction: column; gap: 8px;">
               <div
-                style="display: grid; grid-template-columns: 1fr 1fr; gap: 14px; font-size: 0.92rem; line-height: 1.45;">
+                style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; font-size: 1.1rem; line-height: 1.45;">
                 <div>
                   <strong
-                    style="color: var(--text-main); display: block; font-size: 0.95rem; margin-bottom: 4px;">Candidate
+                    style="color: var(--text-main); display: block; font-size: 1.2rem; margin-bottom: 4px;">Candidate
                     Profile:</strong>
                   <div><b style="color: var(--text-main);">Name:</b> <span
                       style="background: #e8f0fe; color: var(--primary); padding: 2px 8px; border-radius: 6px; font-weight: 700;">Gaurav
@@ -1046,12 +1057,12 @@
 
                 <div>
                   <strong
-                    style="color: var(--text-main); display: block; font-size: 0.95rem; margin-bottom: 4px;">Technical
-                    Stack & Skills:</strong>
-                  <div><b style="color: var(--text-main);">Languages:</b> Python, TypeScript, SQL, Bash</div>
-                  <div><b style="color: var(--text-main);">AI / Vectors:</b> FastEmbed 1024d, pgvector, Semantic Search
+                    style="color: var(--text-main); display: block; font-size: 1.2rem; margin-bottom: 4px;">Professional
+                    Strengths:</strong>
+                  <div><b style="color: var(--text-main);">Expertise:</b> Strategic Leadership, Project Management</div>
+                  <div><b style="color: var(--text-main);">Languages:</b> English, Marathi, Hindi
                   </div>
-                  <div><b style="color: var(--text-main);">Backend:</b> PostgreSQL RLS, FastAPI, Celery, Docker</div>
+                  <div><b style="color: var(--text-main);">Clearance:</b> Level-4 Corporate Security Access</div>
                 </div>
               </div>
             </div>
@@ -1059,11 +1070,11 @@
         </div>
 
         <!-- 3-COLUMN STRIP -->
-        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; width: 100%;">
+        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; width: 100%;">
           <div
-            style="display: flex; align-items: center; gap: 14px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
+            style="display: flex; align-items: center; gap: 24px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
             <div
-              style="background: linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%); color: white; font-weight: 800; font-size: 0.95rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(11,87,208,0.25);">
+              style="background: linear-gradient(135deg, #0b57d0 0%, #1a73e8 100%); color: white; font-weight: 800; font-size: 1.2rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(11,87,208,0.25);">
               1</div>
             <div>
               <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">Multi-Language</div>
@@ -1073,9 +1084,9 @@
           </div>
 
           <div
-            style="display: flex; align-items: center; gap: 14px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
+            style="display: flex; align-items: center; gap: 24px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
             <div
-              style="background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%); color: white; font-weight: 800; font-size: 0.95rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(124,58,237,0.25);">
+              style="background: linear-gradient(135deg, #7c3aed 0%, #9333ea 100%); color: white; font-weight: 800; font-size: 1.2rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(124,58,237,0.25);">
               2</div>
             <div>
               <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">Contextual Intent</div>
@@ -1085,9 +1096,9 @@
           </div>
 
           <div
-            style="display: flex; align-items: center; gap: 14px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
+            style="display: flex; align-items: center; gap: 24px; background: #ffffff; padding: 16px 20px; border-radius: 18px; box-shadow: 0 4px 16px rgba(0,0,0,0.03);">
             <div
-              style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; font-weight: 800; font-size: 0.95rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(5,150,105,0.25);">
+              style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; font-weight: 800; font-size: 1.2rem; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; flex-shrink: 0; box-shadow: 0 4px 10px rgba(5,150,105,0.25);">
               3</div>
             <div>
               <div style="font-weight: 800; font-size: 1rem; color: var(--text-main);">Precision Cutoff</div>
@@ -1099,323 +1110,354 @@
       </div>
     </div>
 
-    <!-- SLIDE 4: CHANGE 3 - ENTERPRISE DATA SECURITY & PRIVACY -->
+    <!-- SLIDE 4: MERGED - SECURITY & UI -->
     <div class="slide" id="slide-4">
       <div class="slide-header">
-        <div class="slide-title">3. Enterprise Data Security & Privacy</div>
-        <div class="slide-subtitle">Kernel-level tenant isolation • Token defense • Zero-trust security</div>
+        <div class="slide-title">3. Secure & Intuitive Design</div>
+        <div class="slide-subtitle">Bank-grade data protection combined with a frictionless consumer-grade workflow
+        </div>
       </div>
 
       <div class="slide-body">
-        <div class="grid-3">
-          <div class="card" style="padding: 26px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Database Row Security (RLS)</div>
+        <div class="grid-2" style="gap: 20px;">
+          <div class="card" style="padding: 40px 32px; min-height: 280px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.6rem; color: var(--primary); margin-bottom: 8px;">Absolute Data
+              Isolation</div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Kernel-Level RLS Isolation</div>
-                <div>• Zero Cross-Tenant Data Leakage</div>
-                <div>• Strict Multi-Tenant Isolation</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.3rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Database Row Security (RLS)</div>
+                <div>• Hard tenant isolation</div>
               </div>
             </div>
-            <span class="pill pill-green" style="align-self: flex-start;">Kernel Security</span>
+            <span class="pill pill-green" style="align-self: flex-start;">Strict Access Control</span>
           </div>
 
-          <div class="card" style="padding: 26px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Session & Token Security</div>
+          <div class="card" style="padding: 40px 32px; min-height: 280px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.6rem; color: var(--primary); margin-bottom: 8px;">Bulletproof
+              Authentication</div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Strict JWT Token Lifecycle</div>
-                <div>• Purged Logout Protection</div>
-                <div>• Protected Route Guards</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.3rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Strict JWT tokens</div>
+                <div>• Purged logout</div>
               </div>
             </div>
-            <span class="pill pill-blue" style="align-self: flex-start;">Zero Leakage</span>
+            <span class="pill pill-blue" style="align-self: flex-start;">Complete Visibility</span>
           </div>
 
-          <div class="card" style="padding: 26px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Infrastructure Integrity</div>
+          <div class="card" style="padding: 36px 40px; min-height: 250px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.6rem; color: var(--primary); margin-bottom: 8px;">Frictionless
+              File Management</div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 16px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Versioned Alembic Migrations</div>
-                <div>• MinIO S3 Object Storage</div>
-                <div>• Continuous Health Diagnostics</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.3rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Multi-file batch select</div>
+                <div>• Fullscreen PDF viewer</div>
               </div>
             </div>
-            <span class="pill pill-green" style="align-self: flex-start;">High Availability</span>
+            <span class="pill pill-blue" style="align-self: flex-end;">Save Time</span>
+          </div>
+
+          <div class="card" style="padding: 36px 40px; min-height: 250px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.6rem; color: var(--primary); margin-bottom: 8px;">Built-in AI
+              Assistant</div>
+            <div class="card-desc">
+              <div
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.3rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• ChatGPT-style interface</div>
+                <div>• Context-aware chat</div>
+              </div>
+            </div>
+            <span class="pill pill-blue" style="align-self: flex-end;">AI Empowered</span>
           </div>
         </div>
       </div>
     </div>
-
-    <!-- SLIDE 5: CHANGE 4 - REDESIGNED DRIVE UI & PDF VIEWER -->
+    <!-- SLIDE 6: CHANGE 5 - AUTOMATED DATA INGESTION -->
     <div class="slide" id="slide-5">
       <div class="slide-header">
-        <div class="slide-title">4. Redesigned Drive UI & PDF Viewer</div>
-        <div class="slide-subtitle">Batch operations • Format filters • ChatGPT UI • Starred guide</div>
+        <div class="slide-title">4. Effortless Data Collection</div>
+        <div class="slide-subtitle">Connect your existing tools to automatically funnel knowledge into one central hub
+        </div>
       </div>
 
       <div class="slide-body">
         <div class="grid-2" style="gap: 20px;">
-          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Batch Operations & Grid Preview
-            </div>
+          <div class="card" style="padding: 36px 40px; min-height: 250px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.6rem; color: var(--primary); margin-bottom: 8px;">Smart Watched
+              Folders</div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Multi-File Batch Selection</div>
-                <div>• Visual Grid Thumbnails</div>
-                <div>• Fullscreen PDF Viewer</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.3rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Auto-ingests dropped files</div>
+                <div>• Retains subfolder paths</div>
               </div>
             </div>
-            <span class="pill pill-blue" style="align-self: flex-end;">Modern Drive UX</span>
+            <span class="pill pill-blue" style="align-self: flex-end;">Zero Click Ingestion</span>
           </div>
 
-          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Format Analytics & Filter Modal
-            </div>
+          <div class="card" style="padding: 36px 40px; min-height: 250px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.6rem; color: var(--primary); margin-bottom: 8px;">Background
+              Cloud Sync</div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Scroll View Analytics (<code style="font-family: 'JetBrains Mono';">max-h-[360px]</code>)</div>
-                <div>• Extension Click-to-Filter Modal</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.3rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Syncs local workspace</div>
+                <div>• Tracks sync state</div>
               </div>
             </div>
-            <span class="pill pill-green" style="align-self: flex-end;">Smart Analytics</span>
+            <span class="pill pill-green" style="align-self: flex-end;">Always Updated</span>
           </div>
 
-          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">ChatGPT-Style AI Chat</div>
+          <div class="card" style="padding: 36px 40px; min-height: 250px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.6rem; color: var(--primary); margin-bottom: 8px;">Enterprise
+              Integration</div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Centered Spacious Layout (<code style="font-family: 'JetBrains Mono';">max-w-3xl</code>)</div>
-                <div>• Image OCR & Multi-Turn History Sync</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.3rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Port 2222 SFTP server</div>
+                <div>• Connect enterprise scanners</div>
               </div>
             </div>
-            <span class="pill pill-blue" style="align-self: flex-end;">ChatGPT UI</span>
+            <span class="pill pill-blue" style="align-self: flex-end;">Universal Compatibility</span>
           </div>
 
-          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Graphical Empty State Guides</div>
+          <div class="card" style="padding: 36px 40px; min-height: 250px; justify-content: space-between;">
+            <div class="card-title" style="font-size: 1.6rem; color: var(--primary); margin-bottom: 8px;">Email-to-Drive
+            </div>
             <div class="card-desc">
               <div
-                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Step-by-Step Starred View Guide</div>
-                <div>• Right-Click Context Menus</div>
+                style="display: flex; flex-direction: column; gap: 24px; font-size: 1.3rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+                <div>• Ingests email attachments</div>
+                <div>• Skips duplicates automatically</div>
               </div>
             </div>
-            <span class="pill pill-green" style="align-self: flex-end;">Intuitive Onboarding</span>
+            <span class="pill pill-orange" style="align-self: flex-end;">Maximum Adoption</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- SLIDE 6: CHANGE 5 - NATIVE LINUX DESKTOP APP INTEGRATION -->
+
+
+    <!-- SLIDE 8: COST REDUCTION -->
     <div class="slide" id="slide-6">
       <div class="slide-header">
-        <div class="slide-title">5. Native Linux Desktop App Integration</div>
-        <div class="slide-subtitle">Cross-platform desktop packaging • System integration • Local file sync</div>
-      </div>
-
-      <div class="slide-body">
-        <div class="grid-2" style="gap: 20px;">
-          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">Desktop Application Packaging</div>
-            <div class="card-desc">
-              <div
-                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Standalone Linux Desktop Binary</div>
-                <div>• AppImage & System Package Support</div>
-                <div>• Custom Native Application Logos</div>
-              </div>
-            </div>
-            <span class="pill pill-blue" style="align-self: flex-end;">Native Desktop</span>
-          </div>
-
-          <div class="card" style="padding: 24px 28px; justify-content: space-between;">
-            <div class="card-title" style="font-size: 1.3rem; color: var(--primary);">System Integration & File Sync</div>
-            <div class="card-desc">
-              <div
-                style="display: flex; flex-direction: column; gap: 14px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">
-                <div>• Native System Tray & Menu Integration</div>
-                <div>• Automatic Local Storage Sync</div>
-                <div>• Offline Document & File Access</div>
-              </div>
-            </div>
-            <span class="pill pill-green" style="align-self: flex-end;">OS Integration</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- SLIDE 7: LAST SLIDE - VERSION COMPARISON -->
-    <div class="slide" id="slide-7">
-      <div class="slide-header">
-        <div class="slide-title">Version Comparison (V1.0 vs V2.0)</div>
-        <div class="slide-subtitle">Comprehensive side-by-side comparison of performance, AI engine, security, and user
-          experience</div>
+        <div class="slide-title">5. Massive Cost Reductions</div>
+        <div class="slide-subtitle">Stop paying exorbitant SaaS fees. Stark Drive dramatically lowers your Total Cost of
+          Ownership.</div>
       </div>
 
       <div class="slide-body" style="flex-direction: column; gap: 20px;">
-        <table class="comp-table">
-          <thead>
-            <tr>
-              <th>System Capability</th>
-              <th>Version 1.0</th>
-              <th>Version 2.0 (Current)</th>
-              <th>Business Impact</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td><b>1. Search Intelligence</b></td>
-              <td>External Paid API</td>
-              <td><b>100% Free Local AI Engine</b></td>
-              <td><span class="pill pill-green">100% Cost Saved</span></td>
-            </tr>
-            <tr>
-              <td><b>2. Language Support</b></td>
-              <td>English Only</td>
-              <td><b>English, Hindi, Marathi & Hinglish</b></td>
-              <td><span class="pill pill-blue">+42% Higher Recall</span></td>
-            </tr>
-            <tr>
-              <td><b>3. Data Security & Privacy</b></td>
-              <td>Application WHERE filtering</td>
-              <td><b>Native Database Row Security (RLS)</b></td>
-              <td><span class="pill pill-green">Enterprise Security</span></td>
-            </tr>
-            <tr>
-              <td><b>4. Drive UI & Selection</b></td>
-              <td>Single item selection</td>
-              <td><b>Batch Multi-Select & Format Filters</b></td>
-              <td><span class="pill pill-blue">3x Faster Workflow</span></td>
-            </tr>
-            <tr>
-              <td><b>5. AI Chat & OCR Ingestion</b></td>
-              <td>Congested UI & Image OCR Fails</td>
-              <td><b>ChatGPT-Style UI & Robust OCR Handling</b></td>
-              <td><span class="pill pill-green">100% Reliability</span></td>
-            </tr>
-            <tr>
-              <td><b>6. Session & Token Security</b></td>
-              <td>Basic Session Clear</td>
-              <td><b>Total Token Purge & Route Guarding</b></td>
-              <td><span class="pill pill-green">Zero Data Leakage</span></td>
-            </tr>
-            <tr>
-              <td><b>7. Desktop Client Integration</b></td>
-              <td>Web Browser Only</td>
-              <td><b>Native Linux Desktop Application</b></td>
-              <td><span class="pill pill-blue">Native OS Workflow</span></td>
-            </tr>
-          </tbody>
-        </table>
-
-        <!-- Live Demo Banner -->
-        <div
-          style="background: var(--search-bg); border: 1px solid var(--pill-active); border-radius: 20px; padding: 18px 32px; display: flex; justify-content: space-between; align-items: center; margin-top: auto;">
-          <div>
-            <div
-              style="font-family: 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 800; color: var(--primary);">
-              Ready for Live System Demo</div>
-            <div style="font-size: 0.98rem; color: var(--text-muted); margin-top: 4px;">Stark Drive V2.0 is faster,
-              cost-free on embeddings, multilingually capable & kernel-secured.</div>
+        <div class="grid-3">
+          <div class="metric-col">
+            <div class="metric-card" style="background: #e6f4ea; border-color: #ceead6;">
+              <div class="metric-card-num color-green">$0</div>
+              <div class="metric-card-title">Per-User Licenses</div>
+              <div class="metric-card-desc">Add your whole team for free</div>
+            </div>
           </div>
-          <button class="btn-nav" onclick="goToSlide(1)"
-            style="background: var(--primary); color: white; border: none;">Restart Presentation</button>
+
+          <div class="metric-col">
+            <div class="metric-card" style="background: #e8f0fe; border-color: #c6dafc;">
+              <div class="metric-card-num color-blue">100%</div>
+              <div class="metric-card-title">Tool Consolidation</div>
+              <div class="metric-card-desc">Replaces 3+ expensive tools</div>
+            </div>
+          </div>
+
+          <div class="metric-col">
+            <div class="metric-card" style="background: #f3e8fd; border-color: #e1c2ff;">
+              <div class="metric-card-num color-purple">-80%</div>
+              <div class="metric-card-title">IT Overhead</div>
+              <div class="metric-card-desc">Automated ingestion & sync</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card"
+          style="margin-top: 10px; flex: 1; justify-content: center; align-items: center; text-align: center; gap: 24px; border-color: var(--success); box-shadow: 0 8px 24px rgba(20, 108, 46, 0.08); padding: 40px;">
+          <div class="card-title" style="font-size: 1.8rem; color: var(--success);">
+            How We Slashed Total Cost of Ownership
+          </div>
+          <div class="card-desc">
+            <div
+              style="display: flex; flex-direction: column; gap: 16px; font-size: 1.4rem; line-height: 1.6; font-weight: 700; color: var(--text-main);">
+              <div>• Shifted to a Self-hosted Architecture (Zero API Usage Fees)</div>
+              <div>• Integrated Local FastEmbed Models (No token processing costs)</div>
+            </div>
+          </div>
         </div>
       </div>
     </div>
-  </div>
 
-  <!-- Footer Navigation -->
-  <footer id="footer-nav">
-    <div class="slide-counter"><span id="current-slide-num">1</span> / 7</div>
-    <div class="controls">
-      <button class="btn-nav" onclick="prevSlide()">← Previous</button>
-      <button class="btn-nav" onclick="nextSlide()">Next →</button>
-    </div>
-  </footer>
+        <!-- SLIDE 9: LAST SLIDE - VERSION COMPARISON -->
+        <div class="slide" id="slide-7">
+          <div class="slide-header">
+            <div class="slide-title">Version Comparison (V1.0 vs V2.0)</div>
+            <div class="slide-subtitle">Comprehensive side-by-side comparison of performance, AI engine, security, and
+              user
+              experience</div>
+          </div>
 
-  <script>
-    let currentSlide = 1;
-    const totalSlides = 7;
+          <div class="slide-body" style="flex-direction: column; gap: 20px;">
+            <table class="comp-table">
+              <thead>
+                <tr>
+                  <th>System Capability</th>
+                  <th>Version 1.0</th>
+                  <th>Version 2.0 (Current)</th>
+                  <th>Business Impact</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><b>1. Search Intelligence</b></td>
+                  <td>External Paid API</td>
+                  <td><b>100% Free Local AI Engine</b></td>
+                  <td><span class="pill pill-green">100% Cost Saved</span></td>
+                </tr>
+                <tr>
+                  <td><b>2. Language Support</b></td>
+                  <td>English Only</td>
+                  <td><b>English, Hindi, Marathi & Hinglish</b></td>
+                  <td><span class="pill pill-blue">+42% Higher Recall</span></td>
+                </tr>
+                <tr>
+                  <td><b>3. Data Security & Privacy</b></td>
+                  <td>Application WHERE filtering</td>
+                  <td><b>Native Database Row Security (RLS)</b></td>
+                  <td><span class="pill pill-green">Enterprise Security</span></td>
+                </tr>
+                <tr>
+                  <td><b>4. Drive UI & Selection</b></td>
+                  <td>Single item selection</td>
+                  <td><b>Batch Multi-Select & Format Filters</b></td>
+                  <td><span class="pill pill-blue">3x Faster Workflow</span></td>
+                </tr>
+                <tr>
+                  <td><b>5. AI Chat & OCR Ingestion</b></td>
+                  <td>Congested UI & Image OCR Fails</td>
+                  <td><b>ChatGPT-Style UI & Robust OCR Handling</b></td>
+                  <td><span class="pill pill-green">100% Reliability</span></td>
+                </tr>
+                <tr>
+                  <td><b>6. Session & Token Security</b></td>
+                  <td>Basic Session Clear</td>
+                  <td><b>Total Token Purge & Route Guarding</b></td>
+                  <td><span class="pill pill-green">Zero Data Leakage</span></td>
+                </tr>
+                <tr>
+                  <td><b>7. Desktop Client Integration</b></td>
+                  <td>Web Browser Only</td>
+                  <td><b>Native Linux Desktop Application</b></td>
+                  <td><span class="pill pill-blue">Native OS Workflow</span></td>
+                </tr>
+              </tbody>
+            </table>
 
-    function updateSlide() {
-      document.querySelectorAll('.slide').forEach((s, idx) => {
-        if (idx + 1 === currentSlide) {
-          s.classList.add('active');
-        } else {
-          s.classList.remove('active');
+            <!-- Live Demo Banner -->
+            <div
+              style="background: var(--search-bg); border: 1px solid var(--pill-active); border-radius: 20px; padding: 18px 32px; display: flex; justify-content: space-between; align-items: center; margin-top: auto;">
+              <div>
+                <div
+                  style="font-family: 'Outfit', sans-serif; font-size: 1.35rem; font-weight: 800; color: var(--primary);">
+                  Ready for Live System Demo</div>
+                <div style="font-size: 0.98rem; color: var(--text-muted); margin-top: 4px;">Stark Drive V2.0 is faster,
+                  cost-free on embeddings, multilingually capable & kernel-secured.</div>
+              </div>
+              <button class="btn-nav" onclick="goToSlide(1)"
+                style="background: var(--primary); color: white; border: none;">Restart Presentation</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer Navigation -->
+      <footer id="footer-nav">
+        <div class="slide-counter"><span id="current-slide-num">1</span> / 7</div>
+        <div class="controls">
+          <button class="btn-nav" onclick="prevSlide()">← Previous</button>
+          <button class="btn-nav" onclick="nextSlide()">Next →</button>
+        </div>
+      </footer>
+
+      <script>
+        let currentSlide = 1;
+        const totalSlides = 7;
+
+        function updateSlide() {
+          document.querySelectorAll('.slide').forEach((s, idx) => {
+            if (idx + 1 === currentSlide) {
+              s.classList.add('active');
+            } else {
+              s.classList.remove('active');
+            }
+          });
+
+          const headerNav = document.getElementById('header-nav');
+          if (currentSlide > 1) {
+            headerNav.classList.add('visible');
+          } else {
+            headerNav.classList.remove('visible');
+          }
+
+          const slideNumEl = document.getElementById('current-slide-num');
+          if (slideNumEl) {
+            slideNumEl.textContent = currentSlide;
+          }
+
+          document.getElementById('progress-bar').style.width = `${(currentSlide / totalSlides) * 100}%`;
         }
-      });
 
-      const headerNav = document.getElementById('header-nav');
-      if (currentSlide > 1) {
-        headerNav.classList.add('visible');
-      } else {
-        headerNav.classList.remove('visible');
-      }
-
-      const slideNumEl = document.getElementById('current-slide-num');
-      if (slideNumEl) {
-        slideNumEl.textContent = currentSlide;
-      }
-
-      document.getElementById('progress-bar').style.width = `${(currentSlide / totalSlides) * 100}%`;
-    }
-
-    function nextSlide() {
-      if (currentSlide < totalSlides) {
-        currentSlide++;
-        updateSlide();
-      }
-    }
-
-    function prevSlide() {
-      if (currentSlide > 1) {
-        currentSlide--;
-        updateSlide();
-      }
-    }
-
-    function goToSlide(num) {
-      currentSlide = num;
-      updateSlide();
-    }
-
-    document.addEventListener('keydown', (e) => {
-      if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
-        nextSlide();
-      } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
-        prevSlide();
-      } else if (e.key === 'Home') {
-        goToSlide(1);
-      } else if (e.key === 'End') {
-        goToSlide(totalSlides);
-      } else if (e.key.toLowerCase() === 'f') {
-        if (!document.fullscreenElement) {
-          document.documentElement.requestFullscreen().catch(() => { });
-        } else {
-          document.exitFullscreen().catch(() => { });
+        function nextSlide() {
+          if (currentSlide < totalSlides) {
+            currentSlide++;
+            updateSlide();
+          }
         }
-      }
-    });
 
-    let startX = 0;
-    document.addEventListener('touchstart', (e) => startX = e.touches[0].clientX);
-    document.addEventListener('touchend', (e) => {
-      let diff = startX - e.changedTouches[0].clientX;
-      if (diff > 50) nextSlide();
-      else if (diff < -50) prevSlide();
-    });
+        function prevSlide() {
+          if (currentSlide > 1) {
+            currentSlide--;
+            updateSlide();
+          }
+        }
 
-    updateSlide();
-  </script>
+        function goToSlide(num) {
+          currentSlide = num;
+          updateSlide();
+        }
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'PageDown') {
+            nextSlide();
+          } else if (e.key === 'ArrowLeft' || e.key === 'PageUp') {
+            prevSlide();
+          } else if (e.key === 'Home') {
+            goToSlide(1);
+          } else if (e.key === 'End') {
+            goToSlide(totalSlides);
+          } else if (e.key.toLowerCase() === 'f') {
+            if (!document.fullscreenElement) {
+              document.documentElement.requestFullscreen().catch(() => { });
+            } else {
+              document.exitFullscreen().catch(() => { });
+            }
+          }
+        });
+
+        let startX = 0;
+        document.addEventListener('touchstart', (e) => startX = e.touches[0].clientX);
+        document.addEventListener('touchend', (e) => {
+          let diff = startX - e.changedTouches[0].clientX;
+          if (diff > 50) nextSlide();
+          else if (diff < -50) prevSlide();
+        });
+
+        updateSlide();
+      </script>
 </body>
 
 </html>

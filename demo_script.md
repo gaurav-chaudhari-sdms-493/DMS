@@ -1,211 +1,268 @@
-# VeritasDocs — Client Demo Script & Positioning
+# Client Demo Script
 
-Prepared: 20-Aug-2026 · For: client demonstration, 21-Aug-2026
+A literal, read-aloud script for presenting the project — technical and
+business framing woven together at each step. Weighted toward what's
+new (the ingestion connectors, the security model in action) rather
+than re-explaining product basics you already know cold.
 
-This is the business-facing companion to `project_study.md`. Use this
-for the pitch, positioning, and anticipated Q&A. Use the study doc if
-the conversation goes deep technical.
+Total run time: ~12-15 minutes if you do everything below; ~8 minutes
+if you cut to the "Tight version" bookmarked at each section.
 
 ---
 
-## 1. The One-Liner
+## Before you start
 
+- [ ] `docker compose ps` — confirm all 9 containers say "Up"
+- [ ] Log in as `biznesskd07@gmail.com` in one browser tab
+- [ ] Have a file manager window pre-connected to the SFTP folder
+- [ ] Have a terminal open, already `cd`'d into the project folder
+- [ ] Pick 2-3 files you have **not** uploaded through any channel yet
+      tonight, so nothing gets silently skipped as a duplicate on stage
+- [ ] Second browser tab ready at the signup page, for the security beat
+
+---
+
+## 1. Open — one line, then move
+
+> "I'm going to show you this live, not slides. Three things: how a
+> document gets into the system without anyone having to think about
+> it, how you find it again in seconds, and how it's kept separate from
+> everyone else's data. Let's start with the part most systems get
+> wrong."
+
+*(Don't linger here — the opening line's job is to get you off the
+title screen and into the product in under ten seconds.)*
+
+---
+
+## 2. Getting documents in — the part that's new
+
+**Say:**
+> "Most document systems assume one thing: that someone will remember
+> to open the app and upload a file. In practice, that step gets
+> skipped constantly — documents pile up 'to add later,' and later
+> never comes. So we built this so a document gets in the moment it
+> exists, no matter which system produced it or who's holding it."
+
+### 2a. Auto-sync a real folder
+
+**Do:** Drag a pre-picked file into `/home/stark/Stark Drive /` on
+screen.
+
+**Say:**
+> "This is a folder on my computer I already use — nothing special
+> about it. Watch."
+
+*(while it processes, ~20-30 sec)*
+> "No upload button, no login on this folder. DMS checks it
+> automatically. In about twenty seconds this shows up fully indexed
+> and searchable, same as a manual upload — because under the hood, it
+> literally goes through the exact same pipeline."
+
+**Do:** Switch to Drive, refresh, point at the file.
+
+### 2b. Bring in a device that isn't this one
+
+**Say:**
+> "That folder only works because it's on this machine. What about a
+> vendor, or another office, with no access to your server at all?"
+
+**Do:** Click **+ New → Connect a device** → **Folder / SFTP** tab.
+
+> "This is self-service — anyone on the team can open this panel and
+> hand these details to an outside vendor themselves. No engineer has
+> to issue credentials by hand."
+
+**Do:** Switch to the pre-connected file manager window, drag a file
+into the SFTP folder, then refresh Drive to show it land.
+
+### 2c. Email — zero setup, zero training
+
+**Say:**
+> "And this is the one I think matters most, because it needs nothing —
+> no client install, no server access, no training. Everyone already
+> knows how to attach a file to an email."
+
+**Do:** Click the **Email** tab in the same panel, point at the
+address. Then, in the pre-positioned terminal:
+```bash
+cd "/home/stark/Work Space/DMS"
+python3 send_demo_email.py "/path/to/a/fresh/file.pdf"
+```
+> "I just sent that as an email a second ago. Give it about ten
+> seconds..."
+
+**Do:** Refresh Drive, show it appear.
+
+**Say, closing this section:**
+> "Three completely different ways in — a folder, another server, an
+> email — and every single one lands in the same place, searchable the
+> same way, in about the same twenty seconds. Whatever already produces
+> your documents today, this absorbs it without changing how your team
+> works."
+
+**Tight version:** if you're short on time, do only 2c (email) — it's
+the fastest to set up on stage and the most visually convincing, since
+the file is obviously arriving from "outside."
+
+---
+
+## 3. Finding it again — ask, don't search
+
+**Say:**
+> "Now the other half. Traditional systems make you remember the exact
+> filename or folder. Here, you just ask."
+
+**Do:** Type a natural-language question about one of the documents
+you just added. Let the AI Summary Card render.
+
+> "That's not a list of files to go open and read yourself — that's a
+> synthesized answer, generated from the actual document content, with
+> the exact source cited underneath. If you don't trust an AI's answer
+> on faith, you don't have to — click through to the source page and
+> verify it in one click."
+
+**Do:** Click into a cited result, show the in-browser preview.
+
+> "No download required to check a citation. That builds trust in the
+> answer, which is the whole point of putting AI in front of your
+> documents in the first place."
+
+**Business framing (say if the audience is non-technical):**
+> "The reason this matters commercially: your team stops spending time
+> searching and starts spending time on the actual answer. That's the
+> return on this, not a feature checkbox."
+
+---
+
+## 4. Multi-tenant security — the 30-second trust builder
+
+**Say:**
+> "One more thing, and this is the fastest way I can prove data
+> isolation to you, rather than just claim it."
+
+**Do:** Switch to the second browser tab, sign up a brand-new
+organization live. Search for a term you know exists in the first
+org's documents.
+
+> "Zero results. Not because we filtered it in the application code —
+> it's enforced at the database level, so there's no code path that
+> could accidentally leak across organizations. If you're running this
+> across departments or client accounts, this is the guarantee that
+> matters."
+
+---
+
+## 5. One more trust signal — no vendor lock-in
+
+**Do:** Open the `.env` config file (or just describe it if you'd
+rather not show raw config on screen).
+
+**Say:**
+> "Every AI role here — the model that answers your questions, the
+> embeddings, the reranker — is swappable with a one-line change. This
+> isn't theoretical: during final testing last night, the AI provider
+> we were using deprecated the exact model we had configured. Fixing
+> production impact was a one-line change, not an emergency migration.
+> You're never hostage to one AI vendor's pricing or uptime."
+
+---
+
+## Business positioning (reference — pull from as needed, don't read verbatim)
+
+### The one-liner
 > "Instead of your team searching through folders and filenames, they
 > ask a question in plain language — and get back a direct answer,
-> with the exact source document and page cited, in seconds."
+> with the exact source document and page cited, in seconds. And
+> documents get in on their own, however they already arrive."
 
----
+### USP, ranked by what a client actually cares about
+1. **Zero-effort intake** — folder, SFTP, or email, all converging on
+   one pipeline; nothing requires a workflow change from your team.
+2. **Ask, don't search** — grounded, cited answers, not a ranked list
+   of files to open yourself.
+3. **True multi-tenant isolation** — database-enforced, not an
+   application check a bug could bypass.
+4. **No AI vendor lock-in** — every AI role is configuration, not code.
+5. **Trilingual out of the box** — English, Hindi, Marathi, one query
+   surface.
+6. **Transparent retrieval** — the system shows *how* it found an
+   answer, not a black box.
 
-## 2. The 60-Second Pitch
+### Traditional DMS vs. this system
 
-Most organizations don't have a search problem because they lack
-documents — they have one because they have *too many*, scattered
-across drives, and nobody can find the right one fast enough. Keyword
-search only works if you remember the exact word someone used in a file
-from three years ago.
-
-This platform ingests documents from wherever your team already puts
-them — manual upload, a watched network folder, or SFTP — and makes
-every one of them instantly askable. Not just searchable: *askable*.
-Your team types a question the way they'd ask a colleague, and gets a
-grounded answer with citations, not a list of maybe-relevant links.
-
-It's built multi-tenant from day one, so if you're running this across
-departments or client accounts, each one's data is isolated at the
-database level — not just hidden behind a login screen.
-
----
-
-## 3. Our Unique Selling Points (USP)
-
-1. **Ask, don't search.** Natural-language questions get synthesized,
-   cited answers — not a ranked list of files to open and read yourself.
-2. **Multi-channel ingestion, one pipeline.** Drag-and-drop, a watched
-   folder, or SFTP — documents get in the way your existing workflow
-   already works, and every channel behaves identically once ingested
-   (same dedup, same security, same search quality).
-3. **True multi-tenant isolation.** Database-enforced row-level
-   security, not an application-layer permission check that a bug could
-   bypass.
-4. **Vendor-independent AI.** Every AI role — the language model, the
-   embeddings, the reranker, the OCR engine — is swappable via
-   configuration. You are never locked into one AI vendor's pricing or
-   uptime.
-5. **Trilingual out of the box.** Query in English, Hindi, or Marathi —
-   the system searches across all three, so language isn't a barrier to
-   finding a document.
-6. **Transparent retrieval.** The system tells you *how* it found an
-   answer (semantic match, keyword match, or a hybrid of both) — not a
-   black box.
-7. **Cost-engineered, not just feature-engineered.** Caching and
-   candidate-filtering are built into the pipeline specifically to keep
-   AI API costs from scaling linearly with usage.
-
----
-
-## 4. Traditional Document Management vs. This System
-
-| Traditional DMS | This System |
+| Traditional DMS | This system |
 |---|---|
-| Find documents by browsing folders or matching filenames/keywords | Ask a question, get a synthesized answer with source citations |
-| One search experience, one language | Trilingual query understanding built in |
-| A search hit is a black box — you don't know why it matched | Every result reports how it was found and how confident the match is |
-| Usually single-tenant, or multi-tenant with weak isolation | Multi-tenant with database-enforced isolation |
-| Locked into whichever AI vendor (if any) the platform shipped with | Swap AI providers via configuration — no rebuild, no vendor lock-in |
-| One ingestion path, typically manual only | Three ingestion channels today (manual, watched folder, SFTP), same pipeline, same guarantees |
-| Search quality is fixed | Layered retrieval pipeline — each layer (cache, hybrid search, reranking, generation) can be independently upgraded as better models emerge |
+| One ingestion path, manual only | Folder, SFTP, or email — same pipeline, same guarantees |
+| Find by browsing folders/filenames | Ask a question, get a cited answer |
+| Search quality is fixed | Layered pipeline — each layer independently upgradeable |
+| Usually single-tenant or weak isolation | Database-enforced multi-tenant isolation |
+| Locked to one AI vendor (if any) | Swap providers via config, no rebuild |
+
+### What it costs
+> "At moderate volume — 100k documents, 50k searches a month — we're
+> estimating roughly $250-450/month all-in, infra plus metered AI cost.
+> Caching and candidate-filtering are built into the pipeline
+> specifically to keep that from scaling linearly as usage grows."
 
 ---
 
-## 5. Why We Stand Out From Other Document Search / DMS Products
+## Anticipated Q&A
 
-- **We're not a search box bolted onto a file drive.** The retrieval
-  pipeline (hybrid search → reranking → grounded generation) is the
-  product, not a feature checkbox — most competitors offer either
-  keyword search *or* a thin AI chat wrapper, not both engineered
-  together with citation-level grounding.
-- **We don't hide the mechanism.** Competitors that use AI search
-  typically present a single opaque "smart search" box. We show which
-  retrieval strategy produced the answer and let that inform trust.
-- **We built for multi-tenant from the schema up**, not retrofitted
-  — this matters immediately if you're serving multiple business units,
-  departments, or clients from one deployment.
-- **No AI vendor hostage situation.** This was proven, not just
-  claimed: during final testing, an AI provider deprecated the specific
-  model we were using — production impact was a one-line config change,
-  not an emergency migration.
-- **Ingestion meets you where you are.** Most DMS platforms assume
-  manual upload as the only path in. We support automated pickup from
-  a watched folder or SFTP server today, so document intake can be
-  automated from existing infrastructure rather than requiring a
-  behavior change from every user.
+**"Is that email address real / does it use our actual mailbox?"**
+> "For the demo we're running a local test mailbox so it doesn't depend
+> on real internet delivery being fast in front of you. In your actual
+> deployment it points at your real company mailbox — same mechanism,
+> different address."
 
----
+**"Can different people have different connector credentials?"**
+> "Today it's one shared connector account per deployment. Per-user
+> credentials with individual permissions is a natural next step, not
+> a rebuild — happy to scope that with you directly."
 
-## 6. Recommended Live Demo Flow
-
-Follow `docs/DEMO_PRESENTATION_GUIDE.md` for the detailed script. High-level flow:
-
-1. **Login** — multi-tenant workspace, clean dashboard.
-2. **Upload** — drag a file in, show it go from `processing` to
-   `indexed` live (Flower dashboard as a nice technical beat if the
-   audience is technical).
-3. **Ask a question** — the headline moment. Type a natural-language
-   question, get a synthesized answer with citations and a working
-   source download link.
-4. **Preview a result in-browser** — no download required to verify a
-   citation.
-5. **Register a second organization live** — search for the first
-   org's content, get zero results. This is the most convincing security
-   demonstration you can give in 30 seconds.
-6. **Show the config file** — point at the AI provider setting, explain
-   it's a one-line swap. Mention the real incident (§5) if it lands well
-   with a technical audience.
-
-*(Watched-folder / SFTP automated ingestion can be shown as a bonus beat
-in step 2 if time allows — pre-stage the file a few seconds before you
-get there so you're not waiting on a live poll cycle.)*
-
----
-
-## 7. Anticipated Questions & Recommended Answers
+**"Does it handle folders-inside-folders, or only flat files?"**
+> "Full nested folder structures — drop a folder with subfolders in,
+> and it recreates that exact structure as real folders in DMS, not
+> flattened filenames." *(Demo live if you have an extra minute — drag
+> a folder with one subfolder inside instead of a single file.)*
 
 **"How is this different from just using ChatGPT on our files?"**
-> A general chatbot doesn't have persistent, tenant-isolated storage
-> of your documents, doesn't cite the specific source page for every
-> claim, and doesn't give you a search layer you can inspect and tune.
-> This is a retrieval system with generation on top — not generation
-> with search bolted on. The citation is the product, not a nice-to-have.
+> "A general chatbot doesn't have persistent, tenant-isolated storage,
+> doesn't cite the specific source page for every claim, and doesn't
+> give you a search layer you can inspect and tune. This is retrieval
+> with generation on top — not generation with search bolted on."
 
 **"What happens if the AI gets something wrong?"**
-> The generation step is instructed to answer *only* from retrieved
-> excerpts, and every claim is traceable to a specific document and
-> page — so a wrong or unsupported answer is checkable in one click,
-> not something you have to take on faith. [Note: the system does not
-> yet have a hard-refusal guarantee for ungrounded answers — that's on
-> the roadmap. Be honest if pressed on this specifically.]
+> "It's instructed to answer only from retrieved excerpts, and every
+> claim traces to a specific document and page — checkable in one
+> click. It doesn't yet have a hard-refusal guarantee for ungrounded
+> answers; that's on the roadmap, and I'd rather tell you that directly
+> than have it surface as a surprise."
 
-**"Can this run entirely on our own infrastructure, with no data
-leaving our network?"**
-> The core stack (database, storage, search) already runs fully
-> self-hosted. Today, the language model and reranking calls go to
-> external AI APIs by default — but because every AI role is
-> provider-abstracted, pointing them at locally-hosted models instead
-> is a configuration change, not a redesign. A fully air-gapped profile
-> is on the roadmap, not yet shipped.
+**"Can this run fully on our own infrastructure?"**
+> "The core stack — database, storage, search — already runs fully
+> self-hosted. The language model and reranking calls go to external
+> AI APIs by default today, but because every AI role is
+> provider-abstracted, pointing them at locally-hosted models is a
+> configuration change, not a redesign."
 
-**"How do you handle multiple clients/departments on one deployment?"**
-> Database-level row-level security, not just application logic —
-> we can show this live: a fresh account genuinely cannot see another
-> tenant's documents, verified at the database layer.
+**"What file types are supported?"**
+> "PDF, Word, Excel, PowerPoint, plain text, CSV, RTF, images with OCR
+> — and roughly thirty code/config formats added recently, since teams
+> increasingly store more than office documents."
 
-**"What does this cost to run?"**
-> It scales with usage rather than a flat license fee — infra cost
-> plus metered AI cost. At moderate volume (100k documents, 50k
-> searches/month) we're estimating roughly $250–450/month all-in,
-> with caching and candidate-filtering specifically built in to keep
-> that from scaling linearly as usage grows. [Full breakdown available
-> in the costing document if asked for specifics.]
-
-**"What file types do you support?"**
-> PDF, Word, Excel, PowerPoint, plain text/CSV/RTF, and images —
-> including scanned documents via OCR.
-
-**"How do documents get into the system — does someone have to upload
-everything manually?"**
-> Three ways today: manual drag-and-drop, an automated watched folder,
-> or SFTP — all converging on the same pipeline, so ingestion can be
-> automated from whatever system already produces these documents,
-> not just a manual habit you have to build.
-
-**"Is this production-ready today, or a prototype?"**
-> The core platform — ingestion, hybrid search, multi-tenant security
-> — is built and tested end-to-end. Some enterprise-grade features
-> (human-review workflows for extracted data, tamper-evident audit
-> trails, fine-grained role permissions) are on the near-term roadmap,
-> not yet shipped. We'd rather tell you that directly than have it
-> surface as a surprise later. [Have this answer ready — it builds more
-> trust than pretending everything is finished, and a technical
-> evaluator will likely find the gaps anyway.]
-
-**"What languages does search support?"**
-> English, Hindi, and Marathi today, with the architecture built to
-> extend to more — a query in one language can retrieve a document
-> written in another.
-
-**"Can we customize / white-label this?"**
-> Frame as: the platform is modular by design (provider abstraction,
-> configurable ingestion channels) — customization scope is a
-> conversation for the next meeting, not something to commit to
-> specifics on live.
+**"Is this production-ready, or a prototype?"**
+> "Core platform — ingestion, hybrid search, multi-tenant security —
+> is built and tested end to end, including live tonight. Some
+> enterprise features — human-review workflows, tamper-evident audit
+> trails, fine-grained role permissions — are near-term roadmap, not
+> shipped yet. I'd rather say that directly than have you find the gap
+> yourself later."
 
 ---
 
-## 8. One Honest Note for the Presenter
+## Closing line
 
-Don't oversell items from the "not yet built" list in `project_study.md`
-§9 if asked directly — the recommended answers above already thread
-that needle. A confident, specific "that's on our near-term roadmap,
-here's what's solid today" lands far better with a technical evaluator
-than an evasive answer, and it's consistent with how this system itself
-is designed to work: don't answer past what's actually grounded.
+> "The short version: documents get in without anyone having to think
+> about it, they get found by asking rather than browsing, and your
+> data never touches anyone else's. That's the product."

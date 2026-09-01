@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 from uuid import UUID
-from typing import Optional, Any, List, Literal
+from typing import Optional, List, Literal
 
 class SearchRequest(BaseModel):
     query: str

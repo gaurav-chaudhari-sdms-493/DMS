@@ -25,7 +25,6 @@ settings.license_grace_period_days grace window before the block kicks
 in, mirroring how SaaS trial expiry behaves.
 """
 import base64
-import hashlib
 import json
 import logging
 from dataclasses import dataclass

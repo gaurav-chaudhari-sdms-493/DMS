@@ -8,7 +8,7 @@ this pipeline's existing best-effort conventions (T22/T23/TS1/TS2 all
 degrade the same way).
 """
 import hashlib
-from typing import Any, List, Optional
+from typing import List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 

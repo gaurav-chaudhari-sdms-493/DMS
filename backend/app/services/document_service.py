@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, delete
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 
@@ -20,7 +20,7 @@ from ..schemas.document import (
     DocumentUpdate,
     DriveStatsResponse,
 )
-from ..services.storage_service import upload_file, generate_presigned_url, delete_file
+from ..services.storage_service import upload_file, generate_presigned_url, delete_file, download_file, archive_file_with_retention
 from ..services.audit_service import log_action
 from ..services.license_service import check_upload_allowed
 from ..pipeline.ingestion import ingest_document
@@ -318,6 +318,7 @@ async def get_document(
         versions=versions,
         quality_flag=q_flag,
         quality_warnings=q_warnings,
+        possible_duplicate_candidates=doc.possible_duplicate_candidates,
     )
 
 
@@ -417,6 +418,19 @@ async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: 
 
     doc.is_trashed = not doc.is_trashed
     doc.trashed_at = datetime.utcnow() if doc.is_trashed else None
+
+    # T66/D-7 — this was the missing half of the retention engine: nothing
+    # ever assigned 'operational_trash', so cleanup_expired_trashed_items'
+    # class lookup treated every trashed document as the permanent default
+    # class and refused to purge it, ever — the 30-day trash-purge has been
+    # silently inert for every document since D-7 shipped. Only touches the
+    # two states this toggle itself owns; never overwrites a class assigned
+    # by something else (e.g. a future 'statutory_record' reclassification).
+    if doc.is_trashed and doc.retention_class == "unclassified_permanent":
+        doc.retention_class = "operational_trash"
+    elif not doc.is_trashed and doc.retention_class == "operational_trash":
+        doc.retention_class = "unclassified_permanent"
+
     await db.commit()
     await db.refresh(doc)
 
@@ -442,6 +456,41 @@ async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: 
         s3_path=s3_path,
         download_url=url,
     )
+
+
+WORM_PERMANENT_RETENTION_DAYS = 36500  # T64 — S3 Object Lock has no infinite
+# option; 100 years is the standard real-world proxy for "permanent" in WORM
+# archival systems. This is a storage-layer lock duration only — it does not
+# affect the DB-level retention_class engine, where 'statutory_record'
+# already means NULL/never-engine-purged regardless of this number.
+
+
+async def archive_document_as_statutory_record(db: AsyncSession, tenant_id: UUID, document_id: UUID) -> None:
+    """T64/T66 — the other missing half: a document that becomes evidence
+    for a Record (T60, i.e. records_service.create_record was called with
+    base_evidence_fact_id) graduates from an ordinary upload to something
+    that needs WORM tamper-evident storage and permanent retention — this
+    is the D-7 'statutory_record' class's own stated purpose ("explicitly
+    for anything tied to a property/entity record"), but nothing ever
+    actually assigned it or archived the file. Best-effort: never raises —
+    called from inside create_record, and a record's own creation must
+    never fail because archival storage had a problem.
+    """
+    try:
+        stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
+        res = await db.execute(stmt)
+        doc = res.scalar_one_or_none()
+        if not doc:
+            return
+        doc.retention_class = "statutory_record"
+
+        curr_v = next((v for v in doc.versions if v.id == doc.current_version_id), None)
+        if curr_v and curr_v.s3_path:
+            file_bytes = await download_file(curr_v.s3_path)
+            await archive_file_with_retention(file_bytes, curr_v.s3_path, "application/octet-stream", WORM_PERMANENT_RETENTION_DAYS)
+            logger.info(f"T64 WORM-archived document {document_id} (now a statutory record)")
+    except Exception as e:
+        logger.warning(f"T64/T66 statutory-record archival skipped for document {document_id}: {e}")
 
 
 async def delete_document_permanently(
