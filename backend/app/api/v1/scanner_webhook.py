@@ -251,6 +251,7 @@ async def receive_scan_inbound(
             try:
                 meta_flag = MetadataItem(
                     id=uuid.uuid4(),
+                    tenant_id=tenant_id,
                     document_id=resp.document_id,
                     key="quality_flag",
                     value={"flag": "needs_review", "warnings": quality_report["warnings"]},
@@ -259,6 +260,7 @@ async def receive_scan_inbound(
                 )
                 meta_report = MetadataItem(
                     id=uuid.uuid4(),
+                    tenant_id=tenant_id,
                     document_id=resp.document_id,
                     key="quality_report",
                     value=quality_report,

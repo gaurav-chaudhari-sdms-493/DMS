@@ -384,6 +384,7 @@ async def poll_scanner_inbox_once() -> int:
                     try:
                         meta_flag = MetadataItem(
                             id=uuid.uuid4(),
+                            tenant_id=tenant_id,
                             document_id=resp.document_id,
                             key="quality_flag",
                             value={"flag": "needs_review", "warnings": quality_report["warnings"]},
@@ -392,6 +393,7 @@ async def poll_scanner_inbox_once() -> int:
                         )
                         meta_report = MetadataItem(
                             id=uuid.uuid4(),
+                            tenant_id=tenant_id,
                             document_id=resp.document_id,
                             key="quality_report",
                             value=quality_report,

@@ -2,6 +2,7 @@ import io
 import json
 import csv
 import logging
+import re
 from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,20 @@ def _extract_image(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
     except Exception as e:
         logger.warning(f"Failed to perform Tesseract OCR on image file {filename}: {e}")
 
-    failed = not text.strip()
+    text_clean = text.strip()
+    tokens = [t for t in text_clean.split() if t]
+    if not tokens:
+        failed = True
+    else:
+        noise_symbols = set("()~<>|[]{}`!@#$%^&*_=+\\/")
+        noise_count = 0
+        for t in tokens:
+            has_symbol = any(c in noise_symbols for c in t)
+            is_gibberish_ascii = bool(re.match(r"^[a-zA-Z]{3,}$", t)) and not any(v in t.lower() for v in "aeiouy")
+            if has_symbol or is_gibberish_ascii:
+                noise_count += 1
+        failed = (noise_count / len(tokens)) >= 0.5
+
     if failed:
         text = f"Image document: {filename}"
 

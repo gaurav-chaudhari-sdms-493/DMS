@@ -23,6 +23,9 @@ class MetadataItem(Base):
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("iam_dg_tenants.id"), index=True, nullable=False
+    )
     document_id: Mapped[uuid.UUID] = mapped_column(
         ForeignKey("doc_dg_documents.id", ondelete="CASCADE"), index=True, nullable=False
     )

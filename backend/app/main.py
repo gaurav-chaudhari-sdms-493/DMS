@@ -30,7 +30,9 @@ async def lifespan(app: FastAPI):
     sftp_task = asyncio.create_task(sftp_poll_loop())
     email_task = asyncio.create_task(email_poll_loop()) if settings.email_enabled else None
     
-    if settings.scanner_enabled and settings.scanner_webhook_secret == "change_me_scanner_secret":
+    if settings.scanner_enabled and settings.scanner_webhook_secret in {"change_me_scanner_secret", "change_me", "secret"}:
+        if settings.app_env == "production":
+            raise ValueError("SECURITY FATAL: scanner_enabled is True but scanner_webhook_secret is using a default weak secret.")
         logger.warning(
             "SECURITY WARNING: scanner_enabled is True but scanner_webhook_secret "
             "is using default value ('change_me_scanner_secret'). Please update it in production!"

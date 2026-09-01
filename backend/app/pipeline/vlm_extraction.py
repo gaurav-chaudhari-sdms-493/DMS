@@ -319,11 +319,10 @@ async def extract_facts_for_document(
     file_bytes: bytes,
     filename: str,
     pages_text: List[dict],
-    template: Template,
+    template: Optional[Template] = None,
 ) -> int:
-    """Runs VLM extraction across a document's pages against one template.
-    Returns the number of facts written. Raises on hard failure — callers
-    are expected to catch and log, never let this fail ingestion."""
+    """Runs VLM extraction across a document's pages.
+    Returns the number of facts written."""
     vlm = get_vlm_provider()
     if vlm is None:
         return 0
@@ -332,10 +331,19 @@ async def extract_facts_for_document(
     if ext not in RENDERABLE_EXTENSIONS:
         return 0
 
-    field_schema = template.field_schema
+    if template:
+        field_schema = template.field_schema
+    else:
+        field_schema = [
+            {"name": "village_name", "type": "text", "description": "Village name (गाव)"},
+            {"name": "taluka", "type": "text", "description": "Taluka (तालुका)"},
+            {"name": "district", "type": "text", "description": "District (जिल्हा)"},
+            {"name": "survey_number", "type": "text", "description": "Survey / Gut number (भूमापन क्रमांक)"},
+            {"name": "landowners", "type": "text", "description": "Landowners (खातेदार / मालकाचे नाव)"},
+        ]
     max_pages = min(len(pages_text), settings.vlm_max_pages_per_document)
 
-    if template.layout == "spread":
+    if template and template.layout == "spread":
         return await _extract_spread_facts(db, tenant_id, document_id, version_id, file_bytes, ext, vlm, field_schema, max_pages)
 
     prompt = _build_extraction_prompt(field_schema)

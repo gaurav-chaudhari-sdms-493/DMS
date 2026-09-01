@@ -74,3 +74,66 @@ async def get_fact_with_regions(db: AsyncSession, fact_id: UUID, tenant_id: UUID
         "download_url": download_url,
         "regions": regions_out,
     }
+
+
+async def create_fact_with_regions(
+    db: AsyncSession,
+    tenant_id: UUID,
+    document_id: UUID,
+    version_id: UUID,
+    field_name: str,
+    value: dict | list | str | float | int,
+    regions: list[dict],
+    confidence: Optional[float] = None,
+    is_handwritten: bool = False,
+    status: str = "in_review",
+) -> Fact:
+    """Enforce Artifact Section 2 / T04 rule: 'If a fact has no region, refuse to save it.'
+
+    Every fact MUST point at the exact spot on the page it came from before being persisted.
+    """
+    from app.models.fact_region import FactRegion
+    from app.utils.bbox import normalize_bbox
+
+    if not regions:
+        raise ValueError("Cannot save fact: 'no region, no save' rule requires at least one FactRegion attached.")
+
+    valid_regions = []
+    for r in regions:
+        bbox = [r.get("x0"), r.get("y0"), r.get("x1"), r.get("y1")]
+        norm = normalize_bbox(bbox, r.get("page_width"), r.get("page_height"))
+        if norm and r.get("page_id"):
+            valid_regions.append((r["page_id"], norm))
+
+    if not valid_regions:
+        raise ValueError("Cannot save fact: 'no region, no save' rule requires at least one valid FactRegion attached.")
+
+    fact = Fact(
+        tenant_id=tenant_id,
+        document_id=document_id,
+        version_id=version_id,
+        field_name=field_name,
+        value=value if isinstance(value, (dict, list)) else {"v": value},
+        confidence=confidence,
+        is_handwritten=is_handwritten,
+        status=status,
+    )
+    db.add(fact)
+    await db.flush()
+
+    for page_id, norm_bbox in valid_regions:
+        x0, y0, x1, y1 = norm_bbox
+        db.add(
+            FactRegion(
+                tenant_id=tenant_id,
+                fact_id=fact.id,
+                page_id=page_id,
+                x0=float(x0),
+                y0=float(y0),
+                x1=float(x1),
+                y1=float(y1),
+            )
+        )
+
+    await db.flush()
+    return fact

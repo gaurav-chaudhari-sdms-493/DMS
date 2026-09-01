@@ -18,6 +18,8 @@ export const metadata = {
   },
 };
 
+import { I18nProvider } from "@/components/common/I18nProvider";
+
 export default function RootLayout({
   children,
 }: {
@@ -26,7 +28,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className="bg-gdriveBg min-h-screen text-gdriveTextMain overflow-hidden select-none">
-        {children}
+        <I18nProvider>
+          {children}
+        </I18nProvider>
       </body>
     </html>
   );

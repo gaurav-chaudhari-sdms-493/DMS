@@ -40,3 +40,7 @@ async def get_int(key: str, default: int) -> int:
 
 async def get_float(key: str, default: float) -> float:
     return float(await get_config(key, default))
+
+
+async def get_str(key: str, default: str) -> str:
+    return str(await get_config(key, default))

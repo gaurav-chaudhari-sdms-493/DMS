@@ -40,7 +40,8 @@ class LlamaParseProvider(OCRProvider):
             
         return [{
             "page_number": 1,
-            "text": text,
+            "text": text.strip() if text else "",
             "words": [],
-            "bbox": {}
+            "bbox": {},
+            "extraction_failed": not bool(text and text.strip())
         }]

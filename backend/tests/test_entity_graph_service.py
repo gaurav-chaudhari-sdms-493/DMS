@@ -29,7 +29,7 @@ async def _make_corpus(db):
 
     doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="eg doc", status="indexed", folder_id=folder.id)
     version = DocumentVersion(
-        id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
         file_hash="deadbeef", file_size_bytes=1, original_filename="eg.pdf",
     )
     db.add_all([doc, version])

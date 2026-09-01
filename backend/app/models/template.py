@@ -1,8 +1,8 @@
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy import CheckConstraint, String, Text, UniqueConstraint
+from sqlalchemy import CheckConstraint, String, Text, UniqueConstraint, ForeignKey
 from datetime import datetime
-from typing import Any
+from typing import Any, Optional
 import uuid
 
 from app.database import Base
@@ -34,6 +34,7 @@ class Template(Base):
     )
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("iam_dg_tenants.id"), index=True, nullable=True)
     form_type: Mapped[str] = mapped_column(String, nullable=False, index=True)
     era_label: Mapped[str] = mapped_column(String, nullable=False)
     field_schema: Mapped[Any] = mapped_column(JSONB, nullable=False)

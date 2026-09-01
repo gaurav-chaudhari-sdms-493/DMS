@@ -2,6 +2,7 @@ import asyncio
 import json
 import logging
 import os
+import uuid
 from uuid import UUID
 
 from celery import Celery
@@ -161,6 +162,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                     db.add(
                         MetadataItem(
                             id=uuid.uuid4(),
+                            tenant_id=tenant_id,
                             document_id=document_id,
                             key="quality_flag",
                             value={"flag": "needs_review", "warnings": quality_report.get("warnings", [])},
@@ -171,6 +173,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                     db.add(
                         MetadataItem(
                             id=uuid.uuid4(),
+                            tenant_id=tenant_id,
                             document_id=document_id,
                             key="quality_report",
                             value=quality_report,
@@ -184,6 +187,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                     extraction_confidence = await get_float("default_extraction_confidence", 0.9)
                     for key, value in meta_dict.items():
                         db_meta = MetadataItem(
+                            tenant_id=tenant_id,
                             document_id=document_id,
                             key=key,
                             value=value if isinstance(value, (dict, list)) else {"v": value},
@@ -220,7 +224,8 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 # Best-effort and non-blocking: a savepoint isolates it so a failure
                 # here never aborts the chunk/metadata commit above (search must
                 # never wait on this, Section 3.5).
-                if template:
+                is_scanned_image = filename.lower().rsplit(".", 1)[-1] in {"jpg", "jpeg", "png", "tiff", "bmp", "webp"}
+                if template or is_scanned_image:
                     try:
                         from app.pipeline.vlm_extraction import extract_facts_for_document
                         async with db.begin_nested():
@@ -229,10 +234,10 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                                 file_bytes, filename, pages, template,
                             )
                         if facts_count:
+                            tmpl_name = f"{template.form_type}/{template.era_label}" if template else "unclassified_scanned_image"
                             logger.info(
                                 f"T22 VLM extraction wrote {facts_count} facts for "
-                                f"document {document_id} against template "
-                                f"{template.form_type}/{template.era_label}"
+                                f"document {document_id} against template {tmpl_name}"
                             )
                     except Exception as vlm_err:
                         logger.warning(f"T22 VLM extraction skipped for document {document_id}: {vlm_err}")

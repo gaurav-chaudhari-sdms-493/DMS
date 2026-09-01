@@ -13,7 +13,7 @@ import json
 from app.ai.factory import get_embed_provider, get_rerank_provider, get_llm_provider
 from app.ai.base import Message, RankedResult
 from app.models.metadata_item import MetadataItem
-from app.services.config_service import get_int, get_float
+from app.services.config_service import get_int, get_float, get_str
 
 logger = logging.getLogger(__name__)
 
@@ -845,7 +845,14 @@ async def search(
     # refuse outright rather than guess when the excerpts don't answer it.
     citations = []
     refused = False
-    if not generate_summary:
+    grounded = True
+    if not final_results or not excerpts:
+        refusal_msg = await get_str("search_refusal_message", "The corpus does not say.")
+        summary = refusal_msg
+        refused = True
+        citations = []
+        grounded = False
+    elif not generate_summary:
         summary = (
             f"Found {len(final_results)} matching document(s) for '{query}'. "
             "AI summary generation is disabled for this search (testing mode)."
@@ -854,8 +861,10 @@ async def search(
         try:
             summary, citations, grounded = await _generate_grounded_answer(query, detected_lang, excerpts)
             if summary is None:
-                summary = f"The documents do not contain information that answers '{query}'."
+                refusal_msg = await get_str("search_refusal_message", "The corpus does not say.")
+                summary = refusal_msg
                 refused = True
+                citations = []
             else:
                 doc_url_by_id = {r.document_id: r.download_url for r in final_results}
                 for c in citations:

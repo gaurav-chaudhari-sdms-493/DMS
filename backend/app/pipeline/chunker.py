@@ -26,8 +26,10 @@ class TextChunker:
         global_index = 0
         
         for page in pages:
+            if page.get("extraction_failed", False):
+                continue
             text = page.get("text", "")
-            if not text:
+            if not text or not text.strip():
                 continue
                 
             tokens = self.tokenizer.encode(text)

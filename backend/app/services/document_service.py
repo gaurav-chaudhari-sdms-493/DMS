@@ -100,6 +100,7 @@ async def upload_document(
 
     version = DocumentVersion(
         id=version_id,
+        tenant_id=tenant_id,
         document_id=doc_id,
         s3_path=s3_key,
         version_number=1,

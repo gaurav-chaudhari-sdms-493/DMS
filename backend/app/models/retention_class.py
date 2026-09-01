@@ -1,7 +1,9 @@
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import Text, Integer
+from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Text, Integer, ForeignKey
 from datetime import datetime
 from typing import Optional
+import uuid
 
 from app.database import Base
 
@@ -16,6 +18,7 @@ class RetentionClass(Base):
     __tablename__ = "sys_dg_retention_classes"
 
     class_name: Mapped[str] = mapped_column(Text, primary_key=True)
+    tenant_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("iam_dg_tenants.id"), index=True, nullable=True)
     retention_days: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)

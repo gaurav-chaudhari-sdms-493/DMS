@@ -18,6 +18,9 @@ import {
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
+import RegionViewer from "@/components/common/RegionViewer";
+import { useI18n } from "@/components/common/I18nProvider";
+import { LanguageToggle } from "@/components/common/LanguageToggle";
 
 interface QueueFact {
   fact_id: string;
@@ -31,18 +34,6 @@ interface QueueFact {
 
 type Category = "low_confidence" | "handwritten" | "marginalia" | "join_mismatch";
 
-const CATEGORY_TABS: { key: Category; label: string; available: boolean }[] = [
-  { key: "low_confidence", label: "Low Confidence", available: true },
-  { key: "handwritten", label: "Handwritten", available: true },
-  // T30 — marginalia now has a real capture path (VLM extraction writes
-  // "_marginalia"-sentinel Facts for handwritten notes outside any field).
-  { key: "marginalia", label: "Marginalia", available: true },
-  // T26 — spread-join wiring; the left/right layout convention it reads
-  // is a best-effort guess, not modeled on a real scanned spread (no
-  // reference corpus yet, T25 stays blocked on A1).
-  { key: "join_mismatch", label: "Join Mismatches", available: true },
-];
-
 function formatValue(value: any): string {
   if (value && typeof value === "object" && "v" in value) return String(value.v);
   if (value && typeof value === "object") return JSON.stringify(value);
@@ -50,6 +41,15 @@ function formatValue(value: any): string {
 }
 
 export default function WorkbenchPage() {
+  const { t } = useI18n();
+
+  const CATEGORY_TABS: { key: Category; label: string; available: boolean }[] = [
+    { key: "low_confidence", label: "Low Confidence", available: true },
+    { key: "handwritten", label: "Handwritten", available: true },
+    { key: "marginalia", label: "Marginalia", available: true },
+    { key: "join_mismatch", label: "Join Mismatches", available: true },
+  ];
+
   const [category, setCategory] = useState<Category>("low_confidence");
   const [facts, setFacts] = useState<QueueFact[]>([]);
   const [total, setTotal] = useState(0);
@@ -65,9 +65,6 @@ export default function WorkbenchPage() {
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ confirmed_count: number; batch_id: string } | null>(null);
 
-  // T80 — bulk edit: select rows, preview the change, then apply. One
-  // typed value replaces every selected row's value — the common case
-  // this is for (the same OCR misread recurring across many rows).
   const [selectedFactIds, setSelectedFactIds] = useState<Set<string>>(new Set());
   const [editValue, setEditValue] = useState("");
   const [editLoading, setEditLoading] = useState(false);
@@ -180,10 +177,6 @@ export default function WorkbenchPage() {
     }
   };
 
-  // T54 — keyboard-first navigation: ↑/↓ move the selection, 'c' claims,
-  // 'r' releases, Enter or 'a' confirms the selected fact. Ignored while
-  // a text input has focus so typing into the bulk-confirm form doesn't
-  // fight with queue navigation.
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement;
@@ -238,17 +231,20 @@ export default function WorkbenchPage() {
             className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9]"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Drive</span>
+            <span>{t("workbench.back")}</span>
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[#0b57d0]" />
-            Verification Workbench
+            {t("workbench.title")}
           </h1>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-[#747775]">
-          <Keyboard className="w-4 h-4" />
-          <span>&uarr;/&darr; navigate &middot; C claim &middot; R release &middot; Enter/A confirm &middot; H mark handwritten</span>
+        <div className="flex items-center gap-4 text-xs text-[#747775]">
+          <div className="flex items-center gap-1.5 hidden md:flex">
+            <Keyboard className="w-4 h-4" />
+            <span>&uarr;/&darr; navigate &middot; C claim &middot; R release &middot; Enter/A confirm &middot; H mark handwritten</span>
+          </div>
+          <LanguageToggle />
         </div>
       </header>
 
@@ -289,7 +285,7 @@ export default function WorkbenchPage() {
 
           <Card className="bg-white border border-[#e1e3e1] p-0 overflow-hidden">
             <div className="px-5 py-3 border-b border-[#e1e3e1] flex items-center justify-between">
-              <span className="text-sm font-semibold text-[#1f1f1f]">Queue &mdash; {total} item{total === 1 ? "" : "s"}</span>
+              <span className="text-sm font-semibold text-[#1f1f1f]">{t("workbench.queue")} &mdash; {total} item{total === 1 ? "" : "s"}</span>
               {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0b57d0]" />}
             </div>
 
@@ -335,7 +331,7 @@ export default function WorkbenchPage() {
 
         <div className="space-y-6">
           <Card className="bg-white border border-[#e1e3e1]">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">Selected fact</h2>
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">{t("workbench.selected_fact")}</h2>
             {!selected ? (
               <p className="text-sm text-[#747775]">Select an item from the queue.</p>
             ) : (
@@ -373,12 +369,18 @@ export default function WorkbenchPage() {
                     </Button>
                   )}
                 </div>
+                <div className="mt-4 border-t border-[#e1e3e1] pt-4">
+                  <h3 className="text-xs text-[#747775] uppercase tracking-wide font-semibold mb-2">Source Region</h3>
+                  <div className="h-[300px] border border-[#e1e3e1] rounded-lg overflow-hidden relative bg-[#f8f9fa]">
+                    <RegionViewer factId={selected.fact_id} />
+                  </div>
+                </div>
               </div>
             )}
           </Card>
 
           <Card className="bg-white border border-[#e1e3e1]">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">Bulk confirm (T54)</h2>
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">{t("workbench.bulk_confirm")}</h2>
             <p className="text-xs text-[#747775] mb-3">
               Promotes every in-review fact above the threshold in one corpus. Requires the corpus to be
               calibrated first (T59) — handwritten facts are always excluded regardless of confidence.
@@ -423,7 +425,7 @@ export default function WorkbenchPage() {
           </Card>
 
           <Card className="bg-white border border-[#e1e3e1]">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">Bulk edit (T80)</h2>
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">{t("workbench.bulk_edit")}</h2>
             <p className="text-xs text-[#747775] mb-3">
               Check rows in the queue, type the corrected value, preview before applying. Never marks a
               value verified — every edited row lands in review, even if it was previously machine or verified.
