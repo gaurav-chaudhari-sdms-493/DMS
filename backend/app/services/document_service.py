@@ -510,7 +510,7 @@ async def get_drive_stats(db: AsyncSession, tenant_id: UUID) -> DriveStatsRespon
     v_res = await db.execute(
         select(func.sum(DocumentVersion.file_size_bytes))
         .join(Document, Document.current_version_id == DocumentVersion.id)
-        .where(Document.tenant_id == tenant_id)
+        .where(Document.tenant_id == tenant_id, Document.is_trashed == False)
     )
     total_bytes = v_res.scalar() or 0
 
@@ -588,13 +588,16 @@ async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 
     pending_documents = []  # (title, retention_class, days_remaining) — has a finite period, just not up yet
     for d_id, t_id, retention_class, trashed_at, title in candidate_docs:
         class_days = class_periods.get(retention_class)
-        if class_days is None:
-            protected_documents.append({"title": title, "retention_class": retention_class})
-            continue  # permanent class, or an unrecognized one — fail safe, never purge
-        if now - trashed_at < timedelta(days=class_days):
-            days_remaining = class_days - (now - trashed_at).days
-            pending_documents.append({"title": title, "retention_class": retention_class, "days_remaining": max(days_remaining, 0)})
-            continue
+        
+        if retention_days > 0:
+            if class_days is None:
+                protected_documents.append({"title": title, "retention_class": retention_class})
+                continue  # permanent class, or an unrecognized one — fail safe, never purge
+            if now - trashed_at < timedelta(days=class_days):
+                days_remaining = class_days - (now - trashed_at).days
+                pending_documents.append({"title": title, "retention_class": retention_class, "days_remaining": max(days_remaining, 0)})
+                continue
+                
         actor_id = await _resolve_policy_actor(db, t_id, actor_cache)
         if actor_id is None:
             logger.warning(f"Skipping purge of document {d_id}: tenant {t_id} has no user to attribute the deletion to")

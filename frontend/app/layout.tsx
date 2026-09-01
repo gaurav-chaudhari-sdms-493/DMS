@@ -22,7 +22,7 @@ export const metadata: Metadata = {
   },
 };
 
-import { I18nProvider } from "@/components/common/I18nProvider";
+import { I18nProvider } from "@/lib/i18n";
 
 export default function RootLayout({
   children,

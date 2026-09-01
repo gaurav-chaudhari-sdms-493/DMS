@@ -16,8 +16,8 @@ import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import RegionViewer from "@/components/common/RegionViewer";
-import { useI18n } from "@/components/common/I18nProvider";
-import { LanguageToggle } from "@/components/common/LanguageToggle";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 interface FieldProvenance {
   kind: "base" | "amendment";
@@ -150,16 +150,16 @@ export default function Entity360Page() {
             className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9]"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>{t("workbench.back")}</span>
+            <span>{t("workbench.back", "Back to Drive")}</span>
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
             <Network className="w-5 h-5 text-[#0b57d0]" />
-            {t("entity.title")}
+            {t("entity.title", "Entity 360")}
           </h1>
         </div>
         <div className="flex items-center gap-4 text-xs text-[#747775]">
-          <LanguageToggle />
+          <LanguageSwitcher />
         </div>
       </header>
 
@@ -169,7 +169,7 @@ export default function Entity360Page() {
             <input
               type="text"
               aria-label="Entity node ID"
-              placeholder={t("entity.node_id_placeholder")}
+              placeholder={t("entity.node_id_placeholder", "Entity node ID")}
               value={nodeId}
               onChange={(e) => setNodeId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && load()}
@@ -216,7 +216,7 @@ export default function Entity360Page() {
             </Card>
 
             <Card className="bg-white border border-[#e1e3e1]">
-              <h3 className="text-sm font-bold mb-4">{t("entity.records")} ({data.records.length})</h3>
+              <h3 className="text-sm font-bold mb-4">{t("entity.records", "Records")} ({data.records.length})</h3>
               {data.records.length === 0 && <p className="text-sm text-[#747775]">No records for this entity.</p>}
               <div className="flex flex-col gap-4">
                 {data.records.map((r) => (
@@ -230,7 +230,7 @@ export default function Entity360Page() {
                         onClick={() => openHistory(r.record_id)}
                         className="flex items-center gap-1 text-xs font-bold text-[#0b57d0] hover:underline"
                       >
-                        <History className="w-3.5 h-3.5" /> {t("entity.view_history")}
+                        <History className="w-3.5 h-3.5" /> {t("entity.view_history", "View history")}
                       </button>
                     </div>
                     <table className="w-full text-xs mt-2">
@@ -262,7 +262,7 @@ export default function Entity360Page() {
             </Card>
 
             <Card className="bg-white border border-[#e1e3e1]">
-              <h3 className="text-sm font-bold mb-4">{t("entity.linked_entities")} ({data.linked_entities.length})</h3>
+              <h3 className="text-sm font-bold mb-4">{t("entity.linked_entities", "Linked entities")} ({data.linked_entities.length})</h3>
               {data.linked_entities.length === 0 && <p className="text-sm text-[#747775]">No linked entities.</p>}
               <div className="flex flex-col gap-2">
                 {data.linked_entities.map((e) => (
@@ -286,7 +286,7 @@ export default function Entity360Page() {
             </Card>
 
             <Card className="bg-white border border-[#e1e3e1]">
-              <h3 className="text-sm font-bold mb-4">{t("entity.linked_facts")} ({data.linked_facts.length})</h3>
+              <h3 className="text-sm font-bold mb-4">{t("entity.linked_facts", "Linked facts")} ({data.linked_facts.length})</h3>
               {data.linked_facts.length === 0 && <p className="text-sm text-[#747775]">No linked facts.</p>}
               <div className="flex flex-col gap-2">
                 {data.linked_facts.map((e) => (

@@ -19,8 +19,8 @@ import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import RegionViewer from "@/components/common/RegionViewer";
-import { useI18n } from "@/components/common/I18nProvider";
-import { LanguageToggle } from "@/components/common/LanguageToggle";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 interface QueueFact {
   fact_id: string;
@@ -231,12 +231,12 @@ export default function WorkbenchPage() {
             className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9]"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>{t("workbench.back")}</span>
+            <span>{t("workbench.back", "Back to Drive")}</span>
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
             <ShieldCheck className="w-5 h-5 text-[#0b57d0]" />
-            {t("workbench.title")}
+            {t("workbench.title", "Verification Workbench")}
           </h1>
         </div>
         <div className="flex items-center gap-4 text-xs text-[#747775]">
@@ -244,7 +244,7 @@ export default function WorkbenchPage() {
             <Keyboard className="w-4 h-4" />
             <span>&uarr;/&darr; navigate &middot; C claim &middot; R release &middot; Enter/A confirm &middot; H mark handwritten</span>
           </div>
-          <LanguageToggle />
+          <LanguageSwitcher />
         </div>
       </header>
 
@@ -285,7 +285,7 @@ export default function WorkbenchPage() {
 
           <Card className="bg-white border border-[#e1e3e1] p-0 overflow-hidden">
             <div className="px-5 py-3 border-b border-[#e1e3e1] flex items-center justify-between">
-              <span className="text-sm font-semibold text-[#1f1f1f]">{t("workbench.queue")} &mdash; {total} item{total === 1 ? "" : "s"}</span>
+              <span className="text-sm font-semibold text-[#1f1f1f]">{t("workbench.queue", "Queue")} &mdash; {total} item{total === 1 ? "" : "s"}</span>
               {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0b57d0]" />}
             </div>
 
@@ -331,7 +331,7 @@ export default function WorkbenchPage() {
 
         <div className="space-y-6">
           <Card className="bg-white border border-[#e1e3e1]">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">{t("workbench.selected_fact")}</h2>
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">{t("workbench.selected_fact", "Selected fact")}</h2>
             {!selected ? (
               <p className="text-sm text-[#747775]">Select an item from the queue.</p>
             ) : (
@@ -380,7 +380,7 @@ export default function WorkbenchPage() {
           </Card>
 
           <Card className="bg-white border border-[#e1e3e1]">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">{t("workbench.bulk_confirm")}</h2>
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">{t("workbench.bulk_confirm", "Bulk confirm (T54)")}</h2>
             <p className="text-xs text-[#747775] mb-3">
               Promotes every in-review fact above the threshold in one corpus. Requires the corpus to be
               calibrated first (T59) — handwritten facts are always excluded regardless of confidence.
@@ -425,7 +425,7 @@ export default function WorkbenchPage() {
           </Card>
 
           <Card className="bg-white border border-[#e1e3e1]">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">{t("workbench.bulk_edit")}</h2>
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">{t("workbench.bulk_edit", "Bulk edit (T80)")}</h2>
             <p className="text-xs text-[#747775] mb-3">
               Check rows in the queue, type the corrected value, preview before applying. Never marks a
               value verified — every edited row lands in review, even if it was previously machine or verified.

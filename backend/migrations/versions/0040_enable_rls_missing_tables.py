@@ -1,7 +1,7 @@
 """enable row level security on metadata_items, document_versions, templates, and retention_classes
 
-Revision ID: 0032_enable_rls_missing_tables
-Revises: 0031_template_layout_spread
+Revision ID: 0040_enable_rls_missing_tables
+Revises: 0039_search_glossary
 Create Date: 2026-08-31 11:00:00.000000
 
 """
@@ -10,8 +10,8 @@ from alembic import op
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
-revision: str = '0032_enable_rls_missing_tables'
-down_revision: Union[str, None] = '0031_template_layout_spread'
+revision: str = '0040_enable_rls_missing_tables'
+down_revision: Union[str, None] = '0039_search_glossary'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
