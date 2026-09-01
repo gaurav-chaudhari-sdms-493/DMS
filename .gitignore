@@ -50,7 +50,6 @@ yarn-error.log*
 .claude/
 *.swp
 *.swo
-/frontend/package-lock.json
 /frontend/public/pdf.worker.min.mjs
 tabular_data_in_csv_temp/*
 /frontend/.dockerignore
