@@ -891,6 +891,62 @@ export default function DrivePage() {
         }}
       />
 
+      {/* Selection action bar — appears whenever any file/folder is checked
+          or ctrl/shift-clicked. Previously the only way to bulk-act was an
+          undiscoverable right-click context menu with no visible checkbox
+          UI anywhere (found live-testing this session). */}
+      {(selectedDocIds.size + selectedFolderIds.size) > 0 && (
+        <div className="flex items-center justify-between px-4 py-2 bg-[#e8f0fe] border-b border-[#c2e7ff]">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => {
+                setSelectedFolderIds(new Set());
+                setSelectedDocIds(new Set());
+              }}
+              className="p-1.5 rounded-full hover:bg-[#c2e7ff] text-[#001d35] transition-colors"
+              aria-label="Clear selection"
+            >
+              <X className="w-4 h-4" />
+            </button>
+            <span className="text-sm font-semibold text-[#001d35]">
+              {selectedDocIds.size + selectedFolderIds.size} selected
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleBulkStar}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#444746] bg-white border border-[#e1e3e1] hover:bg-[#f0f4f9] transition-colors"
+            >
+              <Star className="w-3.5 h-3.5" />
+              Star
+            </button>
+            {selectedDocIds.size > 0 && (
+              <button
+                onClick={handleBulkDownload}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#444746] bg-white border border-[#e1e3e1] hover:bg-[#f0f4f9] transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download
+              </button>
+            )}
+            <button
+              onClick={() => setItemToMove({ type: "doc", item: { id: "bulk" } as any })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-[#444746] bg-white border border-[#e1e3e1] hover:bg-[#f0f4f9] transition-colors"
+            >
+              <FolderInput className="w-3.5 h-3.5" />
+              Move
+            </button>
+            <button
+              onClick={handleBulkTrash}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold text-red-600 bg-white border border-red-200 hover:bg-red-50 transition-colors"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              {currentView === "trash" ? "Delete permanently" : "Move to Bin"}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Body Area */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Navigation Sidebar with Tree */}

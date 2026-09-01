@@ -9,9 +9,7 @@ from .services.cache_service import init_redis
 from .tasks.worker import celery_app
 
 from .services.storage_service import ensure_bucket_exists, ensure_archive_bucket_exists
-from .services.watched_folder_connector import watch_folder_loop
-from .services.sftp_connector import sftp_poll_loop
-from .services.email_connector import email_poll_loop
+from .services.connector_base import get_enabled_connectors
 from .api_logging_middleware import ApiLoggingMiddleware
 
 from .limiter import limiter
@@ -33,14 +31,12 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         import logging
         logging.getLogger(__name__).warning(f"T64 WORM archive bucket setup failed at startup: {e}")
-    watch_task = asyncio.create_task(watch_folder_loop())
-    sftp_task = asyncio.create_task(sftp_poll_loop())
-    email_task = asyncio.create_task(email_poll_loop()) if settings.email_enabled else None
+    # T40 — connectors are a typed contract (services/connector_base.py);
+    # a new connector is added to get_enabled_connectors(), never here.
+    connector_tasks = [asyncio.create_task(c.run_loop()) for c in get_enabled_connectors()]
     yield
-    watch_task.cancel()
-    sftp_task.cancel()
-    if email_task:
-        email_task.cancel()
+    for task in connector_tasks:
+        task.cancel()
 
 def create_app() -> FastAPI:
     app = FastAPI(

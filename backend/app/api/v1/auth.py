@@ -7,7 +7,7 @@ from ...schemas.auth import (
     LoginRequest, TokenResponse, TokenPayload, SignUpRequest, SignUpResponse,
     ForgotPasswordRequest, ForgotPasswordResponse, ResetPasswordRequest,
     UserProfileResponse, FileTypeCount, RefreshTokenRequest,
-    UpdateLocaleRequest, UpdateLocaleResponse
+    UpdateLocaleRequest, UpdateLocaleResponse, ChangePasswordRequest
 )
 from ...models.user import User
 from ...models.tenant import Tenant
@@ -19,7 +19,7 @@ from ...models.folder import Folder
 from ...deps import get_db, get_request_ip, require_tenant_access
 from ...services.auth_service import (
     verify_password, create_access_token, create_refresh_token, sign_up,
-    create_password_reset_token, reset_password_with_token
+    create_password_reset_token, reset_password_with_token, change_password
 )
 from ...services.audit_service import log_action
 
@@ -135,6 +135,20 @@ async def update_current_user_locale(
     user.locale = body.locale
     await db.commit()
     return UpdateLocaleResponse(locale=user.locale)
+
+@router.post('/me/password')
+async def change_current_user_password(
+    body: ChangePasswordRequest,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db)
+):
+    """In-place password change for an already-logged-in user — the
+    profile page's "Change Password" previously just linked to
+    /forgot-password, forcing an unnecessary email round-trip."""
+    user_id = uuid.UUID(current_user.sub)
+    await change_password(user_id, body.current_password, body.new_password, db)
+    await log_action(db, user_id, uuid.UUID(current_user.tenant_id), "auth.password_change")
+    return {"message": "Password changed successfully"}
 
 @router.post('/sign-up', response_model=SignUpResponse, status_code=201)
 async def sign_up_user(

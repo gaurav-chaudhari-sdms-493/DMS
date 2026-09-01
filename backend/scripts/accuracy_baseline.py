@@ -38,22 +38,41 @@ WAQF_GROUND_TRUTH = [
 ]
 
 # Document 2 — waqf_gazette_1973_spread_FIXED.pdf (Maharashtra State Wakf
-# Gazette Register template, spread layout). KNOWN FAILING CASE, not a
-# passing entry: the left-hand page's dense 8-column/18-row response
-# came back as malformed JSON on 3/3 live attempts this session (a
-# structurally broken bracket, different character position each time —
-# genuine model flakiness on a wide/dense table, not a bug this session's
-# two real fixes (null-bbox crash, raw-newline strict-JSON rejection)
-# could resolve). Recorded here so the next investigation starts from
-# "known broken, here's the evidence" instead of rediscovering it.
+# Gazette Register template, spread layout). STILL NOT a passing entry, but
+# for a narrower reason now. The left-hand page's JSON-parse flakiness
+# (malformed JSON on 3/3 attempts, 2026-08-28) is fixed as of 2026-09-01 —
+# see T31_T32_regression_corpus_notes.md's "the parse-retry follow-up was
+# built and it works" section: _call_vlm_with_parse_retry() recovers a
+# malformed response by retrying with a fresh (uncached) sample, live-
+# verified against this exact document. What's left is row-matching
+# completeness (TS1/T26) — a parseable response doesn't guarantee every
+# row's serial number joins cleanly between the two page halves, and that
+# still needs more real samples (A1) to characterize as typical or not.
 GAZETTE_DOC_ID = "139cd522-099e-4642-8199-10b6f6610694"
 GAZETTE_KNOWN_ISSUE = (
-    "Left-hand page (columns 1-8, 18 rows) VLM response is malformed JSON on "
-    "3/3 live attempts (2026-08-28) — a broken bracket structure at a different "
-    "character position each retry. Right-hand page parses fine after this "
-    "session's strict=False fix. Needs either a smaller per-call row batch or "
-    "a parse-retry loop (same pattern as table_stitch.adjudicate_structure's "
-    "ADJUDICATION_ATTEMPTS) before this document can enter the passing corpus."
+    "JSON-parse flakiness on the left-hand page is fixed (parse-retry loop, "
+    "2026-09-01, see T31_T32_regression_corpus_notes.md). Remaining gap: "
+    "left/right row-matching completeness on this document's dense 18-row "
+    "table is not yet consistently full-recall — needs more real spread "
+    "samples (A1) to know if that's typical or this-document-specific."
+)
+
+
+# Document 3 — Wardha.pdf, same spread template, found already uploaded to
+# the real tenant (2026-09-01, outside this session). Not hand-verified
+# against ground truth (would need rendering+reading all 14 pages) — this
+# is a structural known-failing entry, not a recall check: every one of
+# its 5 measurable page-pairs disagreed entirely on serial number between
+# left/right halves. See T31_T32_regression_corpus_notes.md's "a second
+# real spread document, and it corroborates checklist item #2".
+WARDHA_DOC_ID = "fc4263c7-4511-46c2-9590-dbb03458e8c7"
+WARDHA_KNOWN_ISSUE = (
+    "5/5 measurable page-pairs (3-4, 5-6, 7-8, 9-10, 11-12) failed to join — "
+    "'sr_no' values disagree entirely between left and right halves on every "
+    "pair, a 100% mismatch rate. Second real document showing this exact "
+    "failure pattern (see WARDHA vs GAZETTE) — corroborates, doesn't yet fix, "
+    "the checklist's item #2 concern that role:'serial' may not really be "
+    "printed on both halves of a real spread."
 )
 
 
@@ -98,12 +117,16 @@ async def main():
     for field_name, value in result["missing"]:
         print(f"    MISSING: {field_name} = {value!r}")
 
-    print("\n[2] Maharashtra State Wakf Gazette Register (spread, horizontal join)")
-    print("    Status: KNOWN FAILING — 0 facts extracted, not a passing corpus entry")
+    print("\n[2] Maharashtra State Wakf Gazette Register — waqf_gazette_1973_spread_FIXED.pdf (spread, horizontal join)")
+    print("    Status: KNOWN FAILING — row-matching incomplete, not a passing corpus entry")
     print(f"    {GAZETTE_KNOWN_ISSUE}")
 
+    print("\n[3] Maharashtra State Wakf Gazette Register — Wardha.pdf (spread, horizontal join)")
+    print("    Status: KNOWN FAILING — structural, not a passing corpus entry")
+    print(f"    {WARDHA_KNOWN_ISSUE}")
+
     print("\n" + "=" * 70)
-    print(f"Corpus size: 2 real documents (1 passing at {recall:.0f}% recall, 1 documented-failing)")
+    print(f"Corpus size: 3 real documents (1 passing at {recall:.0f}% recall, 2 documented-failing)")
     print("This is a starter, not the A1 reference corpus — see T31_T32_regression_corpus_notes.md")
     print("=" * 70)
 

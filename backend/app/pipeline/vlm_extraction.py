@@ -60,7 +60,7 @@ from app.pipeline.handlers.ditto_chain import expand_ditto_chains
 from app.pipeline import table_stitch
 from app.services.template_service import classify_confidence
 from app.services import table_shape_service
-from app.services.extraction_archive_service import compute_vlm_cache_key, get_cached_vlm_response, record_vlm_response
+from app.services.extraction_archive_service import compute_vlm_cache_key, get_cached_vlm_response, record_vlm_response, overwrite_vlm_response
 from app.services.config_service import get_float
 
 logger = logging.getLogger(__name__)
@@ -214,6 +214,65 @@ async def _call_vlm_cached(db: AsyncSession, vlm, file_hash: str, page_number: i
     return raw
 
 
+VLM_PARSE_RETRY_ATTEMPTS = 3
+
+
+async def _call_vlm_with_parse_retry(
+    db: AsyncSession, vlm, file_hash: str, page_number: int, image_bytes: bytes, prompt: str,
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    """T31/T32 follow-up (documented in T31_T32_regression_corpus_notes.md):
+    on a real 1973 gazette's dense left-hand page, the VLM returned
+    malformed JSON at a different position on 3 separate live attempts —
+    not the two structural bugs already fixed (null bbox, raw newline),
+    just model flakiness on a wide/dense table. Same class of failure
+    table_stitch.adjudicate_structure() already retries for the
+    adjudication LLM; this applies the identical pattern here.
+
+    Retrying via _call_vlm_cached alone would do nothing: the cache key
+    is a pure function of (file_hash, page_number, prompt), so a retry
+    would just replay the same bad cached response forever. The first
+    attempt uses the cache as normal (fast path for the common case, a
+    response that parsed fine the first time); a retry after a parse
+    failure bypasses the cache and asks the model again for a fresh
+    sample, then overwrites the bad cache entry with a good one so later
+    runs benefit too.
+    """
+    last_error: Optional[Exception] = None
+    for attempt in range(VLM_PARSE_RETRY_ATTEMPTS):
+        raw = (
+            await _call_vlm_cached(db, vlm, file_hash, page_number, image_bytes, prompt)
+            if attempt == 0
+            else await vlm.extract_structured(image_bytes, prompt)
+        )
+        try:
+            rows, marginalia = _parse_vlm_response(raw)
+        except Exception as e:
+            # Not just json.JSONDecodeError: a malformed-but-valid-JSON
+            # reply (e.g. a bare list instead of the expected object) can
+            # also raise AttributeError/TypeError inside _parse_vlm_response
+            # — any of these means "unusable response, worth a retry."
+            last_error = e
+            logger.warning(
+                f"VLM response unparseable for page {page_number}, "
+                f"attempt {attempt + 1}/{VLM_PARSE_RETRY_ATTEMPTS}: {e}"
+            )
+            continue
+
+        if attempt > 0:
+            try:
+                cache_key = compute_vlm_cache_key(file_hash, page_number, prompt)
+                await overwrite_vlm_response(db, cache_key, raw)
+            except Exception as e:
+                logger.warning(f"VLM cache rewrite failed for page {page_number}: {e}")
+        return rows, marginalia
+
+    logger.error(
+        f"VLM response unparseable for page {page_number} after "
+        f"{VLM_PARSE_RETRY_ATTEMPTS} attempts, giving up: {last_error}"
+    )
+    return [], []
+
+
 async def _get_or_create_page(
     db: AsyncSession, tenant_id: UUID, document_id: UUID, version_id: UUID,
     page_number: int, width: float, height: float, rotation: float,
@@ -324,10 +383,8 @@ async def _extract_spread_facts(
             left_png, left_w, left_h, left_rot = left_rendered
             right_png, right_w, right_h, right_rot = right_rendered
 
-            left_raw = await _call_vlm_cached(db, vlm, file_hash, left_page_number, left_png, left_prompt)
-            right_raw = await _call_vlm_cached(db, vlm, file_hash, right_page_number, right_png, right_prompt)
-            left_rows, _ = _parse_vlm_response(left_raw)
-            right_rows, _ = _parse_vlm_response(right_raw)
+            left_rows, _ = await _call_vlm_with_parse_retry(db, vlm, file_hash, left_page_number, left_png, left_prompt)
+            right_rows, _ = await _call_vlm_with_parse_retry(db, vlm, file_hash, right_page_number, right_png, right_prompt)
             if not left_rows or not right_rows:
                 continue
 
@@ -588,8 +645,7 @@ async def extract_facts_for_document(
                     break
                 png_bytes, width, height, rotation = _render_image_page_png(file_bytes)
 
-            raw_response = await _call_vlm_cached(db, vlm, file_hash, page_number, png_bytes, prompt)
-            rows, marginalia = _parse_vlm_response(raw_response)
+            rows, marginalia = await _call_vlm_with_parse_retry(db, vlm, file_hash, page_number, png_bytes, prompt)
             if not rows and not marginalia:
                 continue
 

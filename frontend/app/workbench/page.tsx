@@ -15,6 +15,10 @@ import {
   Undo2,
   Eye,
   X,
+  Info,
+  FileText,
+  Layers,
+  SlidersHorizontal,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -35,6 +39,7 @@ function flattenFolders(nodes: FolderTreeNode[], depth = 0): { id: string; name:
 interface QueueFact {
   fact_id: string;
   document_id: string;
+  document_title: string | null;
   field_name: string;
   value: any;
   confidence: number | null;
@@ -44,22 +49,64 @@ interface QueueFact {
 
 type Category = "low_confidence" | "handwritten" | "marginalia" | "join_mismatch";
 
-const CATEGORY_TABS: { key: Category; label: string; available: boolean }[] = [
-  { key: "low_confidence", label: "Low Confidence", available: true },
-  { key: "handwritten", label: "Handwritten", available: true },
+// Raw backend sentinel field names (used internally to route facts into
+// the right queue) previously leaked straight into the UI verbatim —
+// "_marginalia" as if it were a real field. This is the only place that
+// needs to know about them; everywhere else just calls fieldLabel().
+const SENTINEL_LABELS: Record<string, string> = {
+  _marginalia: "Handwritten margin note",
+  _join_mismatch: "Table join couldn't be matched",
+  _stitch_ambiguous: "Table continuation unclear",
+};
+
+function fieldLabel(fieldName: string): string {
+  return SENTINEL_LABELS[fieldName] || fieldName;
+}
+
+const CATEGORY_TABS: { key: Category; label: string; description: string; available: boolean }[] = [
+  {
+    key: "low_confidence",
+    label: "Needs Review",
+    description: "Every field waiting on a human decision, sorted worst-confidence first — not only low-scoring ones.",
+    available: true,
+  },
+  {
+    key: "handwritten",
+    label: "Handwritten",
+    description: "Fields the system read from handwriting rather than print. Excludes margin notes — see \"Marginalia\".",
+    available: true,
+  },
   // T30 — marginalia now has a real capture path (VLM extraction writes
   // "_marginalia"-sentinel Facts for handwritten notes outside any field).
-  { key: "marginalia", label: "Marginalia", available: true },
+  {
+    key: "marginalia",
+    label: "Marginalia",
+    description: "Handwritten notes found outside any known field on the page (margin notes, stamps, annotations).",
+    available: true,
+  },
   // T26 — spread-join wiring; the left/right layout convention it reads
   // is a best-effort guess, not modeled on a real scanned spread (no
   // reference corpus yet, T25 stays blocked on A1).
-  { key: "join_mismatch", label: "Join Mismatches", available: true },
+  {
+    key: "join_mismatch",
+    label: "Join Mismatches",
+    description: "A two-page entry the system couldn't reliably match left-to-right — needs a human to pair the halves.",
+    available: true,
+  },
 ];
 
 function formatValue(value: any): string {
   if (value && typeof value === "object" && "v" in value) return String(value.v);
   if (value && typeof value === "object") return JSON.stringify(value);
   return String(value);
+}
+
+// Bare decimals gave no sense of "is this fine or concerning" at a glance.
+function confidenceBadge(confidence: number | null): { text: string; className: string } {
+  if (confidence === null) return { text: "—", className: "text-[#5f6368] bg-[#f0f4f9] border-[#e1e3e1]" };
+  if (confidence >= 0.8) return { text: confidence.toFixed(2), className: "text-emerald-700 bg-emerald-50 border-emerald-200" };
+  if (confidence >= 0.5) return { text: confidence.toFixed(2), className: "text-amber-700 bg-amber-50 border-amber-200" };
+  return { text: confidence.toFixed(2), className: "text-red-700 bg-red-50 border-red-200" };
 }
 
 export default function WorkbenchPage() {
@@ -73,6 +120,8 @@ export default function WorkbenchPage() {
   const [notice, setNotice] = useState("");
   // T53 — click-through from a fact to its highlighted source region.
   const [viewingSourceFactId, setViewingSourceFactId] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [categoryCounts, setCategoryCounts] = useState<Partial<Record<Category, number>>>({});
 
   const [bulkFolderId, setBulkFolderId] = useState("");
   const [bulkFolders, setBulkFolders] = useState<{ id: string; name: string; depth: number }[] | null>(null);
@@ -175,6 +224,7 @@ export default function WorkbenchPage() {
       setFacts(data.facts || []);
       setTotal(data.total || 0);
       setSelectedIndex(0);
+      setCategoryCounts((prev) => ({ ...prev, [cat]: data.total || 0 }));
     } catch (e: any) {
       setError(e?.message || "Failed to load the adjudication queue");
     } finally {
@@ -185,6 +235,36 @@ export default function WorkbenchPage() {
   useEffect(() => {
     loadQueue(category);
   }, [category, loadQueue]);
+
+  // Tabs previously gave no sense of how many items were in each queue
+  // until you actually clicked into it. One cheap (limit=1, only the
+  // count matters) call per category, once, so every tab shows a real
+  // number up front.
+  useEffect(() => {
+    CATEGORY_TABS.forEach((tab) => {
+      api.facts.getQueue(tab.key, 1, 0)
+        .then((data) => setCategoryCounts((prev) => ({ ...prev, [tab.key]: data.total || 0 })))
+        .catch(() => {});
+    });
+    api.auth.getProfile()
+      .then((p) => setCurrentUserId(p.user_id))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Escape previously did nothing for the View Source modal — its
+  // full-screen backdrop stayed up and kept intercepting every click
+  // until the X button or a backdrop click dismissed it. Confirmed live
+  // this was genuinely disorienting (the near-universal "Esc closes a
+  // dialog" reflex silently broke the page).
+  useEffect(() => {
+    if (!viewingSourceFactId) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setViewingSourceFactId(null);
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [viewingSourceFactId]);
 
   const selected = facts[selectedIndex] || null;
 
@@ -278,7 +358,7 @@ export default function WorkbenchPage() {
             Verification Workbench
           </h1>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-[#747775]">
+        <div className="flex items-center gap-1.5 text-xs text-[#5f6368]">
           <Keyboard className="w-4 h-4" />
           <span>&uarr;/&darr; navigate &middot; C claim &middot; R release &middot; Enter/A confirm &middot; H mark handwritten</span>
         </div>
@@ -286,14 +366,14 @@ export default function WorkbenchPage() {
 
       <main className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
         <div>
-          <div className="flex gap-2 mb-4">
+          <div className="flex flex-wrap gap-2 mb-2">
             {CATEGORY_TABS.map((tab) => (
               <button
                 key={tab.key}
                 disabled={!tab.available}
                 onClick={() => tab.available && setCategory(tab.key as Category)}
-                title={!tab.available ? "Not built yet — no data source exists for this category" : undefined}
-                className={`px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors ${
+                title={tab.description}
+                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors ${
                   category === tab.key
                     ? "bg-[#0b57d0] text-white border-[#0b57d0]"
                     : tab.available
@@ -302,9 +382,20 @@ export default function WorkbenchPage() {
                 }`}
               >
                 {tab.label}
+                <span
+                  className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                    category === tab.key ? "bg-white/20" : "bg-[#f0f4f9] text-[#5f6368]"
+                  }`}
+                >
+                  {categoryCounts[tab.key] ?? "…"}
+                </span>
               </button>
             ))}
           </div>
+          <p className="flex items-center gap-1.5 text-xs text-[#5f6368] mb-4">
+            <Info className="w-3.5 h-3.5 shrink-0" />
+            {CATEGORY_TABS.find((t) => t.key === category)?.description}
+          </p>
 
           {error && (
             <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
@@ -324,6 +415,12 @@ export default function WorkbenchPage() {
               <span className="text-sm font-semibold text-[#1f1f1f]">Queue &mdash; {total} item{total === 1 ? "" : "s"}</span>
               {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0b57d0]" />}
             </div>
+            {facts.length > 0 && (
+              <div className="px-5 py-1.5 bg-[#fafbfc] border-b border-[#e1e3e1] text-[10px] text-[#9aa0a6] flex items-center gap-4">
+                <span>&#9744; check a row to include it in <b>Bulk edit</b>, below</span>
+                <span>Click a row to review it, right</span>
+              </div>
+            )}
 
             {!loading && facts.length === 0 && (
               <div className="px-5 py-10 text-center text-sm text-[#747775]">
@@ -332,35 +429,51 @@ export default function WorkbenchPage() {
             )}
 
             <div className="divide-y divide-[#e1e3e1]">
-              {facts.map((fact, idx) => (
-                <div
-                  key={fact.fact_id}
-                  className={`w-full flex items-center gap-3 px-5 py-3 transition-colors ${
-                    idx === selectedIndex ? "bg-[#e8f0fe]" : "hover:bg-[#f8f9fa]"
-                  }`}
-                >
-                  <input
-                    type="checkbox"
-                    checked={selectedFactIds.has(fact.fact_id)}
-                    onChange={() => toggleFactSelection(fact.fact_id)}
-                    onClick={(e) => e.stopPropagation()}
-                    className="shrink-0 w-4 h-4 accent-[#0b57d0]"
-                    title="Select for bulk edit"
-                  />
-                  <button onClick={() => setSelectedIndex(idx)} className="flex-1 min-w-0 text-left flex items-center justify-between gap-4">
-                    <div className="min-w-0">
-                      <div className="text-sm font-medium text-[#1f1f1f] truncate">{fact.field_name}</div>
-                      <div className="text-xs text-[#747775] truncate">{formatValue(fact.value)}</div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      {fact.claimed_by_actor_id && <Lock className="w-3.5 h-3.5 text-[#9aa0a6]" />}
-                      <span className="text-xs font-mono text-[#444746]">
-                        {fact.confidence !== null ? fact.confidence.toFixed(2) : "—"}
-                      </span>
-                    </div>
-                  </button>
-                </div>
-              ))}
+              {facts.map((fact, idx) => {
+                const badge = confidenceBadge(fact.confidence);
+                const isMine = !!fact.claimed_by_actor_id && fact.claimed_by_actor_id === currentUserId;
+                const isOthers = !!fact.claimed_by_actor_id && fact.claimed_by_actor_id !== currentUserId;
+                return (
+                  <div
+                    key={fact.fact_id}
+                    className={`w-full flex items-center gap-3 px-5 py-3 transition-colors ${
+                      idx === selectedIndex ? "bg-[#e8f0fe]" : "hover:bg-[#f8f9fa]"
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedFactIds.has(fact.fact_id)}
+                      onChange={() => toggleFactSelection(fact.fact_id)}
+                      onClick={(e) => e.stopPropagation()}
+                      className="shrink-0 w-4 h-4 accent-[#0b57d0]"
+                      title="Include in Bulk edit"
+                    />
+                    <button onClick={() => setSelectedIndex(idx)} className="flex-1 min-w-0 text-left flex items-center justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="text-sm font-medium text-[#1f1f1f] truncate">{fieldLabel(fact.field_name)}</div>
+                        <div className="text-xs text-[#747775] truncate">{formatValue(fact.value)}</div>
+                        {fact.document_title && (
+                          <div className="flex items-center gap-1 text-[10px] text-[#9aa0a6] truncate mt-0.5">
+                            <FileText className="w-3 h-3 shrink-0" />
+                            <span className="truncate">{fact.document_title}</span>
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isMine && (
+                          <span title="Claimed by you"><Lock className="w-3.5 h-3.5 text-[#0b57d0]" /></span>
+                        )}
+                        {isOthers && (
+                          <span title="Claimed by another operator"><Lock className="w-3.5 h-3.5 text-[#9aa0a6]" /></span>
+                        )}
+                        <span className={`text-xs font-mono px-1.5 py-0.5 rounded border ${badge.className}`}>
+                          {badge.text}
+                        </span>
+                      </div>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </Card>
         </div>
@@ -369,12 +482,18 @@ export default function WorkbenchPage() {
           <Card className="bg-white border border-[#e1e3e1]">
             <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">Selected fact</h2>
             {!selected ? (
-              <p className="text-sm text-[#747775]">Select an item from the queue.</p>
+              <p className="text-sm text-[#747775]">Select an item from the queue on the left to review it here.</p>
             ) : (
               <div className="space-y-3">
+                {selected.document_title && (
+                  <div className="flex items-center gap-1.5 text-xs text-[#5f6368]">
+                    <FileText className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">{selected.document_title}</span>
+                  </div>
+                )}
                 <div>
                   <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Field</div>
-                  <div className="text-sm text-[#1f1f1f]">{selected.field_name}</div>
+                  <div className="text-sm text-[#1f1f1f]">{fieldLabel(selected.field_name)}</div>
                 </div>
                 <div>
                   <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Value</div>
@@ -382,28 +501,40 @@ export default function WorkbenchPage() {
                 </div>
                 <div>
                   <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Confidence</div>
-                  <div className="text-sm text-[#1f1f1f] font-mono">{selected.confidence?.toFixed(3) ?? "—"}</div>
+                  <div className={`inline-block text-sm font-mono mt-0.5 px-2 py-0.5 rounded border ${confidenceBadge(selected.confidence).className}`}>
+                    {selected.confidence?.toFixed(3) ?? "—"}
+                  </div>
                 </div>
                 {selected.is_handwritten && (
                   <div className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
-                    Handwritten source — T55 rule: cannot be bulk-confirmed
+                    Handwritten source — can&apos;t be included in a threshold-based Bulk Confirm; needs individual review.
                   </div>
                 )}
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <Button size="sm" variant="secondary" onClick={() => setViewingSourceFactId(selected.fact_id)}>
+                  <Button size="sm" variant="secondary" onClick={() => setViewingSourceFactId(selected.fact_id)} title="See exactly where this value was read from on the original page">
                     <Eye className="w-3.5 h-3.5 mr-1.5" />
                     View Source
                   </Button>
-                  <Button size="sm" variant="secondary" loading={actionLoading} onClick={() => doAction(selected.claimed_by_actor_id ? "release" : "claim")}>
+                  <Button
+                    size="sm" variant="secondary" loading={actionLoading}
+                    onClick={() => doAction(selected.claimed_by_actor_id ? "release" : "claim")}
+                    title={selected.claimed_by_actor_id ? "Release (shortcut: R) — let another operator claim this" : "Claim (shortcut: C) — reserve this for yourself so no one else works on it at the same time"}
+                  >
                     {selected.claimed_by_actor_id ? <Unlock className="w-3.5 h-3.5 mr-1.5" /> : <Lock className="w-3.5 h-3.5 mr-1.5" />}
                     {selected.claimed_by_actor_id ? "Release" : "Claim"}
                   </Button>
-                  <Button size="sm" loading={actionLoading} onClick={() => doAction("confirm")}>
+                  <Button
+                    size="sm" loading={actionLoading} onClick={() => doAction("confirm")}
+                    title="Confirm (shortcut: Enter/A) — marks this value as human-verified and removes it from the queue"
+                  >
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
                     Confirm
                   </Button>
                   {!selected.is_handwritten && (
-                    <Button size="sm" variant="secondary" loading={actionLoading} onClick={() => doAction("mark_handwritten")}>
+                    <Button
+                      size="sm" variant="secondary" loading={actionLoading} onClick={() => doAction("mark_handwritten")}
+                      title="Mark Handwritten (shortcut: H) — flags this as handwritten so it's excluded from threshold-based Bulk Confirm"
+                    >
                       <PenLine className="w-3.5 h-3.5 mr-1.5" />
                       Mark Handwritten
                     </Button>
@@ -413,11 +544,16 @@ export default function WorkbenchPage() {
             )}
           </Card>
 
-          <Card className="bg-white border border-[#e1e3e1]">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">Bulk confirm (T54)</h2>
+          <Card className="bg-white border-2 border-emerald-200 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-emerald-400" />
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1 flex items-center gap-1.5">
+              <Layers className="w-4 h-4 text-emerald-600" />
+              Confirm an entire folder at once
+            </h2>
             <p className="text-xs text-[#747775] mb-3">
-              Promotes every in-review fact above the threshold in one corpus. Requires the corpus to be
-              calibrated first (T59) — handwritten facts are always excluded regardless of confidence.
+              Acts on <b>every field above the threshold in one folder</b> — not on anything checked in the queue
+              to the left. The folder must be corpus-calibrated first, or this will be refused. Handwritten
+              fields are always excluded, no matter how confident.
             </p>
             <div className="space-y-2">
               <div className="flex gap-2">
@@ -451,27 +587,33 @@ export default function WorkbenchPage() {
                   ))}
                 </div>
               )}
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                aria-label="Confidence threshold, 0 to 1"
-                placeholder="Threshold (0-1)"
-                value={bulkThreshold}
-                onChange={(e) => setBulkThreshold(e.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
-              />
-              <input
-                type="text"
-                aria-label="Policy version label"
-                placeholder="Policy version label"
-                value={bulkPolicyVersion}
-                onChange={(e) => setBulkPolicyVersion(e.target.value)}
-                className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
-              />
-              <Button size="sm" className="w-full" loading={bulkLoading} onClick={submitBulkConfirm}>
-                Bulk Confirm
+              <div>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="1"
+                  aria-label="Confidence threshold, 0 to 1"
+                  placeholder="Only confirm above this confidence, e.g. 0.8"
+                  value={bulkThreshold}
+                  onChange={(e) => setBulkThreshold(e.target.value)}
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
+                />
+              </div>
+              <div>
+                <input
+                  type="text"
+                  aria-label="Policy version label"
+                  placeholder="Label this decision, e.g. Q1-2026-review"
+                  value={bulkPolicyVersion}
+                  onChange={(e) => setBulkPolicyVersion(e.target.value)}
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
+                />
+                <p className="text-[10px] text-[#9aa0a6] mt-1">A short name for this batch, so it can be found and reverted later if needed.</p>
+              </div>
+              <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700" loading={bulkLoading} onClick={submitBulkConfirm}>
+                <Layers className="w-3.5 h-3.5 mr-1.5" />
+                Confirm Folder
               </Button>
             </div>
             {bulkResult && (
@@ -481,11 +623,15 @@ export default function WorkbenchPage() {
             )}
           </Card>
 
-          <Card className="bg-white border border-[#e1e3e1]">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1">Bulk edit (T80)</h2>
+          <Card className="bg-white border-2 border-amber-200 relative overflow-hidden">
+            <div className="absolute top-0 left-0 w-1 h-full bg-amber-400" />
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-1 flex items-center gap-1.5">
+              <SlidersHorizontal className="w-4 h-4 text-amber-600" />
+              Fix a shared mistake across checked rows
+            </h2>
             <p className="text-xs text-[#747775] mb-3">
-              Check rows in the queue, type the corrected value, preview before applying. Never marks a
-              value verified — every edited row lands in review, even if it was previously machine or verified.
+              Acts on <b>whatever&apos;s checked in the queue</b> to the left — the same one typo/misread corrected
+              everywhere at once. Always requires re-review afterward; this never marks a value verified on its own.
             </p>
             <div className="space-y-2">
               <div className="text-xs font-semibold text-[#444746]">

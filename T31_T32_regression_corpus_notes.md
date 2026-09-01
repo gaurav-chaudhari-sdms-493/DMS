@@ -43,20 +43,50 @@ reading them directly (not by trusting the VLM's own output back).
 Both fixes are real, narrow, and verified live against the actual malformed
 responses that caused them (not hypothetical).
 
-## What's still genuinely broken — the gazette's left-hand page
+## Update 2026-09-01 — the parse-retry follow-up was built and it works
 
-The left page (8 columns × 18 rows, dense, heavy ditto-mark usage) produced
-**malformed JSON on 3 separate live attempts**, at a *different* character
-position each time — a broken bracket structure, not a control-character
-issue the two fixes above could touch. This is model flakiness on a
-wide/dense table, most likely related to response length/complexity, not a
-bug in this codebase. The right-hand page (11 columns) parses reliably now.
+The left page (8 columns × 18 rows, dense, heavy ditto-mark usage) used to
+produce **malformed JSON on 3 separate live attempts**, at a *different*
+character position each time — a broken bracket structure, not a
+control-character issue the two fixes above could touch. Model flakiness on
+a wide/dense table, not a bug in this codebase.
 
-**Real follow-up needed, not done here** (ran out of budget to chase this
-further in one session): either shrink the per-call row batch for wide
-tables, or add a parse-retry loop on `_extract_spread_facts`'s per-page-pair
-VLM calls — the same pattern `table_stitch.adjudicate_structure`'s
-`ADJUDICATION_ATTEMPTS` already uses for exactly this class of flakiness.
+Built the follow-up this note asked for: `_call_vlm_with_parse_retry()` in
+`vlm_extraction.py`, same retry-on-unparseable pattern as
+`table_stitch.adjudicate_structure`'s `ADJUDICATION_ATTEMPTS`. The one real
+subtlety: retrying through the existing `_call_vlm_cached()` alone would do
+nothing, since its cache key is a pure function of (file hash, page number,
+prompt) — a naive retry would just replay the same cached bad response
+forever. The fix bypasses the cache on retry attempts (a fresh sample from
+the model, not the cached one) and — after discovering `record_vlm_response`
+is write-once by design and silently no-ops on an existing key — added
+`overwrite_vlm_response()` so a corrected response actually replaces the bad
+one in the cache, instead of leaving it there for every future run to keep
+retrying past. Unit-tested (`test_vlm_parse_retry.py`,
+`test_extraction_archive_service.py`): malformed-then-good retry succeeds,
+all-attempts-malformed degrades to 0 facts without crashing, and a
+successful retry genuinely overwrites the cache (verified via a second,
+independently-mocked VLM that would return different data if the cache
+rewrite hadn't worked).
+
+**Live-verified against the real gazette document** (`GAZETTE_DOC_ID`,
+read-only — ran inside a DB transaction that was rolled back, never
+committed, so the real tenant's data was never touched): attempt 1 on the
+left page failed with the exact documented symptom
+(`json.JSONDecodeError`, malformed structure), and the retry — a fresh,
+uncached sample — parsed successfully on attempt 2. The specific bug this
+note asked to fix (JSON-parse-level flakiness) is confirmed fixed.
+
+**What's still open, and distinct from the parse fix above:** even with a
+parseable response, this run's left/right join only recovered 2 real field
+facts (`reviewed_by`) plus 2 `_join_mismatch` rows, not the full ~18-row
+table. That's the row-matching/reconciliation layer (TS1's
+`join_rows_horizontally`, T26's real-scan validation checklist below) —
+getting valid JSON back doesn't by itself guarantee every row's serial
+number matches cleanly between the two page halves. Still blocked on A1 for
+a real second (and third, etc.) sample to know whether this run's row-match
+rate is typical or an outlier — one confirmed real spread proves the
+mechanism doesn't crash, not that it's accurate.
 
 ## Running it
 
@@ -64,6 +94,53 @@ VLM calls — the same pattern `table_stitch.adjudicate_structure`'s
 docker compose exec backend python3 scripts/accuracy_baseline.py \
   --email <email> --password <password>
 ```
+
+## T26 update 2026-09-01 — a second real spread document, and it corroborates checklist item #2
+
+Found `Wardha.pdf` already in the real tenant (uploaded outside this
+session, 14 pages, matched to the same gazette spread template) with
+extraction already run. Read-only DB inspection (no re-run, no cost spent):
+every one of its 5 measurable page-pairs (3-4, 5-6, 7-8, 9-10, 11-12) wrote
+a `_join_mismatch` fact with the identical reason — `'sr_no' values on each
+side disagree entirely, no shared value between the two fragments`. Pairs
+1-2 and 13-14 produced neither a mismatch fact nor an error (silently
+skipped — `if not left_rows or not right_rows: continue` — consistent with
+non-tabular front/back matter, not a bug).
+
+This is a **second independent real document showing the exact same
+structural failure**: the role:`serial` field the code asks for on both
+halves never actually matches between them. That's real corroborating
+evidence for the real-scan validation checklist's item #2 in
+`vlm_extraction.py::_extract_spread_facts` ("Is role:'serial' really
+printed on BOTH halves of a real spread, or only once... if the latter,
+the current 'ask serial on both sides' assumption is wrong"): with 2/2 real
+spread documents showing a 100% left/right serial mismatch rate, "wrong
+assumption" now looks like the likely answer, not just a documented
+possibility. Registered as a second known-failing entry in
+`accuracy_baseline.py` (`WARDHA_DOC_ID`) — not hand-verified against
+ground truth (would need rendering+reading all 14 pages, out of scope for
+this pass), just the observed real symptom, same honest-documentation
+pattern as the first gazette.
+
+**Still needs A1 to actually resolve**: fixing this would mean changing
+the pairing strategy (e.g., matching by bbox vertical position only,
+dropping the serial-match fast path entirely for this template) — a real
+code change, but risky to make from 2 data points without knowing whether
+either document's serial numbering is itself atypical (poor scan quality,
+inconsistent handwriting) versus the pairing assumption being structurally
+wrong for every real spread of this form type. Flagging, not fixing blind.
+
+## T25 update 2026-09-01 — the two templates are now seeded, not live-only
+
+Both templates existed only as hand-created rows in this dev DB (built
+while assembling this corpus), so a fresh environment — a new dev DB, CI,
+another deployment — would have neither, and the two documents above would
+fail to classify entirely. Added migration `0045_seed_starter_templates`
+(idempotent, `ON CONFLICT (form_type, era_label) DO NOTHING`, safe to run
+against a DB where they already exist). Still not T25's real goal — a
+template library seeded from an official, human-verified form catalogue,
+which needs A1 — but it closes the "works on this one dev DB only" gap for
+the two templates that do exist.
 
 ## What's needed to actually close T25/T31/T32
 

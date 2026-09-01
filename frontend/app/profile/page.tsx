@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -54,6 +54,47 @@ export default function ProfilePage() {
   const [extDocs, setExtDocs] = useState<any[]>([]);
   const [loadingExtDocs, setLoadingExtDocs] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changePasswordError, setChangePasswordError] = useState("");
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState(false);
+
+  const closeChangePasswordModal = () => {
+    setShowChangePassword(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setChangePasswordError("");
+    setChangePasswordSuccess(false);
+  };
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setChangePasswordError("");
+    if (newPassword.length < 8) {
+      setChangePasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError("New password and confirmation don't match.");
+      return;
+    }
+    setChangePasswordLoading(true);
+    try {
+      await api.auth.changePassword(currentPassword, newPassword);
+      setChangePasswordSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setChangePasswordError(err?.message || "Failed to change password. Check your current password and try again.");
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchProfile();
@@ -185,12 +226,10 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
-                  <Link href="/forgot-password" className="w-full md:w-auto">
-                    <Button variant="secondary" size="md" className="w-full">
-                      <KeyRound className="w-4 h-4 mr-2 text-primary" />
-                      <span>Change Password</span>
-                    </Button>
-                  </Link>
+                  <Button variant="secondary" size="md" className="w-full md:w-auto" onClick={() => setShowChangePassword(true)}>
+                    <KeyRound className="w-4 h-4 mr-2 text-primary" />
+                    <span>Change Password</span>
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -260,26 +299,29 @@ export default function ProfilePage() {
                     const pct = profile.total_files > 0 ? Math.round((item.count / profile.total_files) * 100) : 0;
                     const extUpper = (item.extension || "OTHER").toUpperCase();
 
+                    // T96 — bg-*-500/400 shades don't clear WCAG 4.5:1
+                    // against the badge's fixed white text for most of
+                    // this palette (e.g. red-500 measured 3.76:1 live).
+                    // -600/-700 reliably do, across this whole family.
                     const colorMap: Record<string, string> = {
-                      PDF: "bg-red-500 text-red-400",
-                      DOCX: "bg-blue-500 text-blue-400",
-                      DOC: "bg-blue-400 text-blue-300",
-                      XLSX: "bg-emerald-500 text-emerald-400",
-                      XLS: "bg-emerald-400 text-emerald-300",
-                      CSV: "bg-teal-500 text-teal-400",
-                      PPTX: "bg-amber-500 text-amber-400",
-                      PPT: "bg-amber-400 text-amber-300",
-                      TXT: "bg-purple-500 text-purple-400",
-                      JSON: "bg-cyan-500 text-cyan-400",
-                      MD: "bg-indigo-500 text-indigo-400",
-                      RTF: "bg-pink-500 text-pink-400",
-                      PNG: "bg-sky-500 text-sky-400",
-                      JPG: "bg-indigo-500 text-indigo-400",
-                      JPEG: "bg-indigo-500 text-indigo-400",
+                      PDF: "bg-red-700",
+                      DOCX: "bg-blue-700",
+                      DOC: "bg-blue-600",
+                      XLSX: "bg-emerald-700",
+                      XLS: "bg-emerald-600",
+                      CSV: "bg-teal-700",
+                      PPTX: "bg-amber-700",
+                      PPT: "bg-amber-600",
+                      TXT: "bg-purple-700",
+                      JSON: "bg-cyan-700",
+                      MD: "bg-indigo-700",
+                      RTF: "bg-pink-700",
+                      PNG: "bg-sky-700",
+                      JPG: "bg-indigo-700",
+                      JPEG: "bg-indigo-700",
                     };
 
-                    const badgeColor = colorMap[extUpper] || "bg-gray-500 text-gray-400";
-                    const bgColorClass = badgeColor.split(" ")[0];
+                    const bgColorClass = colorMap[extUpper] || "bg-gray-700";
 
                     return (
                       <div
@@ -396,6 +438,99 @@ export default function ProfilePage() {
                       Log Out
                     </Button>
                   </div>
+                </Card>
+              </div>
+            )}
+
+            {/* Change Password Modal — in-place, authenticated change.
+                Previously this button just linked to /forgot-password,
+                forcing an unnecessary email round-trip for a user who's
+                already logged in and knows their current password. */}
+            {showChangePassword && (
+              <div
+                role="presentation"
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn"
+                onClick={closeChangePasswordModal}
+              >
+                <Card
+                  glow
+                  className="p-6 max-w-md w-full space-y-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h4 className="text-lg font-bold text-textMain flex items-center gap-2">
+                    <KeyRound className="w-5 h-5 text-primary" />
+                    <span>Change Password</span>
+                  </h4>
+
+                  {changePasswordSuccess ? (
+                    <>
+                      <p className="text-sm text-emerald-400">
+                        Your password has been changed successfully.
+                      </p>
+                      <div className="flex justify-end pt-2">
+                        <Button variant="primary" size="md" onClick={closeChangePasswordModal}>
+                          Done
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <form onSubmit={handleChangePassword} className="space-y-3">
+                      <div>
+                        <label htmlFor="current-password-input" className="text-xs font-medium text-textMuted mb-1 block">Current password</label>
+                        <input
+                          id="current-password-input"
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          autoComplete="current-password"
+                          required
+                          className="w-full px-3 py-2 rounded-lg bg-surface border border-borderDark text-sm text-textMain focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="new-password-input" className="text-xs font-medium text-textMuted mb-1 block">New password</label>
+                        <input
+                          id="new-password-input"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          autoComplete="new-password"
+                          required
+                          minLength={8}
+                          className="w-full px-3 py-2 rounded-lg bg-surface border border-borderDark text-sm text-textMain focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="confirm-password-input" className="text-xs font-medium text-textMuted mb-1 block">Confirm new password</label>
+                        <input
+                          id="confirm-password-input"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          autoComplete="new-password"
+                          required
+                          minLength={8}
+                          className="w-full px-3 py-2 rounded-lg bg-surface border border-borderDark text-sm text-textMain focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                      </div>
+
+                      {changePasswordError && (
+                        <div className="flex items-center gap-2 text-xs text-red-400">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{changePasswordError}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <Button type="button" variant="secondary" size="md" onClick={closeChangePasswordModal}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" variant="primary" size="md" loading={changePasswordLoading}>
+                          Change Password
+                        </Button>
+                      </div>
+                    </form>
+                  )}
                 </Card>
               </div>
             )}

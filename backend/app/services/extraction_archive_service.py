@@ -45,3 +45,21 @@ async def record_vlm_response(db: AsyncSession, cache_key: str, raw_response: st
         return
     db.add(VLMArchive(cache_key=cache_key, raw_response=raw_response))
     await db.flush()
+
+
+async def overwrite_vlm_response(db: AsyncSession, cache_key: str, raw_response: str) -> None:
+    """Like record_vlm_response, but replaces an existing entry instead of
+    leaving it in place. record_vlm_response's write-once behavior is
+    correct for its normal caller (a fresh response for a key that's
+    never been cached) but wrong for vlm_extraction's parse-retry path:
+    a retry only happens because the cached response under this exact key
+    was unparseable, so silently no-op'ing on "existing" would leave the
+    bad response cached forever and every later run would keep retrying
+    and discarding the same known-bad text."""
+    existing = await db.get(VLMArchive, cache_key)
+    if existing:
+        existing.raw_response = raw_response
+        await db.flush()
+        return
+    db.add(VLMArchive(cache_key=cache_key, raw_response=raw_response))
+    await db.flush()

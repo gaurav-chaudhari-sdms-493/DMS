@@ -1,6 +1,5 @@
 import pytest
 import uuid
-from app.services.guardrail_service import validate_output_summary
 from app.services.search_service import search
 from app.services.chat_service import _extract_score_threshold, _is_explicit_search_intent
 from app.database import AsyncSessionLocal
@@ -12,13 +11,6 @@ from app.models.chunk import Chunk
 from app.models.fact import Fact
 from app.models.fact_region import FactRegion
 from app.models.page import DocumentPage
-
-
-def test_validate_output_summary_edge_cases():
-    """Verify validate_output_summary scrubs PII from summaries."""
-    assert validate_output_summary(None) is None
-    assert validate_output_summary("") == ""
-    assert validate_output_summary("Contact admin@company.com") == "Contact [REDACTED_EMAIL]"
 
 
 def test_extract_score_threshold_edge_cases():

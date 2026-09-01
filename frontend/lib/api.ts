@@ -244,6 +244,12 @@ export const api = {
         body: JSON.stringify({ locale }),
       });
     },
+    changePassword: async (currentPassword: string, newPassword: string): Promise<any> => {
+      return await request("/api/v1/auth/me/password", {
+        method: "POST",
+        body: JSON.stringify({ current_password: currentPassword, new_password: newPassword }),
+      });
+    },
     logout: (): void => {
       clearTokens();
       if (typeof window !== "undefined") {
@@ -335,6 +341,15 @@ export const api = {
     },
     search: async (q: string): Promise<{ results: { id: string; entity_type: string; label: string }[] }> => {
       return await request(`/api/v1/entities/search?q=${encodeURIComponent(q)}`, { method: "GET" });
+    },
+    // T56/T58 — these backend endpoints existed and worked but were never
+    // called from anywhere in the frontend, so a "held" edge had no way
+    // to actually be confirmed or reverted through the UI at all.
+    confirmEdge: async (edgeId: string): Promise<any> => {
+      return await request(`/api/v1/entities/edges/${edgeId}/confirm`, { method: "POST" });
+    },
+    revertEdge: async (edgeId: string): Promise<any> => {
+      return await request(`/api/v1/entities/edges/${edgeId}/revert`, { method: "POST" });
     },
   },
   records: {

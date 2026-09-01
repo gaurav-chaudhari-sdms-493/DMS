@@ -17,7 +17,7 @@ this reports, matching the backlog line item exactly:
 Read-only throughout: this is a report, not a gate. Nothing here blocks
 indexing or verification (Section 3.5).
 """
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -29,6 +29,15 @@ from app.models.entity_edge import EntityEdge
 from app.models.fact import Fact
 from app.models.template import Template
 
+
+def _folder_filter(corpus_folder_id: Optional[UUID]):
+    """corpus_folder_id=None means the "root" corpus — documents with no
+    folder at all, which were previously invisible to this dashboard since
+    every query required an exact folder UUID."""
+    if corpus_folder_id is None:
+        return Document.folder_id.is_(None)
+    return Document.folder_id == corpus_folder_id
+
 CONFIDENCE_BUCKETS = [
     ("0.00-0.50", 0.0, 0.5),
     ("0.50-0.70", 0.5, 0.7),
@@ -38,11 +47,11 @@ CONFIDENCE_BUCKETS = [
 ]
 
 
-async def _find_missing_fields(db: AsyncSession, tenant_id: UUID, corpus_folder_id: UUID) -> List[Dict[str, Any]]:
+async def _find_missing_fields(db: AsyncSession, tenant_id: UUID, corpus_folder_id: Optional[UUID]) -> List[Dict[str, Any]]:
     res = await db.execute(
         select(Document.id, Document.title, Document.matched_template_id).where(
             Document.tenant_id == tenant_id,
-            Document.folder_id == corpus_folder_id,
+            _folder_filter(corpus_folder_id),
             Document.classification_status == "classified",
             Document.matched_template_id.is_not(None),
         )
@@ -80,7 +89,7 @@ async def _find_missing_fields(db: AsyncSession, tenant_id: UUID, corpus_folder_
     return missing
 
 
-async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_folder_id: UUID) -> Dict[str, Any]:
+async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_folder_id: Optional[UUID]) -> Dict[str, Any]:
     doc_res = await db.execute(
         select(
             func.count(Document.id),
@@ -90,7 +99,7 @@ async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_fold
             func.coalesce(func.sum(Document.data_loss_words_missing), 0),
             func.count(Document.id).filter(Document.data_loss_words_missing > 0),
             func.count(Document.id).filter(Document.page_furniture_candidates.is_not(None)),
-        ).where(Document.tenant_id == tenant_id, Document.folder_id == corpus_folder_id, Document.is_trashed == False)  # noqa: E712
+        ).where(Document.tenant_id == tenant_id, _folder_filter(corpus_folder_id), Document.is_trashed == False)  # noqa: E712
     )
     (
         document_count, pages_total, pages_failed, documents_with_failed_pages,
@@ -100,7 +109,7 @@ async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_fold
     fact_status_res = await db.execute(
         select(Fact.status, func.count(Fact.id))
         .join(Document, Fact.document_id == Document.id)
-        .where(Fact.tenant_id == tenant_id, Document.folder_id == corpus_folder_id)
+        .where(Fact.tenant_id == tenant_id, _folder_filter(corpus_folder_id))
         .group_by(Fact.status)
     )
     fact_status_counts = {status: count for status, count in fact_status_res.all()}
@@ -108,7 +117,7 @@ async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_fold
     conf_res = await db.execute(
         select(Fact.confidence)
         .join(Document, Fact.document_id == Document.id)
-        .where(Fact.tenant_id == tenant_id, Document.folder_id == corpus_folder_id, Fact.confidence.is_not(None))
+        .where(Fact.tenant_id == tenant_id, _folder_filter(corpus_folder_id), Fact.confidence.is_not(None))
     )
     confidences = [c for (c,) in conf_res.all()]
     histogram = []
@@ -119,7 +128,7 @@ async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_fold
         select(EntityEdge.status, func.count(EntityEdge.id))
         .join(Fact, EntityEdge.evidence_fact_id == Fact.id)
         .join(Document, Fact.document_id == Document.id)
-        .where(EntityEdge.tenant_id == tenant_id, Document.folder_id == corpus_folder_id)
+        .where(EntityEdge.tenant_id == tenant_id, _folder_filter(corpus_folder_id))
         .group_by(EntityEdge.status)
     )
     edge_status_counts = {status: count for status, count in edge_status_res.all()}
@@ -127,7 +136,7 @@ async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_fold
     missing_fields = await _find_missing_fields(db, tenant_id, corpus_folder_id)
 
     return {
-        "corpus_folder_id": str(corpus_folder_id),
+        "corpus_folder_id": str(corpus_folder_id) if corpus_folder_id else "root",
         "documents": {
             "total": document_count,
             "pages_total": pages_total,
@@ -163,7 +172,7 @@ async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_fold
     }
 
 
-async def get_completeness_drill(db: AsyncSession, tenant_id: UUID, corpus_folder_id: UUID, category: str) -> List[Dict[str, Any]]:
+async def get_completeness_drill(db: AsyncSession, tenant_id: UUID, corpus_folder_id: Optional[UUID], category: str) -> List[Dict[str, Any]]:
     """Drill-through: the actual rows behind one completeness number."""
     if category == "missing_fields":
         return await _find_missing_fields(db, tenant_id, corpus_folder_id)
@@ -171,7 +180,7 @@ async def get_completeness_drill(db: AsyncSession, tenant_id: UUID, corpus_folde
     if category == "failed_pages":
         res = await db.execute(
             select(Document.id, Document.title, Document.pages_total_count, Document.pages_failed_count).where(
-                Document.tenant_id == tenant_id, Document.folder_id == corpus_folder_id,
+                Document.tenant_id == tenant_id, _folder_filter(corpus_folder_id),
                 Document.pages_failed_count > 0, Document.is_trashed == False,  # noqa: E712
             )
         )
@@ -183,7 +192,7 @@ async def get_completeness_drill(db: AsyncSession, tenant_id: UUID, corpus_folde
     if category == "data_loss_documents":
         res = await db.execute(
             select(Document.id, Document.title, Document.data_loss_words_missing, Document.data_loss_details).where(
-                Document.tenant_id == tenant_id, Document.folder_id == corpus_folder_id,
+                Document.tenant_id == tenant_id, _folder_filter(corpus_folder_id),
                 Document.data_loss_words_missing > 0, Document.is_trashed == False,  # noqa: E712
             )
         )
@@ -195,7 +204,7 @@ async def get_completeness_drill(db: AsyncSession, tenant_id: UUID, corpus_folde
     if category == "page_furniture_documents":
         res = await db.execute(
             select(Document.id, Document.title, Document.page_furniture_candidates).where(
-                Document.tenant_id == tenant_id, Document.folder_id == corpus_folder_id,
+                Document.tenant_id == tenant_id, _folder_filter(corpus_folder_id),
                 Document.page_furniture_candidates.is_not(None), Document.is_trashed == False,  # noqa: E712
             )
         )
@@ -209,7 +218,7 @@ async def get_completeness_drill(db: AsyncSession, tenant_id: UUID, corpus_folde
         res = await db.execute(
             select(Fact.id, Fact.document_id, Fact.field_name, Fact.value, Fact.confidence, Fact.status)
             .join(Document, Fact.document_id == Document.id)
-            .where(Fact.tenant_id == tenant_id, Document.folder_id == corpus_folder_id, Fact.status.in_(status_filter))
+            .where(Fact.tenant_id == tenant_id, _folder_filter(corpus_folder_id), Fact.status.in_(status_filter))
         )
         return [
             {"fact_id": str(f_id), "document_id": str(doc_id), "field_name": fn, "value": v, "confidence": c, "status": s}

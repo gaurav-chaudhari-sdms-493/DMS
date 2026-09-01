@@ -53,35 +53,41 @@ function FolderTreeItem({
   return (
     <div className="select-none">
       <div
-        className={`flex items-center gap-1 py-1 px-2 rounded-xl cursor-pointer transition-colors ${
+        className={`flex items-center gap-1 py-1 px-2 rounded-xl transition-colors ${
           isSelected
             ? "bg-[#c2e7ff] text-[#001d35] font-bold"
             : "hover:bg-[#edf2fc] text-[#444746] hover:text-[#1f1f1f]"
         }`}
         style={{ paddingLeft: `${depth * 12 + 6}px` }}
-        role="button"
-        tabIndex={0}
-        onClick={(e) => {
-          e.stopPropagation();
-          onSelectFolder(node.id);
-        }}
-        onKeyDown={onKeyActivate(() => onSelectFolder(node.id))}
-        aria-label={node.name}
       >
+        {/* Two sibling controls, not nested — a <button> inside a
+            role="button" row fails WCAG 4.1.2 (nested interactive
+            controls have ambiguous focus/activation semantics). */}
         <button
           onClick={(e) => {
             e.stopPropagation();
             setExpanded(!expanded);
           }}
           className="p-1 rounded-full hover:bg-black/10 transition-transform"
+          aria-label={expanded ? `Collapse ${node.name}` : `Expand ${node.name}`}
+          aria-expanded={expanded}
         >
           <ChevronRight
             className={`w-3.5 h-3.5 transition-transform ${expanded ? "rotate-90" : ""}`}
           />
         </button>
 
-        <FolderIcon className="w-4 h-4 text-[#5f6368] fill-[#fbbc04] flex-shrink-0" />
-        <span className="text-xs truncate">{node.name}</span>
+        <button
+          type="button"
+          className="flex items-center gap-1 min-w-0 flex-1 cursor-pointer text-left"
+          onClick={(e) => {
+            e.stopPropagation();
+            onSelectFolder(node.id);
+          }}
+        >
+          <FolderIcon className="w-4 h-4 text-[#5f6368] fill-[#fbbc04] flex-shrink-0" />
+          <span className="text-xs truncate">{node.name}</span>
+        </button>
       </div>
 
       {expanded && (

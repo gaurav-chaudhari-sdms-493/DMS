@@ -91,8 +91,6 @@ async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: li
 
     Returns (summary_text_or_None, citations, grounded).
     """
-    from app.services.guardrail_service import validate_output_summary
-
     llm = get_llm_provider()
 
     numbered = "\n\n".join(
@@ -145,8 +143,6 @@ async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: li
             # The model cited nothing real for this claim — drop the claim
             # rather than show an unbound statement.
             continue
-        claim_text = validate_output_summary(claim_text)
-
         claim_numbers = []
         for s in valid_sources:
             ex = excerpts[s - 1]

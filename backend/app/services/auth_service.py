@@ -111,6 +111,25 @@ async def reset_password_with_token(email: str, token: str, new_password: str, d
     await db.commit()
     return True
 
+async def change_password(user_id: uuid.UUID, current_password: str, new_password: str, db: AsyncSession) -> None:
+    """The other half of password changes — an already-authenticated user
+    changing their own password in place, not the forgot/reset flow (which
+    is for someone who can't log in at all, and mints its own token). The
+    profile page's "Change Password" used to just link to /forgot-password,
+    forcing a real email round-trip for something that should be immediate.
+    """
+    stmt = select(User).where(User.id == user_id)
+    res = await db.execute(stmt)
+    user = res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    if not verify_password(current_password, user.hashed_password):
+        raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    user.hashed_password = hash_password(new_password)
+    await db.commit()
+
 def verify_token(token: str) -> TokenPayload:
     try:
         payload = jwt.decode(token, settings.jwt_secret_key, algorithms=[settings.jwt_algorithm])
