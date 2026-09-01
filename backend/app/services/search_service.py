@@ -14,6 +14,7 @@ from app.ai.factory import get_embed_provider, get_rerank_provider, get_llm_prov
 from app.ai.base import Message, RankedResult
 from app.models.metadata_item import MetadataItem
 from app.services.config_service import get_int, get_float, get_str
+from app.services.search_glossary_service import expand_query_terms
 
 logger = logging.getLogger(__name__)
 
@@ -279,8 +280,15 @@ async def search(
     q_hi = expanded.get("hindi", query)
     q_mr = expanded.get("marathi", query)
     
+    # TS7 — glossary-first cross-script expansion: free, local, always
+    # available (unlike the LLM expansion above, which silently degrades
+    # to the raw query on any failure, including air-gapped mode). Only
+    # ever adds vector-search variants (see search_glossary_service.py's
+    # docstring for why this doesn't touch the keyword-search legs).
+    glossary_terms = await expand_query_terms(db, query)
+
     embed_provider = get_embed_provider()
-    tri_queries = list(dict.fromkeys([q_en, q_hi, q_mr, query]))
+    tri_queries = list(dict.fromkeys([q_en, q_hi, q_mr, query, *glossary_terms]))
     q_embeddings = await embed_provider.embed(tri_queries)
     
     # Build filter clauses dynamically for hybrid search

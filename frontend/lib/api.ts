@@ -221,11 +221,25 @@ export const api = {
         method: "GET",
       });
     },
+    updateLocale: async (locale: string): Promise<any> => {
+      return await request("/api/v1/auth/me/locale", {
+        method: "PATCH",
+        body: JSON.stringify({ locale }),
+      });
+    },
     logout: (): void => {
       clearTokens();
       if (typeof window !== "undefined") {
         window.location.href = "/login";
       }
+    },
+  },
+
+  i18n: {
+    getTranslations: async (locale: string): Promise<Record<string, string>> => {
+      return await request(`/api/v1/i18n/${locale}`, {
+        method: "GET",
+      });
     },
   },
 

@@ -10,9 +10,10 @@ from app.models.document_version import DocumentVersion
 from app.models.fact import Fact
 from app.services.fact_verification_service import (
     confirm_fact, bulk_confirm_facts, mark_fact_handwritten, get_adjudication_queue,
-    bulk_edit_facts, revert_bulk_edit_batch,
+    bulk_edit_facts, revert_bulk_edit_batch, resolve_stitch_ambiguity,
 )
 from app.services.corpus_calibration_service import calibrate_corpus
+from app.services import field_trust_service, table_shape_service
 
 
 async def _make_corpus(db):
@@ -41,10 +42,10 @@ async def _make_corpus(db):
     return tenant_id, actor_id, folder.id, doc.id, version.id
 
 
-def _make_fact(tenant_id, doc_id, version_id, *, status="in_review", confidence=0.9, is_handwritten=False):
+def _make_fact(tenant_id, doc_id, version_id, *, status="in_review", confidence=0.9, is_handwritten=False, field_name="owner_name"):
     return Fact(
         id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc_id, version_id=version_id,
-        field_name="owner_name", value={"v": "Test Value"}, confidence=confidence,
+        field_name=field_name, value={"v": "Test Value"}, confidence=confidence,
         status=status, is_handwritten=is_handwritten,
     )
 
@@ -437,6 +438,208 @@ async def test_revert_bulk_edit_batch_unknown_batch_404s():
             with pytest.raises(HTTPException) as exc_info:
                 await revert_bulk_edit_batch(db, tenant_id, uuid.uuid4(), actor_id)
             assert exc_info.value.status_code == 404
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+# ── TS4 — field-shape trust signal + stitch-ambiguity resolution ──
+
+
+@pytest.mark.asyncio
+async def test_confirm_fact_records_trust_signal():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            field_name = f"ts4_owner_{uuid.uuid4().hex}"
+            fact = _make_fact(tenant_id, doc_id, version_id, field_name=field_name)
+            db.add(fact)
+            await db.flush()
+
+            await confirm_fact(db, tenant_id, fact.id, actor_id)
+
+            signal = await field_trust_service.get_trust_signal(db, field_name)
+            assert signal.confirmed_count == 1
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_confirm_fact_does_not_record_trust_signal_for_handwritten():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            field_name = f"ts4_handwritten_{uuid.uuid4().hex}"
+            fact = _make_fact(tenant_id, doc_id, version_id, field_name=field_name, is_handwritten=True)
+            db.add(fact)
+            await db.flush()
+
+            await confirm_fact(db, tenant_id, fact.id, actor_id)
+
+            assert await field_trust_service.get_trust_signal(db, field_name) is None
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_bulk_edit_records_correction_for_in_review_fact():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            field_name = f"ts4_corrected_{uuid.uuid4().hex}"
+            fact = _make_fact(tenant_id, doc_id, version_id, field_name=field_name, status="in_review")
+            db.add(fact)
+            await db.flush()
+
+            await bulk_edit_facts(db, tenant_id, [{"fact_id": fact.id, "new_value": {"v": "Corrected"}}], actor_id)
+
+            signal = await field_trust_service.get_trust_signal(db, field_name)
+            assert signal.corrected_count == 1
+            assert signal.confirmed_count == 0
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_bulk_edit_does_not_record_correction_for_machine_fact():
+    """Editing a never-reviewed 'machine' fact for the first time isn't a
+    correction of a prior human confirmation — only editing something
+    already flagged in_review counts."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            field_name = f"ts4_machine_edit_{uuid.uuid4().hex}"
+            fact = _make_fact(tenant_id, doc_id, version_id, field_name=field_name, status="machine")
+            db.add(fact)
+            await db.flush()
+
+            await bulk_edit_facts(db, tenant_id, [{"fact_id": fact.id, "new_value": {"v": "Corrected"}}], actor_id)
+
+            assert await field_trust_service.get_trust_signal(db, field_name) is None
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_adjudication_queue_surfaces_trust_signal():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            field_name = f"ts4_queue_{uuid.uuid4().hex}"
+            fact = _make_fact(tenant_id, doc_id, version_id, field_name=field_name)
+            db.add(fact)
+            await db.flush()
+            await field_trust_service.record_confirmation(db, field_name)
+            await field_trust_service.record_confirmation(db, field_name)
+            await field_trust_service.record_correction(db, field_name)
+
+            queue = await get_adjudication_queue(db, tenant_id, category="low_confidence")
+            item = next(f for f in queue["facts"] if f["fact_id"] == str(fact.id))
+            assert item["trust_signal"] == {"confirmed_count": 2, "corrected_count": 1}
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+async def _make_stitch_ambiguous_fact(db, tenant_id, doc_id, version_id, shape_hash):
+    fact = Fact(
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc_id, version_id=version_id,
+        field_name="_stitch_ambiguous",
+        value={"shape_hash": shape_hash, "page_a": 1, "page_b": 2, "reason": "test"},
+        confidence=None, is_handwritten=False, status="in_review",
+    )
+    db.add(fact)
+    await db.flush()
+    return fact
+
+
+@pytest.mark.asyncio
+async def test_resolve_stitch_ambiguity_writes_human_shape_decision():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            shape_hash = f"ts4_shape_{uuid.uuid4().hex}"
+            fact = await _make_stitch_ambiguous_fact(db, tenant_id, doc_id, version_id, shape_hash)
+
+            resolved = await resolve_stitch_ambiguity(db, tenant_id, fact.id, "vertical", actor_id)
+            assert resolved.status == "verified"
+
+            decision = await table_shape_service.get_cached_shape_decision(db, shape_hash)
+            assert decision.relation == "vertical"
+            assert decision.decided_by == "human"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_resolve_stitch_ambiguity_human_outranks_existing_llm_decision():
+    """table_shape_service.record_shape_decision()'s existing precedence
+    rule (human always outranks a prior llm guess for the same shape) is
+    exercised for real here through the new write path."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            shape_hash = f"ts4_override_{uuid.uuid4().hex}"
+            await table_shape_service.record_shape_decision(db, shape_hash, "vertical", decided_by="llm", confidence=0.65)
+
+            fact = await _make_stitch_ambiguous_fact(db, tenant_id, doc_id, version_id, shape_hash)
+            await resolve_stitch_ambiguity(db, tenant_id, fact.id, "horizontal", actor_id)
+
+            decision = await table_shape_service.get_cached_shape_decision(db, shape_hash)
+            assert decision.relation == "horizontal"
+            assert decision.decided_by == "human"
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_resolve_stitch_ambiguity_rejects_invalid_relation():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = await _make_stitch_ambiguous_fact(db, tenant_id, doc_id, version_id, f"ts4_bad_{uuid.uuid4().hex}")
+
+            with pytest.raises(HTTPException) as exc_info:
+                await resolve_stitch_ambiguity(db, tenant_id, fact.id, "sideways", actor_id)
+            assert exc_info.value.status_code == 400
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_resolve_stitch_ambiguity_rejects_wrong_fact_type():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            fact = _make_fact(tenant_id, doc_id, version_id)  # a normal low-confidence fact
+            db.add(fact)
+            await db.flush()
+
+            with pytest.raises(HTTPException) as exc_info:
+                await resolve_stitch_ambiguity(db, tenant_id, fact.id, "vertical", actor_id)
+            assert exc_info.value.status_code == 409
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_adjudication_queue_stitch_ambiguous_category():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, doc_id, version_id = await _make_corpus(db)
+            await _make_stitch_ambiguous_fact(db, tenant_id, doc_id, version_id, f"ts4_cat_{uuid.uuid4().hex}")
+
+            queue = await get_adjudication_queue(db, tenant_id, category="stitch_ambiguous")
+            assert queue["total"] >= 1
+            assert all(f["field_name"] == "_stitch_ambiguous" for f in queue["facts"])
         finally:
             await db.rollback()
             await db.close()

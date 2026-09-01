@@ -22,6 +22,7 @@ from ..schemas.document import (
 )
 from ..services.storage_service import upload_file, generate_presigned_url, delete_file
 from ..services.audit_service import log_action
+from ..services.license_service import check_upload_allowed
 from ..pipeline.ingestion import ingest_document
 
 logger = logging.getLogger(__name__)
@@ -36,6 +37,13 @@ async def upload_document(
     force: bool = False,
 ) -> DocumentUploadResponse:
     """Upload a document to MinIO S3, create DB records, and schedule async ingestion."""
+    # T81 — the metered action. Blocks new ingestion only; already-stored
+    # documents stay fully readable/searchable/exportable regardless of
+    # license state (see license_service module docstring).
+    license_check = await check_upload_allowed(db, tenant_id)
+    if not license_check.allowed:
+        raise HTTPException(status_code=402, detail=license_check.reason)
+
     if folder_id:
         folder = await db.get(Folder, folder_id)
         if not folder or folder.tenant_id != tenant_id:
@@ -541,7 +549,14 @@ async def _resolve_policy_actor(db: AsyncSession, tenant_id: UUID, cache: dict) 
     return actor_id
 
 
-async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 30) -> dict:
+async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 30, tenant_id: Optional[UUID] = None) -> dict:
+    """tenant_id=None sweeps every tenant — that's what the scheduled
+    worker task wants (a system-wide retention janitor). A real caller
+    acting on behalf of one tenant (the "Empty Bin" API) MUST pass its
+    own tenant_id, or this silently purges every other tenant's expired
+    trash too — confirmed live: a single-tenant Empty Bin click deleted
+    an unrelated tenant's folder alongside the caller's own, because
+    neither query here was ever scoped by tenant."""
     from datetime import datetime, timedelta
     from app.models.folder import Folder
     from app.models.retention_class import RetentionClass
@@ -558,20 +573,27 @@ async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 
     class_res = await db.execute(select(RetentionClass.class_name, RetentionClass.retention_days))
     class_periods = dict(class_res.all())
 
-    doc_stmt = select(Document.id, Document.tenant_id, Document.retention_class, Document.trashed_at).where(
-        Document.is_trashed == True,
-        Document.trashed_at.is_not(None),
+    doc_conditions = [Document.is_trashed == True, Document.trashed_at.is_not(None)]
+    if tenant_id is not None:
+        doc_conditions.append(Document.tenant_id == tenant_id)
+    doc_stmt = select(Document.id, Document.tenant_id, Document.retention_class, Document.trashed_at, Document.title).where(
+        *doc_conditions,
     )
     doc_res = await db.execute(doc_stmt)
     candidate_docs = doc_res.all()
 
     now = datetime.utcnow()
     deleted_doc_count = 0
-    for d_id, t_id, retention_class, trashed_at in candidate_docs:
+    protected_documents = []  # (title, retention_class) — never auto-purged, no matter the caller's retention_days
+    pending_documents = []  # (title, retention_class, days_remaining) — has a finite period, just not up yet
+    for d_id, t_id, retention_class, trashed_at, title in candidate_docs:
         class_days = class_periods.get(retention_class)
         if class_days is None:
+            protected_documents.append({"title": title, "retention_class": retention_class})
             continue  # permanent class, or an unrecognized one — fail safe, never purge
         if now - trashed_at < timedelta(days=class_days):
+            days_remaining = class_days - (now - trashed_at).days
+            pending_documents.append({"title": title, "retention_class": retention_class, "days_remaining": max(days_remaining, 0)})
             continue
         actor_id = await _resolve_policy_actor(db, t_id, actor_cache)
         if actor_id is None:
@@ -584,11 +606,10 @@ async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 
             logger.warning(f"Error purging expired trashed document {d_id}: {e}")
 
     # 2. Fetch expired trashed folders (trashed_at <= cutoff)
-    folder_stmt = select(Folder.id, Folder.tenant_id).where(
-        Folder.is_trashed == True,
-        Folder.trashed_at.is_not(None),
-        Folder.trashed_at <= cutoff
-    )
+    folder_conditions = [Folder.is_trashed == True, Folder.trashed_at.is_not(None), Folder.trashed_at <= cutoff]
+    if tenant_id is not None:
+        folder_conditions.append(Folder.tenant_id == tenant_id)
+    folder_stmt = select(Folder.id, Folder.tenant_id).where(*folder_conditions)
     folder_res = await db.execute(folder_stmt)
     expired_folders = folder_res.all()
 
@@ -605,4 +626,9 @@ async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 
             logger.warning(f"Error purging expired trashed folder {f_id}: {e}")
 
     logger.info(f"Purged {deleted_doc_count} expired documents and {deleted_folder_count} expired folders older than {retention_days} days in Bin.")
-    return {"deleted_documents": deleted_doc_count, "deleted_folders": deleted_folder_count}
+    return {
+        "deleted_documents": deleted_doc_count,
+        "deleted_folders": deleted_folder_count,
+        "protected_documents": protected_documents,
+        "pending_documents": pending_documents,
+    }

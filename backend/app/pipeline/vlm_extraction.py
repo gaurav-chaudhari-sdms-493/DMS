@@ -10,14 +10,23 @@ to, and writes one Fact + FactRegion per field per row so every value is
 click-through-able back to the exact spot it was read from (T06 contract).
 
 Two-page spread joins (Handler 1, T26 — a register entry split across
-facing pages, matched by serial number via join_spread()) are wired via
-Template.layout == "spread" and _extract_spread_facts(). The left/right
-field convention it reads is a best-effort invention, not modeled on a
-real scanned spread — no seeded template exists yet (T25 stays blocked
-on A1, no reference corpus) — flagged for revalidation once one is
-available, not a confirmed real-world shape. A page pair that can't be
-matched by serial writes a field_name="_join_mismatch" Fact for a human
-to look at, same reused-facts pattern T30 used for marginalia.
+facing pages, matched by serial number) are wired via Template.layout ==
+"spread" and _extract_spread_facts(). The left/right field convention it
+reads is a best-effort invention, not modeled on a real scanned spread —
+no seeded template exists yet (T25 stays blocked on A1, no reference
+corpus) — flagged for revalidation once one is available, not a
+confirmed real-world shape. A page pair that can't be reconciled by
+serial number OR bbox position (TS1, see table_stitch.py) writes a
+field_name="_join_mismatch" Fact for a human to look at, same
+reused-facts pattern T30 used for marginalia.
+
+TS1 also stitches the generic (non-spread) path vertically: consecutive
+pages whose extracted field coverage is evidence-equivalent (or, for the
+genuinely ambiguous cases, adjudicated by a narrow local-LLM call) get
+concatenated into one logical segment BEFORE continuation-merge runs, so
+a continuation row that happens to start a fresh page merges into the
+entry above it instead of becoming a stray, disconnected row. See
+_stitch_vertical_segments() and app/pipeline/table_stitch.py.
 
 Document classification (T23) is now a separate stage
 (app/services/classification_service.py) that runs unconditionally at
@@ -30,6 +39,7 @@ chunk indexing must never wait on this (Section 3.5), so every call site
 wraps this module in a try/except and logs, it doesn't raise.
 """
 import base64
+import hashlib
 import io
 import json
 import logging
@@ -39,7 +49,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.ai.factory import get_vlm_provider
+from app.ai.factory import get_vlm_provider, get_llm_provider
 from app.config import settings
 from app.models.fact import Fact
 from app.models.fact_region import FactRegion
@@ -48,7 +58,10 @@ from app.models.template import Template
 from app.pipeline.handlers.blob_cell_parser import parse_blob_cell
 from app.pipeline.handlers.continuation_merge import merge_continuation_rows
 from app.pipeline.handlers.ditto_chain import expand_ditto_chains
+from app.pipeline import table_stitch
 from app.services.template_service import classify_confidence
+from app.services import table_shape_service
+from app.services.extraction_archive_service import compute_vlm_cache_key, get_cached_vlm_response, record_vlm_response
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +72,11 @@ RENDERABLE_EXTENSIONS = {"pdf", "jpg", "jpeg", "png", "bmp", "webp", "tiff"}
 #   "role": "serial"             — the row-number column continuation-merge keys off
 #   "role": "continuation_text"  — text column(s) a continuation row's text merges into
 #   "ditto_eligible": true       — this column may carry a ditto mark to expand
+#   "role": "chain_anchor"       — TS5, opt-in and unused by any currently-registered
+#                                   template: a genuine change in this column resets
+#                                   every ditto_eligible column's chain, not just its
+#                                   own (see ditto_chain.py's own docstring for why
+#                                   this is never inferred automatically)
 #   "type": "blob"               — free-text cell to run through parse_blob_cell
 
 
@@ -100,7 +118,10 @@ def _build_extraction_prompt(field_schema: List[dict]) -> str:
         '"marginalia": [ {"text": <string>, "bbox": [x0,y0,x1,y1]}, ... ]}\n\n'
         "Rules:\n"
         "- One entry in \"rows\" per data row visible on this page (a page with a single "
-        "form, not a table, still produces exactly one row).\n"
+        "form, not a table, still produces exactly one row). A table row where most or all "
+        "cells just show a placeholder mark for 'not applicable' (e.g. \"..\", \"--\", \"-\") "
+        "is still a real row — include it with those literal marks as values, do not skip it. "
+        "Every printed row matters for matching this page's rows against a continuation page.\n"
         "- bbox is [x0,y0,x1,y1], each a fraction from 0.0 to 1.0 of the page's width/height. "
         "The ORIGIN is the page's TOP-LEFT corner: x grows right, y grows DOWN.\n"
         "- If a cell literally contains a ditto mark (e.g. \",,\", '\"', \"do\", \"-do-\") "
@@ -142,6 +163,30 @@ def _find_role_field(field_schema: List[dict], role: str) -> Optional[str]:
         if f.get("role") == role:
             return f["name"]
     return None
+
+
+async def _call_vlm_cached(db: AsyncSession, vlm, file_hash: str, page_number: int, image_bytes: bytes, prompt: str) -> str:
+    """TS3 — a page asked with the exact same prompt (same template, same
+    field subset) never re-spends a Gemini call. The cache key includes
+    the prompt itself, so a left-half vs right-half spread call (or a
+    template's field_schema changing) naturally gets its own cache entry
+    rather than colliding."""
+    cache_key = compute_vlm_cache_key(file_hash, page_number, prompt)
+    try:
+        cached = await get_cached_vlm_response(db, cache_key)
+    except Exception as e:
+        logger.warning(f"TS3 VLM cache lookup failed for page {page_number}: {e}")
+        cached = None
+    if cached is not None:
+        logger.info(f"TS3 VLM cache hit for page {page_number} (key {cache_key[:12]}...)")
+        return cached
+
+    raw = await vlm.extract_structured(image_bytes, prompt)
+    try:
+        await record_vlm_response(db, cache_key, raw)
+    except Exception as e:
+        logger.warning(f"TS3 VLM cache write failed for page {page_number}: {e}")
+    return raw
 
 
 async def _get_or_create_page(
@@ -186,14 +231,21 @@ async def _extract_spread_facts(
     Deliberately does not run continuation-merge, ditto-chain, or
     blob-cell parsing on top of this — stacking those handlers on an
     unvalidated layout guess would compound one speculative assumption
-    on another. A page-pair a template can't match by serial number
-    writes a Fact+FactRegion under the field_name="_join_mismatch"
-    sentinel (same reused-facts pattern T30 used for marginalia),
-    anchored to the left page's full extent — there's no finer-grained
-    region for a whole-pair structural mismatch.
-    """
-    from app.pipeline.handlers.spread_join import join_spread
+    on another. A page-pair the serial number AND bbox position both
+    can't reconcile writes a Fact+FactRegion under the
+    field_name="_join_mismatch" sentinel (same reused-facts pattern T30
+    used for marginalia), anchored to the left page's full extent —
+    there's no finer-grained region for a whole-pair structural mismatch.
 
+    TS1 — row matching goes through table_stitch.join_rows_horizontally()
+    rather than the plain exact-set join_spread() it used to: an exact
+    serial match still joins directly, but a row present on only one side
+    (e.g. one waqf entry lists two properties, so the right-hand band has
+    an extra line) is now reconciled by bbox vertical position instead of
+    failing the whole page pair. A pair with genuinely no shared serials
+    at all — or leftovers with no usable bbox to place them by — still
+    goes to _join_mismatch exactly as before.
+    """
     serial_field = _find_role_field(field_schema, "serial")
     if not serial_field:
         logger.warning("T26 spread template has no role:'serial' field — cannot pair pages by serial, skipping")
@@ -203,14 +255,7 @@ async def _extract_spread_facts(
     right_fields = [f for f in field_schema if f.get("half") == "right" or f["name"] == serial_field]
     left_prompt = _build_extraction_prompt(left_fields)
     right_prompt = _build_extraction_prompt(right_fields)
-
-    def _to_plain(rows: List[dict]) -> List[dict]:
-        plain = []
-        for row in rows:
-            p = {k: (v.get("value") if isinstance(v, dict) else v) for k, v in row.items()}
-            p["no"] = p.pop(serial_field, None)
-            plain.append(p)
-        return plain
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     facts_written = 0
 
@@ -233,19 +278,14 @@ async def _extract_spread_facts(
             left_png, left_w, left_h, left_rot = left_rendered
             right_png, right_w, right_h, right_rot = right_rendered
 
-            left_raw = await vlm.extract_structured(left_png, left_prompt)
-            right_raw = await vlm.extract_structured(right_png, right_prompt)
+            left_raw = await _call_vlm_cached(db, vlm, file_hash, left_page_number, left_png, left_prompt)
+            right_raw = await _call_vlm_cached(db, vlm, file_hash, right_page_number, right_png, right_prompt)
             left_rows, _ = _parse_vlm_response(left_raw)
             right_rows, _ = _parse_vlm_response(right_raw)
             if not left_rows or not right_rows:
                 continue
 
-            left_plain = _to_plain(left_rows)
-            right_plain = _to_plain(right_rows)
-            left_by_serial_raw = {p["no"]: raw for p, raw in zip(left_plain, left_rows) if p.get("no") not in (None, "")}
-            right_by_serial_raw = {p["no"]: raw for p, raw in zip(right_plain, right_rows) if p.get("no") not in (None, "")}
-
-            result = join_spread(left_plain, right_plain)
+            result = table_stitch.join_rows_horizontally(left_rows, right_rows, serial_field)
 
             left_page = await _get_or_create_page(db, tenant_id, document_id, version_id, left_page_number, left_w, left_h, left_rot)
 
@@ -264,22 +304,32 @@ async def _extract_spread_facts(
 
             right_page = await _get_or_create_page(db, tenant_id, document_id, version_id, right_page_number, right_w, right_h, right_rot)
 
-            for merged_row in result.rows:
-                serial = merged_row.get("no")
+            # A leftover row on one side can be positionally grouped under a
+            # single row on the other (e.g. one waqf entry spanning two
+            # property rows) — result.pairs then repeats that shared row
+            # object across several pairs. Write each side's fields once
+            # per DISTINCT row object, not once per pair, or the shared
+            # side's facts get duplicated once per extra row it groups with.
+            written_left_ids: set = set()
+            written_right_ids: set = set()
+            for left_raw_row, right_raw_row in result.pairs:
                 for field_def in field_schema:
                     field_name = field_def["name"]
                     if field_name == serial_field:
                         continue
-                    value = merged_row.get(field_name)
-                    if value is None or value == "":
-                        continue
 
                     half = field_def.get("half")
-                    raw_row = (left_by_serial_raw if half == "left" else right_by_serial_raw).get(serial)
-                    if raw_row is None:
+                    raw_row = left_raw_row if half == "left" else right_raw_row
+                    written_ids = written_left_ids if half == "left" else written_right_ids
+                    row_identity = id(raw_row)
+                    if (field_name, row_identity) in written_ids:
                         continue
+                    written_ids.add((field_name, row_identity))
                     src_field = raw_row.get(field_name)
                     if not isinstance(src_field, dict) or not src_field.get("bbox"):
+                        continue
+                    value = src_field.get("value")
+                    if value is None or value == "":
                         continue
 
                     src_confidence = src_field.get("confidence")
@@ -309,6 +359,120 @@ async def _extract_spread_facts(
             continue
 
     return facts_written
+
+
+ADJUDICATION_CONFIDENCE_THRESHOLD = 0.6
+
+
+async def _write_stitch_ambiguous_fact(
+    db: AsyncSession, tenant_id: UUID, document_id: UUID, version_id: UUID,
+    shape_hash: str, prev_pe: Dict[str, Any], pe: Dict[str, Any],
+) -> None:
+    """TS4 — skips writing a duplicate review item if this exact shape is
+    already sitting unresolved in the queue (a batch of documents sharing
+    one recurring ambiguous layout shouldn't flood the queue with N
+    identical items before a human answers the first one)."""
+    existing = await db.execute(
+        select(Fact).where(
+            Fact.tenant_id == tenant_id,
+            Fact.field_name == "_stitch_ambiguous",
+            Fact.status == "in_review",
+            Fact.value["shape_hash"].astext == shape_hash,
+        ).limit(1)
+    )
+    if existing.scalar_one_or_none():
+        return
+
+    fact = Fact(
+        tenant_id=tenant_id, document_id=document_id, version_id=version_id,
+        field_name="_stitch_ambiguous",
+        value={
+            "shape_hash": shape_hash,
+            "page_a": prev_pe["page_number"],
+            "page_b": pe["page_number"],
+            "reason": "field-set overlap is neither clearly the same table continuing nor clearly disjoint column bands, and no confident answer was available",
+        },
+        confidence=None, is_handwritten=False, status="in_review",
+    )
+    db.add(fact)
+    await db.flush()
+    db.add(FactRegion(tenant_id=tenant_id, fact_id=fact.id, page_id=prev_pe["page"].id, x0=0.0, y0=0.0, x1=1.0, y1=1.0))
+
+
+async def _stitch_vertical_segments(
+    db: AsyncSession,
+    tenant_id: UUID,
+    document_id: UUID,
+    version_id: UUID,
+    page_extractions: List[Dict[str, Any]],
+    full_schema_fields: frozenset,
+    exclude_fields: frozenset,
+) -> List[List[Dict[str, Any]]]:
+    """TS1 — groups consecutive per-page extractions into logical table
+    segments (a segment = one or more pages that are the same table,
+    continuing downward). A wide table split across pages no longer loses
+    its tail: today, each page's continuation-merge only ever sees that
+    one page's rows (see extract_facts_for_document's docstring history),
+    so a page-1-ending / page-2-starting continuation row was silently
+    treated as its own bogus record. This closes that gap.
+
+    Evidence-certain decisions (see table_stitch.decide_relation) apply
+    directly. Ambiguous pairs check the shape-hash cache first, then fall
+    back to a narrow LLM adjudication call — never both attempted for the
+    same shape twice. Adjudication unavailable (air-gapped, no local LLM,
+    malformed response) or below-confidence defaults to NOT stitching —
+    the safe, current behavior — rather than guessing, but (TS4) also
+    writes a "_stitch_ambiguous" Fact so a human can answer it via
+    POST /facts/{fact_id}/resolve-stitch-ambiguity. That answer is
+    cached with decided_by='human' (table_shape_service.py), which
+    outranks any future LLM guess for the same shape and is applied
+    automatically to every future document with it — closing the loop
+    the shape-hash cache's decided_by='human' column was built for but,
+    before TS4, had no write path to ever reach.
+
+    Deliberately vertical-only: a horizontal (sideways) relation detected
+    here is left as separate segments, not auto-merged. Horizontal joins
+    stay the explicit, template-declared "spread" layout path
+    (_extract_spread_facts) — blending auto-detected sideways merges into
+    every template would risk pairing two genuinely unrelated pages that
+    happen to have complementary field coverage.
+    """
+    if len(page_extractions) <= 1:
+        return [[pe] for pe in page_extractions]
+
+    segments: List[List[Dict[str, Any]]] = [[page_extractions[0]]]
+    for pe in page_extractions[1:]:
+        prev_pe = segments[-1][-1]
+        fields_a = table_stitch.field_set(prev_pe["rows"], exclude=exclude_fields)
+        fields_b = table_stitch.field_set(pe["rows"], exclude=exclude_fields)
+        decision = table_stitch.decide_relation(fields_a, fields_b, full_schema_fields)
+        relation = decision.relation
+
+        if not decision.certain:
+            s_hash = table_stitch.shape_hash(fields_a, fields_b)
+            cached = await table_shape_service.get_cached_shape_decision(db, s_hash)
+            if cached:
+                relation = cached.relation
+            else:
+                llm = None
+                try:
+                    llm = get_llm_provider()
+                except Exception as e:
+                    logger.info(f"TS1 adjudication unavailable, treating page {pe['page_number']} as a new segment: {e}")
+                verdict = await table_stitch.adjudicate_structure(llm, fields_a, fields_b, full_schema_fields) if llm else None
+                if verdict and verdict.relation != "unrelated" and verdict.confidence >= ADJUDICATION_CONFIDENCE_THRESHOLD:
+                    relation = verdict.relation
+                    await table_shape_service.record_shape_decision(db, s_hash, relation, decided_by="llm", confidence=verdict.confidence)
+                else:
+                    relation = "unrelated"
+                    await _write_stitch_ambiguous_fact(db, tenant_id, document_id, version_id, s_hash, prev_pe, pe)
+
+        if relation == "vertical":
+            segments[-1].append(pe)
+        else:
+            segments.append([pe])
+
+    return segments
 
 
 async def extract_facts_for_document(
@@ -350,10 +514,18 @@ async def extract_facts_for_document(
     serial_field = _find_role_field(field_schema, "serial")
     continuation_text_fields = [f["name"] for f in field_schema if f.get("role") == "continuation_text"]
     ditto_fields = [f["name"] for f in field_schema if f.get("ditto_eligible")]
+    chain_anchor_field = _find_role_field(field_schema, "chain_anchor")
     blob_fields = [f["name"] for f in field_schema if f.get("type") == "blob"]
+    full_schema_fields = frozenset(f["name"] for f in field_schema)
+    stitch_exclude_fields = frozenset({serial_field}) if serial_field else frozenset()
+    file_hash = hashlib.sha256(file_bytes).hexdigest()
 
     facts_written = 0
 
+    # Phase A — collect every page's raw VLM extraction. No Facts written
+    # yet: whether page N's rows belong to the same table segment as page
+    # N+1's isn't decided until every page in the run has been read.
+    page_extractions: List[Dict[str, Any]] = []
     for page_number in range(1, max_pages + 1):
         try:
             if ext == "pdf":
@@ -366,108 +538,152 @@ async def extract_facts_for_document(
                     break
                 png_bytes, width, height, rotation = _render_image_page_png(file_bytes)
 
-            raw_response = await vlm.extract_structured(png_bytes, prompt)
+            raw_response = await _call_vlm_cached(db, vlm, file_hash, page_number, png_bytes, prompt)
             rows, marginalia = _parse_vlm_response(raw_response)
             if not rows and not marginalia:
                 continue
 
-            # Continuation-merge (Handler 3) needs the serial column present to know
-            # which rows are continuations; skip it for templates that don't declare one.
-            if serial_field:
-                plain_rows = [
-                    {k: (v.get("value") if isinstance(v, dict) else v) for k, v in row.items()}
-                    for row in rows
-                ]
-                # Normalize to the handler's expected "no" key without mutating the template.
-                for plain, row in zip(plain_rows, rows):
-                    plain["no"] = plain.pop(serial_field, None)
-                try:
-                    merged_plain = merge_continuation_rows(plain_rows, text_columns=continuation_text_fields or None)
-                except ValueError as e:
-                    logger.warning(f"T22 continuation-merge skipped for page {page_number}: {e}")
-                    merged_plain = [{**p, "_source_row_indices": [i]} for i, p in enumerate(plain_rows)]
-            else:
-                merged_plain = [{**{k: (v.get("value") if isinstance(v, dict) else v) for k, v in row.items()}, "_source_row_indices": [i]} for i, row in enumerate(rows)]
-
-            if ditto_fields:
-                try:
-                    merged_plain = expand_ditto_chains(merged_plain, ditto_fields)
-                except ValueError as e:
-                    logger.warning(f"T22 ditto-chain expansion skipped for page {page_number}: {e}")
-
             page = await _get_or_create_page(db, tenant_id, document_id, version_id, page_number, width, height, rotation)
+            page_extractions.append({"page_number": page_number, "rows": rows, "marginalia": marginalia, "page": page})
 
-            for merged_row in merged_plain:
-                source_indices = merged_row.get("_source_row_indices", [])
-                if not source_indices:
+        except Exception as e:
+            logger.warning(f"T22 VLM extraction failed on page {page_number} of {filename}: {e}")
+            continue
+
+    # Phase B (TS1) — decide which consecutive pages are the same table
+    # continuing downward, so a continuation row that starts a fresh page
+    # merges into the entry it actually continues rather than becoming a
+    # stray half-record.
+    segments = await _stitch_vertical_segments(db, tenant_id, document_id, version_id, page_extractions, full_schema_fields, stitch_exclude_fields)
+
+    # Phase C — per segment: concatenate its pages' rows in reading order,
+    # then run the existing continuation-merge/ditto/blob-parse handlers
+    # over that combined list exactly as before, just no longer bounded
+    # to a single page. Each source row still remembers its own physical
+    # page for FactRegion linkage (region_page_map), since a merged fact
+    # can now legitimately span more than one page.
+    for segment in segments:
+        rows_all: List[Dict[str, Any]] = []
+        region_page_map: List[DocumentPage] = []
+        for pe in segment:
+            for row in pe["rows"]:
+                rows_all.append(row)
+                region_page_map.append(pe["page"])
+
+        if serial_field:
+            plain_rows = [
+                {k: (v.get("value") if isinstance(v, dict) else v) for k, v in row.items()}
+                for row in rows_all
+            ]
+            for plain, row in zip(plain_rows, rows_all):
+                plain["no"] = plain.pop(serial_field, None)
+            try:
+                merged_plain = merge_continuation_rows(plain_rows, text_columns=continuation_text_fields or None)
+            except ValueError as e:
+                logger.warning(f"T22/TS1 continuation-merge skipped for a segment starting at page {segment[0]['page_number']}: {e}")
+                merged_plain = [{**p, "_source_row_indices": [i]} for i, p in enumerate(plain_rows)]
+        else:
+            merged_plain = [{**{k: (v.get("value") if isinstance(v, dict) else v) for k, v in row.items()}, "_source_row_indices": [i]} for i, row in enumerate(rows_all)]
+
+        if ditto_fields:
+            try:
+                merged_plain = expand_ditto_chains(merged_plain, ditto_fields, chain_anchor_column=chain_anchor_field)
+            except Exception as e:
+                logger.warning(f"T22 ditto-chain expansion skipped for a segment starting at page {segment[0]['page_number']}: {e}")
+
+        for merged_row in merged_plain:
+            source_indices = merged_row.get("_source_row_indices", [])
+            if not source_indices:
+                continue
+            for field_def in field_schema:
+                field_name = field_def["name"]
+                row_key = "no" if field_name == serial_field else field_name
+                if row_key not in merged_row:
                     continue
-                for field_def in field_schema:
-                    field_name = field_def["name"]
-                    row_key = "no" if field_name == serial_field else field_name
-                    if row_key not in merged_row:
+                value = merged_row[row_key]
+                if value is None or value == "":
+                    continue
+
+                confidences = []
+                region_boxes = []  # (bbox, DocumentPage) — a stitched fact can span pages
+                field_is_handwritten = False
+                for src_idx in source_indices:
+                    if src_idx >= len(rows_all):
                         continue
-                    value = merged_row[row_key]
-                    if value is None or value == "":
-                        continue
+                    src_field = rows_all[src_idx].get(field_name)
+                    if isinstance(src_field, dict) and src_field.get("bbox"):
+                        region_boxes.append((src_field["bbox"], region_page_map[src_idx]))
+                        if src_field.get("confidence") is not None:
+                            confidences.append(float(src_field["confidence"]))
+                        if src_field.get("is_handwritten"):
+                            field_is_handwritten = True
+                if not region_boxes:
+                    continue
 
-                    confidences = []
-                    region_boxes = []
-                    field_is_handwritten = False
-                    for src_idx in source_indices:
-                        if src_idx >= len(rows):
-                            continue
-                        src_field = rows[src_idx].get(field_name)
-                        if isinstance(src_field, dict) and src_field.get("bbox"):
-                            region_boxes.append(src_field["bbox"])
-                            if src_field.get("confidence") is not None:
-                                confidences.append(float(src_field["confidence"]))
-                            if src_field.get("is_handwritten"):
-                                field_is_handwritten = True
-                    if not region_boxes:
-                        continue
+                fact_value: Any = value
+                if field_name in blob_fields and isinstance(value, str):
+                    parsed = parse_blob_cell(value)
+                    fact_value = {
+                        "raw_text": parsed.raw_text,
+                        "survey_numbers": parsed.survey_numbers,
+                        "cts": parsed.cts,
+                        "area_sqm": parsed.area_sqm,
+                        "built_sqm": parsed.built_sqm,
+                        "open_space_sqm": parsed.open_space_sqm,
+                        "flags": parsed.flags,
+                    }
 
-                    fact_value: Any = value
-                    if field_name in blob_fields and isinstance(value, str):
-                        parsed = parse_blob_cell(value)
-                        fact_value = {
-                            "raw_text": parsed.raw_text,
-                            "survey_numbers": parsed.survey_numbers,
-                            "cts": parsed.cts,
-                            "area_sqm": parsed.area_sqm,
-                            "built_sqm": parsed.built_sqm,
-                            "open_space_sqm": parsed.open_space_sqm,
-                            "flags": parsed.flags,
-                        }
+                fact_confidence = (sum(confidences) / len(confidences)) if confidences else None
+                fact_status = classify_confidence(field_def, fact_confidence, is_handwritten=field_is_handwritten)
 
-                    fact_confidence = (sum(confidences) / len(confidences)) if confidences else None
-                    fact = Fact(
-                        tenant_id=tenant_id,
-                        document_id=document_id,
-                        version_id=version_id,
-                        field_name=field_name,
-                        value=fact_value if isinstance(fact_value, (dict, list)) else {"v": fact_value},
-                        confidence=fact_confidence,
-                        is_handwritten=field_is_handwritten,
-                        status=classify_confidence(field_def, fact_confidence, is_handwritten=field_is_handwritten),
-                    )
-                    db.add(fact)
-                    await db.flush()
+                # TS5 — ditto-filled fields carry both the resolved value
+                # and the literal mark that was actually read; a mark
+                # with a broken chain (no valid value above to copy) is
+                # never silently guessed — it's forced into review instead
+                # of whatever confidence banding would otherwise apply.
+                ditto_verbatim = merged_row.get("_ditto_verbatim", {}).get(field_name)
+                is_unresolved_ditto = field_name in merged_row.get("_unresolved_ditto_columns", [])
+                if ditto_verbatim is not None:
+                    fact_value = {
+                        "v": fact_value,
+                        "verbatim": ditto_verbatim,
+                        "was_ditto_filled": not is_unresolved_ditto,
+                    }
+                    if is_unresolved_ditto:
+                        fact_value["ditto_unresolved"] = True
+                        fact_status = "in_review"
 
-                    for box in region_boxes:
-                        x0, y0, x1, y1 = box
-                        db.add(FactRegion(
-                            tenant_id=tenant_id, fact_id=fact.id, page_id=page.id,
-                            x0=float(x0), y0=float(y0), x1=float(x1), y1=float(y1),
-                        ))
-                    facts_written += 1
+                fact = Fact(
+                    tenant_id=tenant_id,
+                    document_id=document_id,
+                    version_id=version_id,
+                    field_name=field_name,
+                    value=fact_value if isinstance(fact_value, (dict, list)) else {"v": fact_value},
+                    confidence=fact_confidence,
+                    is_handwritten=field_is_handwritten,
+                    status=fact_status,
+                )
+                db.add(fact)
+                await db.flush()
 
-            # T30 — marginalia: handwritten notes that aren't an answer to any
-            # schema field. Reuses Fact+FactRegion (T06's click-through contract)
-            # rather than a separate table; field_name="_marginalia" is the
-            # sentinel get_adjudication_queue's 'marginalia' category filters on.
-            # Always in_review — there's no confidence band for "is this note
-            # important," a human reads every one.
-            for note in marginalia:
+                for box, box_page in region_boxes:
+                    x0, y0, x1, y1 = box
+                    db.add(FactRegion(
+                        tenant_id=tenant_id, fact_id=fact.id, page_id=box_page.id,
+                        x0=float(x0), y0=float(y0), x1=float(x1), y1=float(y1),
+                    ))
+                facts_written += 1
+
+        # T30 — marginalia: handwritten notes that aren't an answer to any
+        # schema field. Reuses Fact+FactRegion (T06's click-through contract)
+        # rather than a separate table; field_name="_marginalia" is the
+        # sentinel get_adjudication_queue's 'marginalia' category filters on.
+        # Always in_review — there's no confidence band for "is this note
+        # important," a human reads every one. Stays per-original-page:
+        # a marginal note belongs to the physical page it's written on
+        # regardless of table stitching.
+        for pe in segment:
+            for note in pe["marginalia"]:
                 text = note.get("text")
                 bbox = note.get("bbox")
                 if not text or not bbox or len(bbox) != 4:
@@ -486,13 +702,9 @@ async def extract_facts_for_document(
                 await db.flush()
                 x0, y0, x1, y1 = bbox
                 db.add(FactRegion(
-                    tenant_id=tenant_id, fact_id=fact.id, page_id=page.id,
+                    tenant_id=tenant_id, fact_id=fact.id, page_id=pe["page"].id,
                     x0=float(x0), y0=float(y0), x1=float(x1), y1=float(y1),
                 ))
                 facts_written += 1
-
-        except Exception as e:
-            logger.warning(f"T22 VLM extraction failed on page {page_number} of {filename}: {e}")
-            continue
 
     return facts_written

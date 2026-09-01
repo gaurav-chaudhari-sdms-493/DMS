@@ -36,6 +36,7 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(default="")
     hashed_password: Mapped[str] = mapped_column("password_hash")
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), default=UserRole.user)
+    locale: Mapped[str] = mapped_column(default="en")  # T95 — 'en' or 'mr'
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="users")

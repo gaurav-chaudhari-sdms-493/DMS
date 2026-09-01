@@ -21,6 +21,10 @@ class BulkEditRequest(BaseModel):
     dry_run: bool = False
 
 
+class ResolveStitchAmbiguityRequest(BaseModel):
+    relation: str  # "vertical" | "horizontal" | "unrelated"
+
+
 @router.get("/queue")
 async def get_adjudication_queue_api(
     category: str = "low_confidence",
@@ -122,6 +126,19 @@ async def mark_fact_handwritten_api(
     user_id = uuid.UUID(current_user.sub)
     fact = await fact_verification_service.mark_fact_handwritten(db, tenant_id, fact_id, user_id)
     return {"fact_id": str(fact.id), "is_handwritten": fact.is_handwritten, "status": fact.status}
+
+
+@router.post("/{fact_id}/resolve-stitch-ambiguity")
+async def resolve_stitch_ambiguity_api(
+    fact_id: uuid.UUID,
+    body: ResolveStitchAmbiguityRequest,
+    current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    fact = await fact_verification_service.resolve_stitch_ambiguity(db, tenant_id, fact_id, body.relation, user_id)
+    return {"fact_id": str(fact.id), "status": fact.status, "relation": body.relation}
 
 
 @router.post("/{fact_id}/confirm")

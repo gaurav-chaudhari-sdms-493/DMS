@@ -326,15 +326,19 @@ frames the roadmap conversation.
 - Ingestion (multi-format parsing, 3 channels), hybrid search & RAG
   answering, multi-tenant RLS security, provider abstraction, basic
   admin analytics.
+- **Entity/knowledge graph** — tiered entity linking across documents
+  (people, properties, organizations) via a Postgres property-graph
+  (`entity_dg_nodes` / `entity_dg_edges`, plain tables, not a graph
+  DB), with edge confirmation/reversal and a 360-degree entity view.
+  Built as part of Phase W3 (`backend/app/services/entity_graph_service.py`,
+  `entity_360_service.py`, `backend/app/api/v1/entities.py`).
 
 **Not yet built (roadmap items, not secrets — worth naming proactively):**
 - **Human verification workbench** — there's no review/approval UI for
   AI-extracted data before it's treated as "confirmed." Everything the
   AI extracts today is presented as-is.
-- **Entity/knowledge graph and record versioning** — no linking of
-  extracted entities (people, properties, organizations) across
-  documents, no amendment/correction history model for records that
-  change over time.
+- **Record versioning** — no amendment/correction history model for
+  records that change over time.
 - **Governance & audit chain** — an audit log exists, but it is not yet
   tamper-evident (no hash-chaining), and only covers a subset of actions
   (auth, search, chat). Document view/edit/delete are not yet logged.

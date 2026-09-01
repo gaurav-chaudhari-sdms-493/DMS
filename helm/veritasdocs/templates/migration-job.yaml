@@ -1,0 +1,58 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ include "veritasdocs.fullname" . }}-migrate
+  labels:
+    {{- include "veritasdocs.labels" . | nindent 4 }}
+    app.kubernetes.io/component: migrate
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "0"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 5
+  template:
+    metadata:
+      labels:
+        {{- include "veritasdocs.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: migrate
+    spec:
+      restartPolicy: Never
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      initContainers:
+        - name: wait-for-postgres
+          image: {{ include "veritasdocs.image" (dict "registry" .Values.image.registry "repository" .Values.image.backend.repository "tag" .Values.image.backend.tag) }}
+          imagePullPolicy: {{ .Values.image.backend.pullPolicy }}
+          # postgres is created earlier in this same pre-install/pre-upgrade
+          # hook phase (see postgres.yaml, hook-weight -10), but Helm does
+          # not wait for non-Job hook resources to become Ready before
+          # moving to the next weight — so wait for it here explicitly
+          # rather than relying on timing between hook stages.
+          command:
+            - python3
+            - -c
+            - |
+              import os, socket, sys, time
+              host, port = "{{ include "veritasdocs.fullname" . }}-postgres", 5432
+              for attempt in range(60):
+                  try:
+                      with socket.create_connection((host, port), timeout=2):
+                          print("postgres reachable")
+                          sys.exit(0)
+                  except OSError as e:
+                      print(f"waiting for postgres ({attempt+1}/60): {e}")
+                      time.sleep(2)
+              sys.exit("timed out waiting for postgres")
+      containers:
+        - name: migrate
+          image: {{ include "veritasdocs.image" (dict "registry" .Values.image.registry "repository" .Values.image.backend.repository "tag" .Values.image.backend.tag) }}
+          imagePullPolicy: {{ .Values.image.backend.pullPolicy }}
+          command: ["alembic", "upgrade", "head"]
+          envFrom:
+            - configMapRef:
+                name: {{ include "veritasdocs.fullname" . }}-config
+          env:
+            {{- include "veritasdocs.appEnv" . | nindent 12 }}

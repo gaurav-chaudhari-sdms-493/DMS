@@ -6,7 +6,8 @@ import uuid
 from ...schemas.auth import (
     LoginRequest, TokenResponse, TokenPayload, SignUpRequest, SignUpResponse,
     ForgotPasswordRequest, ForgotPasswordResponse, ResetPasswordRequest,
-    UserProfileResponse, FileTypeCount, RefreshTokenRequest
+    UserProfileResponse, FileTypeCount, RefreshTokenRequest,
+    UpdateLocaleRequest, UpdateLocaleResponse
 )
 from ...models.user import User
 from ...models.tenant import Tenant
@@ -105,6 +106,7 @@ async def get_current_user_profile(
         full_name=user.full_name,
         email=user.email,
         role=user.role.value if hasattr(user.role, 'value') else str(user.role),
+        locale=user.locale,
         tenant_id=user.tenant_id,
         tenant_name=tenant_name,
         created_at=user.created_at.strftime("%B %d, %Y") if user.created_at else "N/A",
@@ -114,6 +116,25 @@ async def get_current_user_profile(
         total_chunks=total_chunks,
         file_types_breakdown=file_types
     )
+
+@router.patch('/me/locale', response_model=UpdateLocaleResponse)
+async def update_current_user_locale(
+    body: UpdateLocaleRequest,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db)
+):
+    """T95 — persists the user's language choice for their next login on
+    any device; the frontend also mirrors this to localStorage so the
+    choice applies immediately, before this call resolves."""
+    user_id = uuid.UUID(current_user.sub)
+    u_res = await db.execute(select(User).where(User.id == user_id))
+    user = u_res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.locale = body.locale
+    await db.commit()
+    return UpdateLocaleResponse(locale=user.locale)
 
 @router.post('/sign-up', response_model=SignUpResponse, status_code=201)
 async def sign_up_user(

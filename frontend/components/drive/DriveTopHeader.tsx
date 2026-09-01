@@ -5,6 +5,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { api } from "@/lib/api";
 import { onKeyActivate } from "@/lib/a11y";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 interface DriveTopHeaderProps {
   onSearch: (query: string, useAi: boolean) => void;
@@ -32,6 +34,7 @@ export function DriveTopHeader({
   onChangeGenerateSummary,
 }: DriveTopHeaderProps) {
   const router = useRouter();
+  const { t } = useI18n();
   const [query, setQuery] = useState(searchQuery);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -104,10 +107,10 @@ export function DriveTopHeader({
 
           <input
             type="text"
-            aria-label="Search anything with Stark AI"
+            aria-label={t("header.search_placeholder", "Search anything with Stark AI")}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search anything with Stark AI..."
+            placeholder={t("header.search_placeholder", "Search anything with Stark AI...")}
             className="w-full pl-14 pr-12 py-3.5 rounded-full bg-[#edf2fc] text-[#1f1f1f] placeholder:text-[#444746] text-base font-normal border border-[#d3d7dc]/60 hover:bg-[#e4ebf7] hover:border-[#0b57d0]/30 focus:outline-none focus:bg-white focus:shadow-xl focus:ring-2 focus:ring-[#0b57d0]/50 focus:border-[#0b57d0] transition-all duration-300 shadow-inner"
           />
 
@@ -126,6 +129,9 @@ export function DriveTopHeader({
         </div>
       </form>
 
+      {/* Language switcher */}
+      <LanguageSwitcher className="shrink-0" />
+
       {/* Search Settings: reranker strategy + AI summary on/off — applies to your NEXT search */}
       <div className="relative shrink-0">
         <button
@@ -141,12 +147,12 @@ export function DriveTopHeader({
             <div role="presentation" className="fixed inset-0 z-40" onClick={() => setSettingsOpen(false)} />
             <div className="absolute right-0 mt-2 w-72 bg-white border border-[#d3d7dc] rounded-xl shadow-xl z-50 p-4 space-y-4 text-[#1f1f1f]">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wider text-[#444746] mb-1">Search Settings</p>
+                <p className="text-xs font-semibold uppercase tracking-wider text-[#444746] mb-1">{t("header.search_settings", "Search Settings")}</p>
                 <p className="text-[11px] text-[#747775]">Applies to your next global search.</p>
               </div>
 
               <div>
-                <label htmlFor="reranker-strategy" className="text-xs font-medium text-[#444746] mb-1 block">Reranker strategy</label>
+                <label htmlFor="reranker-strategy" className="text-xs font-medium text-[#444746] mb-1 block">{t("header.reranker_strategy", "Reranker strategy")}</label>
                 <select
                   id="reranker-strategy"
                   value={rerankProvider}
@@ -160,7 +166,7 @@ export function DriveTopHeader({
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-xs font-medium text-[#444746]">AI Summary generation</p>
+                  <p className="text-xs font-medium text-[#444746]">{t("header.ai_summary", "AI Summary generation")}</p>
                   <p className="text-[11px] text-[#747775]">Off saves LLM call cost. AI chat still answers when asked.</p>
                 </div>
                 <button
@@ -202,7 +208,7 @@ export function DriveTopHeader({
             />
             <div className="absolute right-0 mt-2 w-56 bg-surface border border-borderDark rounded-xl shadow-xl z-50 py-2 animate-fadeIn text-textMain">
               <div className="px-4 py-2.5 border-b border-borderDark/60">
-                <p className="text-xs text-textMuted uppercase font-semibold tracking-wider">Account</p>
+                <p className="text-xs text-textMuted uppercase font-semibold tracking-wider">{t("header.account_menu", "Account")}</p>
                 <p className="text-sm font-semibold truncate text-textMain mt-0.5">{userName}</p>
                 {userEmail && <p className="text-xs text-textMuted truncate">{userEmail}</p>}
               </div>
@@ -214,7 +220,7 @@ export function DriveTopHeader({
                   className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMain hover:bg-white/5 transition-colors font-medium"
                 >
                   <User className="w-4 h-4 text-primary" />
-                  <span>Profile & Analytics</span>
+                  <span>{t("header.profile_analytics", "Profile & Analytics")}</span>
                 </Link>
                 <Link
                   href="/workbench"
@@ -222,7 +228,7 @@ export function DriveTopHeader({
                   className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMain hover:bg-white/5 transition-colors font-medium"
                 >
                   <ShieldCheck className="w-4 h-4 text-primary" />
-                  <span>Verification Workbench</span>
+                  <span>{t("header.verification_workbench", "Verification Workbench")}</span>
                 </Link>
                 <Link
                   href="/completeness"
@@ -230,7 +236,7 @@ export function DriveTopHeader({
                   className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMain hover:bg-white/5 transition-colors font-medium"
                 >
                   <BarChart3 className="w-4 h-4 text-primary" />
-                  <span>Completeness Dashboard</span>
+                  <span>{t("header.completeness_dashboard", "Completeness Dashboard")}</span>
                 </Link>
                 <Link
                   href="/entities"
@@ -238,7 +244,7 @@ export function DriveTopHeader({
                   className="flex items-center gap-2.5 px-4 py-2 text-sm text-textMain hover:bg-white/5 transition-colors font-medium"
                 >
                   <Network className="w-4 h-4 text-primary" />
-                  <span>Entity 360</span>
+                  <span>{t("header.entity_360", "Entity 360")}</span>
                 </Link>
               </div>
 
@@ -248,7 +254,7 @@ export function DriveTopHeader({
                   className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-400 hover:bg-red-500/10 transition-colors text-left font-medium"
                 >
                   <LogOut className="w-4 h-4" />
-                  <span>Log Out</span>
+                  <span>{t("header.logout", "Log Out")}</span>
                 </button>
               </div>
             </div>

@@ -17,6 +17,17 @@ class EntityNodeCreate(BaseModel):
     attributes: Optional[Dict[str, Any]] = None
 
 
+class EntityEdgeCreate(BaseModel):
+    edge_type: str
+    tier: int
+    source_node_id: uuid.UUID
+    target_type: str
+    target_node_id: Optional[uuid.UUID] = None
+    target_fact_id: Optional[uuid.UUID] = None
+    confidence: Optional[float] = None
+    evidence_fact_id: Optional[uuid.UUID] = None
+
+
 @router.post("", status_code=201)
 async def create_entity_node_api(
     node_in: EntityNodeCreate,
@@ -29,6 +40,43 @@ async def create_entity_node_api(
         db, tenant_id, node_in.entity_type, node_in.label, user_id, attributes=node_in.attributes,
     )
     return {"id": str(node.id), "entity_type": node.entity_type, "label": node.label, "attributes": node.attributes}
+
+
+@router.post("/edges", status_code=201)
+async def create_entity_edge_api(
+    edge_in: EntityEdgeCreate,
+    current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
+    db: AsyncSession = Depends(get_db),
+):
+    """T56 — the create-edge half of the API. create_node, confirm/revert
+    and bulk-confirm/revert were all wired up, but nothing ever exposed
+    entity_graph_service.create_edge itself: a real gap found while
+    testing the graph end-to-end against real data, since without this
+    no edge could ever exist outside a unit test's direct service call.
+    created_by_actor_id is always the calling human — created_by_policy_version
+    is reserved for the bulk-confirm code path, not a human create action.
+    """
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    edge = await entity_graph_service.create_edge(
+        db, tenant_id, edge_in.edge_type, edge_in.tier, edge_in.source_node_id, edge_in.target_type,
+        target_node_id=edge_in.target_node_id,
+        target_fact_id=edge_in.target_fact_id,
+        confidence=edge_in.confidence,
+        evidence_fact_id=edge_in.evidence_fact_id,
+        created_by_actor_id=user_id,
+    )
+    return {
+        "id": str(edge.id),
+        "edge_type": edge.edge_type,
+        "tier": edge.tier,
+        "status": edge.status,
+        "source_node_id": str(edge.source_node_id),
+        "target_type": edge.target_type,
+        "target_node_id": str(edge.target_node_id) if edge.target_node_id else None,
+        "target_fact_id": str(edge.target_fact_id) if edge.target_fact_id else None,
+        "confidence": edge.confidence,
+    }
 
 
 @router.get("/{node_id}/360")

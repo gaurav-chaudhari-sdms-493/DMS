@@ -7,9 +7,12 @@ import { api } from "@/lib/api";
 import { storeTokens } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 export default function SignUpPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -56,11 +59,14 @@ export default function SignUpPage() {
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-8rem)] py-8">
       <div className="w-full max-w-md animate-fadeIn">
+        <div className="flex justify-end mb-2">
+          <LanguageSwitcher />
+        </div>
         <div className="text-center mb-8">
           <div className="flex justify-center mx-auto mb-6">
             <img src="/stark-drive.svg" alt="Stark Drive Logo" className="h-20 md:h-24 lg:h-28 w-auto object-contain drop-shadow-md" />
           </div>
-          <h1 className="text-2xl font-bold text-textMain">Create Account</h1>
+          <h1 className="text-2xl font-bold text-textMain">{t("auth.signup.title", "Create your account")}</h1>
           <p className="text-textMuted mt-2">Get started with DocSearch AI document platform</p>
         </div>
 
@@ -80,8 +86,8 @@ export default function SignUpPage() {
               <input
                 type="text"
                 required
-                aria-label="Full Name"
-                placeholder="Full Name"
+                aria-label={t("auth.signup.full_name_label", "Full name")}
+                placeholder={t("auth.signup.full_name_label", "Full name")}
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 className="w-full h-12 pl-10 pr-4 bg-surface/50 border border-borderDark rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
@@ -95,8 +101,8 @@ export default function SignUpPage() {
               <input
                 type="email"
                 required
-                aria-label="Email Address"
-                placeholder="Email Address"
+                aria-label={t("auth.signup.email_label", "Email")}
+                placeholder={t("auth.signup.email_label", "Email")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full h-12 pl-10 pr-4 bg-surface/50 border border-borderDark rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all"
@@ -151,14 +157,14 @@ export default function SignUpPage() {
 
 
             <Button type="submit" size="lg" className="w-full mt-2" loading={loading}>
-              <span>Create Account</span>
+              <span>{t("auth.signup.submit", "Create Account")}</span>
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
 
             <div className="text-center mt-4 text-sm text-textMuted">
-              Already have an account?{" "}
+              {t("auth.signup.have_account", "Already have an account?")}{" "}
               <Link href="/login" className="font-semibold text-primary hover:underline transition-all">
-                Sign In
+                {t("auth.signup.login_link", "Sign in")}
               </Link>
             </div>
           </form>

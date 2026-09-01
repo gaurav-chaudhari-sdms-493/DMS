@@ -1,8 +1,10 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException
+from app.database import AsyncSessionLocal
+from app.services.i18n_service import get_translations, SUPPORTED_LOCALES
 
-router = APIRouter(prefix="/i18n", tags=["i18n"])
+router = APIRouter()
 
-translations = {
+HARDCODED_TRANSLATIONS = {
     "en": {
         "workbench.title": "Verification Workbench",
         "workbench.back": "Back to Drive",
@@ -39,6 +41,17 @@ translations = {
     }
 }
 
-@router.get("/{locale}")
-async def get_i18n(locale: str):
-    return translations.get(locale, translations["en"])
+@router.get('/i18n/{locale}')
+async def get_locale_translations(locale: str):
+    if locale not in SUPPORTED_LOCALES:
+        raise HTTPException(status_code=404, detail=f"Unsupported locale: {locale}")
+    
+    # Get DB translations
+    async with AsyncSessionLocal() as db:
+        db_translations = await get_translations(db, locale)
+        
+    # Merge hardcoded translations with DB translations (DB takes precedence)
+    final_translations = HARDCODED_TRANSLATIONS.get(locale, {}).copy()
+    final_translations.update(db_translations)
+    
+    return final_translations

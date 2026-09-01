@@ -40,7 +40,7 @@ export default function OnlineWarningModal({
             <h3 className="text-lg font-bold text-textMain flex items-center gap-2">
               Internet Connection Required
             </h3>
-            <p className="text-xs text-amber-400/90 font-medium">
+            <p className="text-xs text-amber-700 font-medium">
               Offline Limitation Notice
             </p>
           </div>

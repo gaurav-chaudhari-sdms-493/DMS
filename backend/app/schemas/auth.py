@@ -58,6 +58,7 @@ class UserProfileResponse(BaseModel):
     full_name: str
     email: EmailStr
     role: str
+    locale: str
     tenant_id: UUID
     tenant_name: str
     created_at: str
@@ -66,3 +67,11 @@ class UserProfileResponse(BaseModel):
     total_size_bytes: int
     total_chunks: int
     file_types_breakdown: list[FileTypeCount]
+
+
+class UpdateLocaleRequest(BaseModel):
+    locale: str = Field(..., pattern="^(en|mr)$")
+
+
+class UpdateLocaleResponse(BaseModel):
+    locale: str

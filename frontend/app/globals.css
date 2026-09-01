@@ -20,6 +20,12 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* T95 — toggled on <html> by I18nProvider when locale is Marathi; the
+   Latin UI chrome font above doesn't carry Devanagari glyphs. */
+html.font-devanagari body {
+  font-family: var(--font-devanagari), 'Google Sans', Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
 .glass {
   background: #ffffff;
   border: 1px solid var(--border);

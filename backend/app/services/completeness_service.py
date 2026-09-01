@@ -87,9 +87,15 @@ async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_fold
             func.coalesce(func.sum(Document.pages_total_count), 0),
             func.coalesce(func.sum(Document.pages_failed_count), 0),
             func.count(Document.id).filter(Document.pages_failed_count > 0),
+            func.coalesce(func.sum(Document.data_loss_words_missing), 0),
+            func.count(Document.id).filter(Document.data_loss_words_missing > 0),
+            func.count(Document.id).filter(Document.page_furniture_candidates.is_not(None)),
         ).where(Document.tenant_id == tenant_id, Document.folder_id == corpus_folder_id, Document.is_trashed == False)  # noqa: E712
     )
-    document_count, pages_total, pages_failed, documents_with_failed_pages = doc_res.one()
+    (
+        document_count, pages_total, pages_failed, documents_with_failed_pages,
+        data_loss_words_total, documents_with_data_loss, documents_with_furniture,
+    ) = doc_res.one()
 
     fact_status_res = await db.execute(
         select(Fact.status, func.count(Fact.id))
@@ -128,6 +134,18 @@ async def get_corpus_completeness(db: AsyncSession, tenant_id: UUID, corpus_fold
             "pages_failed": pages_failed,
             "documents_with_failed_pages": documents_with_failed_pages,
         },
+        "data_loss": {
+            # TS2 — word-level audit between OCR and stored chunks (see
+            # app/services/data_loss_audit.py), populated at ingest.
+            "documents_with_loss": documents_with_data_loss,
+            "total_missing_words": data_loss_words_total,
+        },
+        "page_furniture": {
+            # TS6 — running header/footer candidates by position
+            # stability (see app/services/page_furniture_service.py).
+            # Detection only, informational.
+            "documents_with_candidates": documents_with_furniture,
+        },
         "facts": {
             "machine": fact_status_counts.get("machine", 0),
             "in_review": fact_status_counts.get("in_review", 0),
@@ -162,6 +180,30 @@ async def get_completeness_drill(db: AsyncSession, tenant_id: UUID, corpus_folde
             for d_id, title, total, failed in res.all()
         ]
 
+    if category == "data_loss_documents":
+        res = await db.execute(
+            select(Document.id, Document.title, Document.data_loss_words_missing, Document.data_loss_details).where(
+                Document.tenant_id == tenant_id, Document.folder_id == corpus_folder_id,
+                Document.data_loss_words_missing > 0, Document.is_trashed == False,  # noqa: E712
+            )
+        )
+        return [
+            {"document_id": str(d_id), "document_title": title, "words_missing": missing, "details": details}
+            for d_id, title, missing, details in res.all()
+        ]
+
+    if category == "page_furniture_documents":
+        res = await db.execute(
+            select(Document.id, Document.title, Document.page_furniture_candidates).where(
+                Document.tenant_id == tenant_id, Document.folder_id == corpus_folder_id,
+                Document.page_furniture_candidates.is_not(None), Document.is_trashed == False,  # noqa: E712
+            )
+        )
+        return [
+            {"document_id": str(d_id), "document_title": title, "candidates": candidates}
+            for d_id, title, candidates in res.all()
+        ]
+
     if category in ("unverified_facts", "machine_facts"):
         status_filter = ["machine", "in_review"] if category == "unverified_facts" else ["machine"]
         res = await db.execute(
@@ -174,4 +216,4 @@ async def get_completeness_drill(db: AsyncSession, tenant_id: UUID, corpus_folde
             for f_id, doc_id, fn, v, c, s in res.all()
         ]
 
-    raise HTTPException(status_code=400, detail=f"Unknown drill category '{category}'. Valid: missing_fields, failed_pages, unverified_facts, machine_facts")
+    raise HTTPException(status_code=400, detail=f"Unknown drill category '{category}'. Valid: missing_fields, failed_pages, data_loss_documents, page_furniture_documents, unverified_facts, machine_facts")

@@ -1051,17 +1051,40 @@ export default function DrivePage() {
                   <h2 className="text-xl font-semibold text-[#1f1f1f]">Items in Bin</h2>
                   <p className="text-xs text-[#747775] mt-1 font-medium flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5 text-amber-600" />
-                    <span>Items in the Bin are permanently deleted automatically after 30 days.</span>
+                    <span>Folders are permanently deleted after 30 days. Documents follow their own retention policy — some are never auto-deleted.</span>
                   </p>
                 </div>
 
                 {(folders.length > 0 || documents.length > 0) && (
                   <button
                     onClick={async () => {
-                      if (confirm("Are you sure you want to empty the Bin? All items in the Bin will be permanently deleted immediately.")) {
+                      if (confirm("Are you sure you want to empty the Bin? Items not protected by retention policy will be permanently deleted immediately.")) {
                         try {
-                          await api.documents.cleanupTrash(0);
+                          const result = await api.documents.cleanupTrash(0);
                           loadContents();
+
+                          const protectedCount = result?.protected_documents?.length || 0;
+                          const pendingCount = result?.pending_documents?.length || 0;
+                          const deletedCount = (result?.deleted_documents || 0) + (result?.deleted_folders || 0);
+
+                          if (protectedCount > 0 || pendingCount > 0) {
+                            const lines = [`${deletedCount} item(s) permanently deleted.`];
+                            if (protectedCount > 0) {
+                              lines.push(
+                                `${protectedCount} item(s) could not be deleted — protected by retention policy (never auto-purged): ` +
+                                  result.protected_documents.map((d: any) => `"${d.title}"`).join(", ")
+                              );
+                            }
+                            if (pendingCount > 0) {
+                              lines.push(
+                                `${pendingCount} item(s) not yet eligible for deletion: ` +
+                                  result.pending_documents.map((d: any) => `"${d.title}" (${d.days_remaining}d remaining)`).join(", ")
+                              );
+                            }
+                            alert(lines.join("\n\n"));
+                          } else if (deletedCount === 0) {
+                            alert("Nothing was deleted — the Bin may already be empty.");
+                          }
                         } catch (err: any) {
                           alert("Failed to empty Bin: " + (err.message || "Unknown error"));
                         }

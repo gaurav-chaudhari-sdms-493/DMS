@@ -21,6 +21,14 @@ from app.models.record_amendment import RecordAmendment
 from app.models.corpus_calibration import CorpusCalibration
 from app.models.department import Department, DepartmentMember, DepartmentFolder
 from app.models.retention_class import RetentionClass
+from app.models.translation import Translation
+from app.models.subscription import Subscription
+from app.models.license import License
+from app.models.table_shape_decision import TableShapeDecision
+from app.models.ocr_archive import OCRArchive
+from app.models.vlm_archive import VLMArchive
+from app.models.field_trust_signal import FieldTrustSignal
+from app.models.search_glossary import SearchGlossaryTerm
 from app.database import Base
 
 

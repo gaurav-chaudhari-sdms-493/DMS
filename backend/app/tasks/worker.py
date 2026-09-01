@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -18,6 +19,7 @@ from ..ocr.factory import get_ocr_provider
 from ..pipeline.chunker import TextChunker
 from ..services.storage_service import download_file
 from ..services.config_service import get_int, get_float
+from ..services.extraction_archive_service import get_cached_ocr, record_ocr
 from ..config import settings
 
 celery_app = Celery(
@@ -66,10 +68,29 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         # 1. Download file
         file_bytes = await download_file(s3_path)
         filename = os.path.basename(s3_path)
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
 
-        # 2. OCR
-        ocr = get_ocr_provider()
-        pages = await ocr.extract_pages(file_bytes, filename)
+        # 2. OCR — TS3: an unchanged file (by content hash) under the same
+        # OCR engine is never re-OCR'd; reprocessing the same upload after a
+        # chunking/parsing fix replays the archived response for free.
+        pages = None
+        try:
+            async with AsyncSessionLocal() as cache_db:
+                pages = await get_cached_ocr(cache_db, file_hash, settings.ai_ocr_provider)
+        except Exception as cache_err:
+            logger.warning(f"TS3 OCR cache lookup failed for {document_id_str}: {cache_err}")
+
+        if pages is not None:
+            logger.info(f"TS3 OCR cache hit for document {document_id_str} (hash {file_hash[:12]}...)")
+        else:
+            ocr = get_ocr_provider()
+            pages = await ocr.extract_pages(file_bytes, filename)
+            try:
+                async with AsyncSessionLocal() as cache_db:
+                    await record_ocr(cache_db, file_hash, settings.ai_ocr_provider, pages)
+                    await cache_db.commit()
+            except Exception as cache_err:
+                logger.warning(f"TS3 OCR cache write failed for {document_id_str}: {cache_err}")
 
         # 3. Chunk
         chunk_size = await get_int("chunk_size_tokens", 512)
@@ -83,6 +104,35 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 "It may be a scanned image requiring an OCR provider "
                 "(set AI_OCR_PROVIDER=gcv or llamaparse)."
             )
+
+        # TS2 — data-loss audit: does every word OCR read survive into the
+        # chunks about to be stored (the search/chat/viewer-facing surface)?
+        # Best-effort, same as every other optional pipeline stage here —
+        # a failure here must never block ingestion.
+        data_loss_result = None
+        try:
+            from app.services.data_loss_audit import audit_pages_vs_chunks
+            data_loss_result = audit_pages_vs_chunks(pages, [c.content for c in chunks])
+            if not data_loss_result.passed:
+                logger.warning(
+                    f"TS2 data-loss audit: document {document_id_str} lost "
+                    f"{data_loss_result.missing_count}/{data_loss_result.total_words} words "
+                    f"({data_loss_result.loss_ratio:.2%}) between OCR and stored chunks"
+                )
+        except Exception as audit_err:
+            logger.warning(f"TS2 data-loss audit skipped for document {document_id_str}: {audit_err}")
+
+        # TS6 — page-furniture detection: flags (never removes) running
+        # headers/footers by position stability. Purely informational,
+        # same best-effort contract as every other optional stage here.
+        furniture_candidates = None
+        try:
+            from app.services.page_furniture_service import detect_page_furniture
+            furniture_candidates = detect_page_furniture(pages)
+            if furniture_candidates:
+                logger.info(f"TS6 page-furniture: document {document_id_str} has {len(furniture_candidates)} candidate(s)")
+        except Exception as furniture_err:
+            logger.warning(f"TS6 page-furniture detection skipped for document {document_id_str}: {furniture_err}")
 
         # 4. Embed chunks (batched for local BGE-M3 model / API providers)
         embed_provider = get_embed_provider()
@@ -252,6 +302,14 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                     # matches (unlike doc_dg_pages, which only T22 writes to).
                     doc.pages_total_count = len(pages)
                     doc.pages_failed_count = sum(1 for p in pages if p.get("extraction_failed"))
+                    if data_loss_result:
+                        doc.data_loss_words_missing = data_loss_result.missing_count
+                        doc.data_loss_details = (
+                            {"loss_ratio": data_loss_result.loss_ratio, "missing_sample": data_loss_result.missing_sample}
+                            if data_loss_result.missing_count > 0 else None
+                        )
+                    if furniture_candidates:
+                        doc.page_furniture_candidates = furniture_candidates
 
         try:
             from app.services.cache_service import invalidate_tenant_cache

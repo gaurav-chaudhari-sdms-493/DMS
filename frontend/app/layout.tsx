@@ -1,16 +1,20 @@
+import type { Metadata } from "next";
 import "./globals.css";
-import React from "react";
+import { Noto_Sans_Devanagari } from "next/font/google";
 
-export const metadata = {
-  title: "DMS - DocSearch AI",
-  description: "AI Powered Document Management System (DMS)",
-  viewport: "width=device-width, initial-scale=1",
+const notoSansDevanagari = Noto_Sans_Devanagari({
+  subsets: ["devanagari", "latin"],
+  weight: ["400", "500", "600", "700"],
+  variable: "--font-noto-devanagari",
+});
+
+export const metadata: Metadata = {
+  title: "DMS Ai",
+  description: "DMS Ai verification system",
   icons: {
     icon: [
-      { url: "/stark-dms-app-logo.svg", type: "image/svg+xml" },
       { url: "/favicon.ico" },
-      { url: "/stark-icon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/stark-icon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
     ],
     apple: [
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
@@ -26,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={notoSansDevanagari.variable}>
       <body className="bg-gdriveBg min-h-screen text-gdriveTextMain overflow-hidden select-none">
         <I18nProvider>
           {children}
