@@ -653,7 +653,12 @@ async def extract_facts_for_document(
             page_extractions.append({"page_number": page_number, "rows": rows, "marginalia": marginalia, "page": page})
 
         except Exception as e:
-            logger.warning(f"T22 VLM extraction failed on page {page_number} of {filename}: {e}")
+            # str(e) alone can be empty (httpx.ReadTimeout and friends
+            # often carry no message, just a type) -- observed live on
+            # Wardha.pdf: "T22 VLM extraction failed on page 5 of
+            # Wardha.pdf: " with nothing after the colon, hiding whether
+            # it was a timeout, a connection error, or something else.
+            logger.warning(f"T22 VLM extraction failed on page {page_number} of {filename}: {type(e).__name__}: {e}")
             continue
 
     # Phase B (TS1) — decide which consecutive pages are the same table

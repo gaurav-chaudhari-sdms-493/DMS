@@ -73,22 +73,31 @@ GAZETTE_KNOWN_ISSUE = (
 )
 
 
-# Document 3 — Wardha.pdf, same spread template, found already uploaded to
-# the real tenant (2026-09-01, outside this session). Not hand-verified
-# against ground truth (would need rendering+reading all 14 pages) — this
-# is a structural known-failing entry, not a recall check: every one of
-# its 5 measurable page-pairs disagreed entirely on serial number between
-# left/right halves. See T31_T32_regression_corpus_notes.md's "a second
-# real spread document, and it corroborates checklist item #2".
+# Document 3 — Wardha.pdf. UPDATE 2026-09-02: the "5/5 page-pairs failed
+# to join" finding below was never a real T26 spread-pairing gap -- it was
+# a misclassification. Wardha.pdf is a completely different, unrelated
+# document: a 2004 gazette ("List of Wakf properties District Warda",
+# Central Wakf Act 1995), not the 1973 Aurangabad gazette its
+# matched_template_id pointed at. Its real structure is "Form B", a
+# self-contained SINGLE-PAGE table (confirmed by reading two consecutive
+# pages directly: their Sr.No ranges, e.g. WB-116/WB-18/... vs
+# WB-114/WB-127/..., never overlap -- no left/right relationship at all).
+# The 100% mismatch rate was the correct, expected result of joining two
+# unrelated pages against each other under the wrong template, not a real
+# extraction-logic bug. Registered the real Form B template
+# (scripts/register_wardha_form_b.py) and reclassified. See
+# T31_T32_regression_corpus_notes.md's "Wardha.pdf was never a
+# spread-layout document" for the full writeup.
 WARDHA_DOC_ID = "fc4263c7-4511-46c2-9590-dbb03458e8c7"
-WARDHA_KNOWN_ISSUE = (
-    "5/5 measurable page-pairs (3-4, 5-6, 7-8, 9-10, 11-12) failed to join — "
-    "'sr_no' values disagree entirely between left and right halves on every "
-    "pair, a 100% mismatch rate. Second real document showing this exact "
-    "failure pattern (see WARDHA vs GAZETTE) — corroborates, doesn't yet fix, "
-    "the checklist's item #2 concern that role:'serial' may not really be "
-    "printed on both halves of a real spread."
-)
+WARDHA_GROUND_TRUTH = [
+    ("sr_no", "WB-116"),
+    ("wakf_name", "Choti Masjid Arvi Ganpati Ward, Arvi."),
+    ("sect", "SUNNI"),
+    ("nature_object", "Religious"),
+    ("admin_of_wakf", "Admin. By Scheme"),
+    ("gross_income", "Rs.10000/-"),
+    ("value", "Variable"),
+]
 
 
 # Document 4 — Aurangabad-Shia.pdf, and Document 5 — Ambajogai (1).pdf:
@@ -181,9 +190,14 @@ async def main():
         print("    Status: KNOWN FAILING — row-matching incomplete, not a passing corpus entry")
         print(f"    {GAZETTE_KNOWN_ISSUE}")
 
-        print("\n[3] Maharashtra State Wakf Gazette Register — Wardha.pdf (spread, horizontal join)")
-        print("    Status: KNOWN FAILING — structural, not a passing corpus entry")
-        print(f"    {WARDHA_KNOWN_ISSUE}")
+        print("\n[3] Maharashtra State Wakf Gazette Register — Form B — Wardha.pdf (single_page)")
+        result = await check_document(db, WARDHA_DOC_ID, WARDHA_GROUND_TRUTH)
+        recall = len(result["found"]) / len(WARDHA_GROUND_TRUTH) * 100
+        recalls.append(recall)
+        print(f"    {result['total_facts']} total facts on the document")
+        print(f"    Recall on hand-verified ground truth: {len(result['found'])}/{len(WARDHA_GROUND_TRUTH)} ({recall:.0f}%)")
+        for field_name, value in result["missing"]:
+            print(f"    MISSING: {field_name} = {value!r}")
 
         print("\n[4] Maharashtra State Wakf Gazette Register (Form A) — Aurangabad-Shia.pdf (single_page)")
         result = await check_document(db, AURANGABAD_SHIA_DOC_ID, AURANGABAD_SHIA_GROUND_TRUTH)
@@ -206,7 +220,7 @@ async def main():
 
     overall = sum(recalls) / len(recalls)
     print("\n" + "=" * 70)
-    print(f"Corpus size: 5 real documents (3 passing, avg {overall:.0f}% recall; 2 documented-failing)")
+    print(f"Corpus size: 5 real documents (4 passing, avg {overall:.0f}% recall; 1 documented-failing)")
     print("This is a starter, not the A1 reference corpus — see T31_T32_regression_corpus_notes.md")
     print("=" * 70)
 

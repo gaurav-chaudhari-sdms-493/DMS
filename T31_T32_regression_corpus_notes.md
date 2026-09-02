@@ -203,29 +203,93 @@ would never have shown up there — the script would have silently reported
 which is what the script's own docstring already promised ("recovered
 *somewhere* in the document's Facts") but wasn't actually doing.
 
-**Corpus is now 5 real documents, 3 passing at 100% recall** (16/16
-hand-verified fields), 2 documented-failing (unchanged, pre-existing
-spread-join gap). Real `docker compose exec backend python3
-scripts/accuracy_baseline.py` output:
+## T26 update 2026-09-02 — Wardha.pdf was never a spread-layout document
+
+Started "T26" as its own task right after the above. Downloaded Wardha.pdf
+and rendered its pages directly to actually look at what the "5/5
+page-pairs failed to join, 100% mismatch" finding was really showing.
+
+**Real finding: Wardha.pdf is a completely different, unrelated document
+from the one its `matched_template_id` pointed at.** Its cover page is
+dated 30 December 2004 ("List of Wakf properties District Warda"),
+published under the Central Wakf Act 1995 — not the 1954 Act the 1973
+Aurangabad gazette (the template it was matched against) uses. Its table
+pages are "Form B (See Rule 5)": a single, self-contained, single-page-
+wide table (14 columns — Sr.No, Name of the Wakf Institution, Sunni/
+Shia, Nature & Object, Admin of Wakf, Creation of Wakf, Boundaries, Wakf
+Deed Reg Deed, Movable Property, Immovable Property, Value, Income, Tax
+Payable, Scheme Settlement — alphanumeric Sr.No like "WB-116", not the
+numeric sr_no the other templates use). Confirmed by comparing two
+consecutive pages (3 and 4): their Sr.No ranges (WB-116, WB-18, WB-8, ...
+vs WB-114, WB-127, WB-14, ...) never overlap at all — these are two
+independent pages of institutions, not a left/right split of the same
+rows. There is no "right half" to join against; the 100% mismatch rate
+was the entirely expected, correct result of the join logic comparing two
+unrelated pages against each other under the wrong template. **Not a T26
+extraction-logic gap — a plain misclassification**, most likely a
+mistaken manual assignment from before this session (Wardha.pdf was
+"found already uploaded to the real tenant, outside this session,"
+per the original 2026-09-01 note).
+
+Registered the real "Form B" template
+(`scripts/register_wardha_form_b.py`, kept as a reusable tool,
+`layout=single_page`) and reclassified. Extraction hit two real,
+separate blockers along the way, both resolved:
+
+1. **OpenRouter account ran out of credits mid-run** (`402: This request
+   requires more credits`) — external, account-level, not fixable from
+   code. Switched `AI_VLM_PROVIDER` from `openrouter` to `gemini` in
+   `backend/.env` (the native `GeminiVLMProvider` already existed, fully
+   implemented, using the same `GOOGLE_API_KEY` already configured for
+   embeddings — a completely separate credit pool from OpenRouter).
+2. **A real, small diagnostics bug found live**: several pages failed
+   with `"T22 VLM extraction failed on page N of Wardha.pdf: "` — nothing
+   after the colon. `except Exception as e: ... f"{e}"` silently produces
+   an empty string for exceptions like `httpx.ReadTimeout` that carry no
+   message, only a type. Fixed in `vlm_extraction.py`
+   (`f"{type(e).__name__}: {e}"`) — re-running with the fix revealed the
+   real cause: Gemini's free tier is rate-limited to 20
+   `generate_content` requests/minute, and page-by-page sequential
+   extraction across a 14-page document hit that ceiling. Not fixed
+   further (would need a backoff/retry-with-delay layer, out of scope for
+   this pass) — 13/14 pages succeeded on the pass that used this fixed
+   diagnostic; the corpus entry below reflects that.
+
+Ground truth hand-verified 2026-09-02 by reading page 3 directly against
+the extracted Facts: **7/7 fields match exactly** (`sr_no`, `wakf_name`,
+`sect`, `nature_object`, `admin_of_wakf`, `gross_income`, `value`) —
+1358 real facts written across 13/14 pages.
+
+**Corpus is now 5 real documents, 4 passing at 100% recall** (23/23
+hand-verified fields), 1 documented-failing (unchanged — the original
+1973 gazette's dense 18-row table, a genuine remaining row-matching-
+completeness gap, unrelated to Wardha). Real
+`docker compose exec backend python3 scripts/accuracy_baseline.py`
+output:
 
 ```
 [1] Waqf Institution Registration File — 392 facts, 6/6 (100%)
+[3] Wardha.pdf (Form B) — 1358 facts, 7/7 (100%)
 [4] Aurangabad-Shia.pdf (Form A) — 170 facts, 4/4 (100%)
 [5] Ambajogai (1).pdf (Form A) — 401 facts, 6/6 (100%)
-Corpus size: 5 real documents (3 passing, avg 100% recall; 2 documented-failing)
+Corpus size: 5 real documents (4 passing, avg 100% recall; 1 documented-failing)
 ```
 
-## What's needed to actually close T25/T31/T32
+## What's needed to actually close T25/T26/T31/T32
 
 - **A1**: a real, official reference corpus with human-verified ground
   truth across a representative document sample — now 5 documents one
   person hand-checked across two sessions, still not an official corpus
   with representative coverage (no handwritten-heavy sample, no damaged/
-  torn-page sample, no non-gazette Wakf form type yet).
+  torn-page sample).
 - **D-4**: someone needs to agree what accuracy is "good enough" — this
   report has no pass/fail bar, it just states recall.
 - The gazette's left-page parse-retry fix (above) before that document can
-  move from "documented known-failing" to "passing."
+  move from "documented known-failing" to "passing" — this is now the
+  *only* remaining T26 gap; every other "spread join failure" investigated
+  this session turned out to be a misclassification, not a real pairing
+  bug. Still worth treating this one as genuinely unresolved rather than
+  assuming it's the same root cause.
 - The stamp-obscured-seed-row ditto-corruption bug (above) — needs either
   stamp/seal detection or a per-row confidence signal that can veto a
   ditto-chain when the seed cell itself looks unreadable.
@@ -233,6 +297,10 @@ Corpus size: 5 real documents (3 passing, avg 100% recall; 2 documented-failing)
   the first 8 columns are captured for those rows) — would need either a
   combined template that switches sub-layout per row, or per-row
   classification instead of per-document.
+- Gemini free-tier rate limiting (20 req/min) makes native `gemini` an
+  unreliable default for any multi-page bulk extraction run — needs
+  either a paid tier or a backoff/retry-with-delay layer before relying
+  on it for anything beyond spot-checks like this session's.
 - Wiring `accuracy_baseline.py` (or its successor) into CI once real
   reference PDFs are committed to the repo — right now it depends on live
   data in a real tenant, which CI shouldn't depend on.
