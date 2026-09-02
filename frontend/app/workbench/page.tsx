@@ -561,7 +561,7 @@ export default function WorkbenchPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <RegionHighlightViewer factId={viewingSourceFactId} renderWidth={640} />
+            <RegionViewer factId={viewingSourceFactId} />
           </div>
         </div>
       )}

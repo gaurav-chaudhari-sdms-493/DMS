@@ -296,7 +296,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 # here never aborts the chunk/metadata commit above (search must
                 # never wait on this, Section 3.5).
                 is_scanned_image = filename.lower().rsplit(".", 1)[-1] in {"jpg", "jpeg", "png", "tiff", "bmp", "webp"}
-                if template or is_scanned_image:
+                if template or is_scanned_image or ext == ".pdf":
                     try:
                         from app.pipeline.vlm_extraction import extract_facts_for_document
                         async with db.begin_nested():
