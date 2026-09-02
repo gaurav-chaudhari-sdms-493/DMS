@@ -1,6 +1,6 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy import ForeignKey, TEXT, INTEGER, Index
+from sqlalchemy import ForeignKey, TEXT, INTEGER
 from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import uuid
@@ -12,12 +12,12 @@ if TYPE_CHECKING:
     from app.models.document import Document
 
 class Chunk(Base):
-    __tablename__ = "chunks"
+    __tablename__ = "doc_dg_chunks"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("documents.id"), index=True)
-    version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("document_versions.id"), index=True)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)
+    document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("doc_dg_documents.id"), index=True)
+    version_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("doc_dg_document_versions.id"), index=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("iam_dg_tenants.id"), index=True)
     content: Mapped[str] = mapped_column(TEXT)
     embedding: Mapped[Any] = mapped_column(Vector(1024))
     chunk_metadata: Mapped[dict] = mapped_column(JSONB)

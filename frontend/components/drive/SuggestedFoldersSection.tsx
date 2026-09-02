@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { ChevronDown, Folder as FolderIcon, MoreVertical, Star, Edit2, FolderInput, Trash2 } from "lucide-react";
 import type { Folder } from "@/types";
+import { onKeyActivate } from "@/lib/a11y";
 
 interface SuggestedFoldersProps {
   folders: Folder[];
@@ -59,6 +60,8 @@ export function SuggestedFoldersSection({
             return (
               <div
                 key={item.id}
+                role="button"
+                tabIndex={0}
                 onClick={(e) => {
                   if (onSelectFolder) onSelectFolder(item.raw, e.ctrlKey || e.metaKey || e.shiftKey);
                 }}
@@ -66,6 +69,8 @@ export function SuggestedFoldersSection({
                 onContextMenu={(e) => {
                   if (onContextMenu) onContextMenu(e, item.raw);
                 }}
+                onKeyDown={onKeyActivate(() => onOpenFolder(item.raw))}
+                aria-label={item.name}
                 className={`group relative flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer shadow-xs select-none border ${
                   isSelected
                     ? "bg-[#c2e7ff] border-[#0b57d0] shadow-sm font-semibold"
@@ -96,7 +101,7 @@ export function SuggestedFoldersSection({
 
                 {activeMenuId === item.id && (
                   <>
-                    <div className="fixed inset-0 z-40" onClick={() => setActiveMenuId(null)} />
+                    <div role="presentation" className="fixed inset-0 z-40" onClick={() => setActiveMenuId(null)} />
                     <div className="absolute right-2 top-10 z-50 w-44 bg-white rounded-xl shadow-xl border border-[#e1e3e1] p-1.5 text-xs text-[#1f1f1f]">
                       <button
                         onClick={(e) => {

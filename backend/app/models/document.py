@@ -1,9 +1,9 @@
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy import ForeignKey, Boolean, DateTime
 from datetime import datetime
 import uuid
-from typing import List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING
 
 from app.database import Base
 
@@ -15,21 +15,58 @@ if TYPE_CHECKING:
     from app.models.folder import Folder
 
 class Document(Base):
-    __tablename__ = "documents"
+    __tablename__ = "doc_dg_documents"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("tenants.id"), index=True)
-    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("users.id"), index=True, nullable=True)
-    current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("document_versions.id", use_alter=True, name="fk_document_current_version_id"), nullable=True)
-    folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("folders.id", ondelete="SET NULL"), index=True, nullable=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("iam_dg_tenants.id"), index=True)
+    created_by: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("iam_dg_users.id"), index=True, nullable=True)
+    current_version_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_document_versions.id", use_alter=True, name="fk_doc_dg_documents_current_version"), nullable=True)
+    folder_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("doc_dg_folders.id", ondelete="SET NULL"), index=True, nullable=True)
     title: Mapped[str] = mapped_column()
     doc_type: Mapped[Optional[str]] = mapped_column()
+    mime_type: Mapped[Optional[str]] = mapped_column(nullable=True)
     status: Mapped[str] = mapped_column(default="pending")
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
     
     is_starred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_trashed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     trashed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # T66/D-7 — governs whether/when the retention engine may purge this
+    # document once trashed. Defaults to the never-purge class; only
+    # 'operational_trash' has a finite period (see D7 decision doc).
+    retention_class: Mapped[str] = mapped_column(
+        ForeignKey("sys_dg_retention_classes.class_name"), default="unclassified_permanent", nullable=False
+    )
+
+    # T23 — 'unclassified' is a normal resting state, not an error: most
+    # documents in this system (budgets, financial analyses, ...) are not
+    # statutory forms and never will be. 'dismissed' is an operator
+    # explicitly confirming that, so it stops reappearing in the queue.
+    classification_status: Mapped[str] = mapped_column(default="unclassified", nullable=False)
+    matched_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(
+        ForeignKey("doc_dg_templates.id", ondelete="SET NULL"), nullable=True
+    )
+
+    # T76 — populated once at ingest for every document (not just template
+    # matches, unlike doc_dg_pages which only T22's VLM path writes to).
+    pages_total_count: Mapped[int] = mapped_column(default=0, nullable=False)
+    pages_failed_count: Mapped[int] = mapped_column(default=0, nullable=False)
+
+    # TS2 — data-loss audit (see app/services/data_loss_audit.py). Always
+    # populated at ingest, 0 = clean; details only holds a capped sample
+    # of missing words when the count is non-zero.
+    data_loss_words_missing: Mapped[int] = mapped_column(default=0, nullable=False)
+    data_loss_details: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+
+    # TS6 — page-furniture detection (see app/services/page_furniture_service.py).
+    # Detection only, never applied to chunk content. NULL when nothing detected.
+    page_furniture_candidates: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
+
+    # T79 — fuzzy-duplicate candidates (see app/services/duplicate_service.py),
+    # computed at ingest instead of only on-demand. Informational only, never
+    # blocks upload or auto-merges. NULL when nothing above threshold found.
+    possible_duplicate_candidates: Mapped[Optional[Any]] = mapped_column(JSONB, nullable=True)
 
     tenant: Mapped["Tenant"] = relationship("Tenant", back_populates="documents")
     folder: Mapped[Optional["Folder"]] = relationship("Folder", back_populates="documents")

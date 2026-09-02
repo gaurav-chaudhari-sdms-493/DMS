@@ -55,6 +55,7 @@ export function ConfirmModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-fadeIn select-none">
       <div
+        role="presentation"
         className="w-full max-w-md bg-white border border-[#e1e3e1] rounded-3xl shadow-2xl overflow-hidden animate-scaleUp text-[#1f1f1f]"
         onClick={(e) => e.stopPropagation()}
       >

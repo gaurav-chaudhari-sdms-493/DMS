@@ -53,11 +53,11 @@ export const SearchBar: React.FC<SearchBarProps> = ({ onSearch, loading }) => {
       <input
         ref={inputRef}
         type="text"
+        aria-label="Search documents"
         className="w-full h-14 pl-12 pr-24 bg-surface/50 border border-borderDark rounded-full text-textMain placeholder-textMuted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary focus:bg-surface transition-all shadow-sm focus:shadow-[0_0_20px_rgba(99,102,241,0.2)] glass"
         placeholder={placeholders[placeholderIndex]}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
-        autoFocus
       />
       
       <div className="absolute inset-y-0 right-0 pr-3 flex items-center gap-2">

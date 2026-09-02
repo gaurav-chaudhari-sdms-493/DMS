@@ -1,0 +1,32 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "veritasdocs.fullname" . }}-config
+  labels:
+    {{- include "veritasdocs.labels" . | nindent 4 }}
+  annotations:
+    # Must exist before the pre-install migration Job (hook-weight -5 <
+    # migration-job.yaml's "0") — Helm creates a chart's regular resources
+    # only after pre-install hooks finish, so without this the Job's
+    # envFrom configMapRef fails with "configmap ... not found".
+    "helm.sh/hook": pre-install,pre-upgrade
+    "helm.sh/hook-weight": "-5"
+data:
+  APP_ENV: {{ .Values.app.env | quote }}
+  CORS_ORIGINS: {{ .Values.app.corsOrigins | quote }}
+  AIR_GAPPED: {{ .Values.airGapped.enabled | quote }}
+
+  S3_ENDPOINT_URL: "http://{{ include "veritasdocs.fullname" . }}-minio:9000"
+  S3_PUBLIC_ENDPOINT_URL: "http://{{ include "veritasdocs.fullname" . }}-minio:9000"
+  S3_BUCKET_NAME: {{ (index .Values.minio.buckets 0) | quote }}
+  S3_ARCHIVE_BUCKET_NAME: {{ (index .Values.minio.buckets 1) | quote }}
+  AWS_REGION: "us-east-1"
+
+  AI_LLM_PROVIDER: {{ .Values.app.ai.llmProvider | quote }}
+  AI_EMBED_PROVIDER: {{ .Values.app.ai.embedProvider | quote }}
+  AI_EMBED_FALLBACK_PROVIDER: {{ .Values.app.ai.embedFallbackProvider | quote }}
+  AI_RERANK_PROVIDER: {{ .Values.app.ai.rerankProvider | quote }}
+  AI_OCR_PROVIDER: {{ .Values.app.ai.ocrProvider | quote }}
+  AI_VLM_PROVIDER: {{ .Values.app.ai.vlmProvider | quote }}
+
+  NEXT_PUBLIC_API_URL: {{ printf "http://%s" .Values.ingress.host | quote }}

@@ -2,14 +2,19 @@ import React, { useState } from "react";
 import { Bot, ChevronDown, ChevronUp } from "lucide-react";
 import { Card } from "../ui/Card";
 import { MarkdownViewer } from "../chat/MarkdownViewer";
+import { CitationModal, CitationModalCitation } from "./CitationModal";
 
 interface AISummaryProps {
   summary: string;
+  citations?: CitationModalCitation[];
 }
 
-export const AISummary: React.FC<AISummaryProps> = ({ summary }) => {
+export const AISummary: React.FC<AISummaryProps> = ({ summary, citations = [] }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [activeCitationNumber, setActiveCitationNumber] = useState<number | null>(null);
   const isLong = summary.length > 240;
+
+  const activeCitation = citations.find((c) => c.number === activeCitationNumber) ?? null;
 
   return (
     <Card gradient glow className="animate-slideUp mb-8 relative">
@@ -28,7 +33,10 @@ export const AISummary: React.FC<AISummaryProps> = ({ summary }) => {
                 !isExpanded && isLong ? "max-h-48 overflow-hidden" : ""
               }`}
             >
-              <MarkdownViewer content={summary} />
+              <MarkdownViewer
+                content={summary}
+                onCitationClick={citations.length > 0 ? (n) => setActiveCitationNumber(n) : undefined}
+              />
             </div>
 
             {!isExpanded && isLong && (
@@ -49,6 +57,8 @@ export const AISummary: React.FC<AISummaryProps> = ({ summary }) => {
           )}
         </div>
       </div>
+
+      <CitationModal citation={activeCitation} onClose={() => setActiveCitationNumber(null)} />
     </Card>
   );
 };

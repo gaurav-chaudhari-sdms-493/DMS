@@ -81,12 +81,20 @@ export interface DocumentDetailResponse {
     download_url: string;
     created_at: string;
   }>;
+  // T79 — fuzzy-duplicate candidates found at ingest (embedding similarity
+  // on chunk 0). Informational only; null/absent when nothing above threshold.
+  possible_duplicate_candidates?: Array<{
+    document_id: string;
+    title: string;
+    similarity: number;
+  }> | null;
 }
 
 export interface DriveStats {
   total_files: number;
   total_folders: number;
-  total_size_bytes: number;
+  total_bytes?: number;
+  total_size_bytes?: number;
   total_starred: number;
   total_trashed: number;
 }
@@ -102,14 +110,29 @@ export interface SearchResult {
   metadata: Record<string, unknown>;
 }
 
+export interface Citation {
+  number: number;
+  claim: string;
+  document_id: string;
+  document_name: string;
+  page_number: number | null;
+  chunk_id?: string | null;
+  fact_id?: string | null;
+  download_url?: string | null;
+}
+
 export interface SearchResponse {
   query: string;
   ai_summary: string;
   results: SearchResult[];
+  citations?: Citation[];
+  refused?: boolean;
   cached: boolean;
   took_ms: number;
   search_mode?: string;
   hyde_triggered?: boolean;
+  reranked?: boolean;
+  grounded?: boolean;
 }
 
 export interface ChatMessage {
@@ -139,5 +162,29 @@ export interface ChatSession {
   created_at: string;
   updated_at: string;
   messages: ChatMessage[];
+}
+
+export interface TemplateFieldDef {
+  name: string;
+  type: string;
+  required?: boolean;
+  role?: string | null;
+}
+
+export interface TemplateResponse {
+  id: string;
+  form_type: string;
+  era_label: string;
+  field_schema: TemplateFieldDef[];
+  layout: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TemplateCreatePayload {
+  form_type: string;
+  era_label: string;
+  field_schema: TemplateFieldDef[];
+  layout: string;
 }
 

@@ -593,6 +593,8 @@ export function DocumentPreviewModal({
                 <h3 className="text-lg font-bold text-[#1f1f1f] mb-1">{doc.title}</h3>
                 <span className="text-xs text-[#747775]">Audio File</span>
               </div>
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption -- arbitrary user-uploaded audio,
+                  no transcript/caption source exists to attach; an empty track would falsely claim one */}
               <audio controls src={doc.download_url} className="w-full" />
             </div>
           )}
@@ -600,6 +602,8 @@ export function DocumentPreviewModal({
           {/* Video Player */}
           {isVideo && doc.download_url && (
             <div className="w-full max-w-4xl max-h-[80vh] flex items-center justify-center">
+              {/* eslint-disable-next-line jsx-a11y/media-has-caption -- arbitrary user-uploaded video,
+                  no transcript/caption source exists to attach; an empty track would falsely claim one */}
               <video
                 controls
                 autoPlay
@@ -671,16 +675,44 @@ export function DocumentPreviewModal({
             style={{ width: `${chatWidth}px` }}
             className="border-l border-[#e1e3e1] bg-white flex flex-col h-full shadow-2xl animate-fadeIn relative z-20 flex-shrink-0 transition-none"
           >
-            {/* Draggable Left Boundary Handle */}
+            {/* Draggable Left Boundary Handle. WAI-ARIA APG "window splitter" pattern:
+                role="separator" with tabIndex+onKeyDown is the recommended accessible
+                resize-handle widget; jsx-a11y's interactive-roles list doesn't include
+                separator, hence the block disable below. */}
+            {/* eslint-disable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
             <div
+              role="separator"
+              aria-orientation="vertical"
+              aria-label="Resize chat panel"
+              aria-valuenow={chatWidth}
+              aria-valuemin={340}
+              aria-valuemax={typeof window !== "undefined" ? Math.min(950, window.innerWidth - 200) : 950}
+              tabIndex={0}
               onMouseDown={handleChatMouseDown}
+              onKeyDown={(e) => {
+                const maxWidth = typeof window !== "undefined" ? Math.min(950, window.innerWidth - 200) : 950;
+                if (e.key === "ArrowLeft") {
+                  e.preventDefault();
+                  setChatWidth((w) => Math.min(maxWidth, w + 20));
+                } else if (e.key === "ArrowRight") {
+                  e.preventDefault();
+                  setChatWidth((w) => Math.max(340, w - 20));
+                } else if (e.key === "Home") {
+                  e.preventDefault();
+                  setChatWidth(340);
+                } else if (e.key === "End") {
+                  e.preventDefault();
+                  setChatWidth(maxWidth);
+                }
+              }}
               className={`absolute left-0 top-0 bottom-0 w-2.5 -ml-1.5 cursor-col-resize z-50 flex items-center justify-center group hover:bg-[#0b57d0]/20 transition-colors ${
                 isResizingChat ? "bg-[#0b57d0]/30" : ""
               }`}
-              title="Click and drag to extend/resize chatbot width"
+              title="Click and drag, or use arrow keys, to resize the chat panel"
             >
               <div className="w-1 h-10 bg-[#c4c7c5] group-hover:bg-[#0b57d0] rounded-full transition-colors" />
             </div>
+            {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
 
             {/* Header */}
             <div className="p-4 border-b border-[#e1e3e1] flex items-center justify-between bg-[#f8fafd] shadow-2xs">
@@ -790,6 +822,7 @@ export function DocumentPreviewModal({
               <div className="flex-1 relative flex items-center">
                 <input
                   type="text"
+                  aria-label={`Ask AI about ${doc.title}`}
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder={`Ask AI about ${doc.title}...`}

@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "dms-email-router",
+  "main": "src/index.js",
+  "compatibility_date": "2024-09-23",
+  "vars": {
+    "BACKEND_URL": "https://dms.yourdomain.com"
+  }
+}

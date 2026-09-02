@@ -1,0 +1,881 @@
+<!DOCTYPE html>
+<!-- saved from url=(0133)https://efab1f85-92f7-4f6b-9c4b-84abbb9be6d1.frame.claudeusercontent.com/_f/1786965210-17dc/?__frame_v=manifest.7ad9d6101669efe9.json -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><!-- frame-runtime --><!--<base href="/_f/1786965210-17dc/">--><base href="."><script>window.__FRAME_PREAMBLE={"capabilities":{"artifact":"artifact.BWD0CGLd.js","assets":"assets.a_mJ8q_Q.js","comments":"comments.DGBrvfFR.js","db":"db.VpIrzqr_.js","downloads":"downloads.BXsoAvg9.js","mcp":"mcp.D3B2EyQu.js","permissions":"permissions.BNySkLV5.js","room":"room.BgXZkiYR.js","sample":"sample.kXGC3wc0.js","self":"artifact.BWD0CGLd.js","user":"user.CGub7vEP.js"},"transforms":"_transforms.BI3gXbbT.js","comments":"_comments.hMHmCz0l.js","translate":"_translate.3AdCy0Ua.js"}</script><script>(function(){"use strict";var ce=["light","dark","system"],ue=/^[A-Za-z0-9_-]{1,64}$/,V=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,fe=new Set(["class","hidden","value","checked"]);function de(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||fe.has(t)}var pe="http://www.w3.org/1999/xhtml",me="http://www.w3.org/2000/svg",ge=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),_e=new Set(["script","style"]);function ve(e){const t=e.localName.toLowerCase();return e.namespaceURI===pe?!ge.has(t):e.namespaceURI===me?!_e.has(t):!1}function he(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_patch;if(t===null||typeof t!="object")return!1;const{seq:n,elements:a}=t;if(typeof n!="number"||!Number.isSafeInteger(n)||!Array.isArray(a)||a.length===0||a.length>64)return!1;for(const i of a){if(i===null||typeof i!="object")return!1;const r=i;if(typeof r.target!="string"||!ue.test(r.target)||r.text!==void 0&&typeof r.text!="string")return!1;if(r.attrsSet!==void 0){if(r.attrsSet===null||typeof r.attrsSet!="object")return!1;for(const[l,c]of Object.entries(r.attrsSet))if(!V.test(l)||typeof c!="string")return!1}if(r.attrsRemoved!==void 0){if(!Array.isArray(r.attrsRemoved))return!1;for(const l of r.attrsRemoved)if(typeof l!="string"||!V.test(l))return!1}}return!0}function ye(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function be(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function Ee(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const n=t.theme;return typeof n=="string"&&ce.includes(n)}function we(e){try{typeof reportError=="function"?reportError(e):setTimeout(()=>{throw e},0)}catch{}}var X=["#62744c","#b04e72","#5b7596","#a3651f","#7a6ba8","#3f7a75"],J=e=>{let t=0;for(let n=0;n<e.length;n++)t=t*31+e.charCodeAt(n)>>>0;return X[t%X.length]??"#788c5d"},Z="#c7c9d1",Ae=["data:image","/svg+xml,"].join(""),Q=e=>Ae+"%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Ccircle cx='1' cy='1' r='1' fill='"+encodeURIComponent(e)+"'/%3E%3C/svg%3E",Se=Object.freeze({id:null,name:"",avatarUrl:Q(Z),color:Z,email:null,isOwner:!1,canEdit:!1}),je=(...e)=>{const t=e[0],n=typeof t=="string"?[t]:Array.isArray(t)?t.filter(i=>typeof i=="string"):[],a=Object.create(null);for(const i of n)a[i]={id:i,name:"",avatarUrl:Q(J(i)),color:J(i),email:null,isMe:!1};return a},ee=Object.freeze(Object.assign(Object.create(null),{user:Object.freeze(Object.assign(Object.create(null),{id:null,isOwner:!1,canEdit:!1,me:Se,profiles:je,name:"",avatarUrl:null,search:Object.freeze([]),email:null}))})),Re={sample:"sample"};function te(){const e=new Uint8Array(20);try{crypto.getRandomValues(e)}catch{for(let n=0;n<e.length;n++)e[n]=Math.floor(Math.random()*256)}let t="";for(const n of e)t+=(n%36).toString(36);return t}function Oe(e,t){const n=r=>{const l={path:r},c=r.split("/");return{id:c[c.length-1],path:r,get:()=>t("get",[l]),set:d=>t("set",[l,d]),update:d=>t("update",[l,d]),delete:()=>t("delete",[l]),acquire:d=>t("acquire",[l,d]),onSnapshot:(d,E)=>t("subscribe",[l,d,E]),collection:d=>i(r+"/"+String(d))}},a=r=>({where:(l,c,d)=>a({...r,where:[...r.where??[],{f:String(l),op:String(c),v:d}]}),orderBy:(l,c)=>a({...r,orderBy:{f:String(l),dir:c===void 0?"asc":String(c)}}),limit:l=>a({...r,limit:Number(l)}),get:()=>t("query",[r]),onSnapshot:(l,c)=>t("subscribe",[r,l,c])}),i=r=>({...a({collection:r}),path:r,doc:l=>n(r+"/"+(l===void 0?te():String(l))),add:l=>{const c=n(r+"/"+te());return Promise.resolve(c.set(l)).then(()=>c)}});e.doc=r=>n(String(r)),e.collection=r=>i(String(r))}var Pe=Object.freeze([]);function Te(e,t){let n=null,a=null;const i=()=>e.__settled;e.peers=()=>Pe,e.connected=()=>!1,e.emit=()=>i()?.()??Promise.resolve(),e.presence=r=>{const l=i();if(l)return l();let c=null;if(r!==null&&typeof r=="object")try{Array.isArray(r)||(c={...r})}catch{}return c===null?Promise.reject({code:"invalid_argument",message:"presence takes an object"}):(n===null&&(n=Object.create(null),a=Promise.resolve(t("presence",[n]))),Object.assign(n,c),a)}}var B="__frame_scroll",Me=150,Le=310,ke=160,Ce=3e4;function Ne(){let e=0,t=!1,n=!1,a=!1,i=0,r=null;const l=u=>{try{sessionStorage.setItem(B,JSON.stringify({y:u}))}catch{}},c=()=>{if(clearTimeout(e),r===null)return;const u=r;r=null,l(u)},d=()=>{if(t){t=!1;return}n=!0,r=scrollY,clearTimeout(e),e=setTimeout(c,Me)};try{addEventListener("scroll",d,{passive:!0}),addEventListener("pagehide",c)}catch{}const E=()=>{let u;try{u=sessionStorage.getItem(B)}catch{return null}if(u===null)return null;let g;try{g=JSON.parse(u)}catch{g=null}const f=g?.y;if(!(typeof f=="number"&&Number.isFinite(f)&&f>=0)){try{sessionStorage.removeItem(B)}catch{}return null}return f};let T=!1;const h=u=>{try{const g=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),i=u,a=!0,clearTimeout(e),r=null,l(u);const f=scrollY;f!==g&&(t=!0),f!==u&&!T&&(T=!0,addEventListener("load",()=>{try{if(scrollY===f){const p=E();h(p!==null?p:i)}}catch{}},{once:!0}))}catch{}},R=()=>{try{return!!location.hash}catch{return!0}};let A=!1;const O=()=>{try{if(A||innerWidth>Le||innerHeight>ke)return;A=!0;const u=Date.now(),g=()=>{try{removeEventListener("resize",g)}catch{}if(Date.now()-u>Ce||n||R())return;const f=E();h(f!==null?f:i)};addEventListener("resize",g)}catch{}};let M=!1,o=!1;return{restore(){if(M||(M=!0,R()))return;const u=E();u!==null&&(h(u),O())},promoted(){if(o||(o=!0,R()))return;const u=E();u!==null?(h(u),O()):a&&h(i)}}}var Ye="modulepreload",We=function(e){return"/"+e},Ke={},Ue=function(t,n,a){let i=Promise.resolve();function r(l){const c=new Event("vite:preloadError",{cancelable:!0});if(c.payload=l,window.dispatchEvent(c),!c.defaultPrevented)throw l}return i.then(l=>{for(const c of l||[])c.status==="rejected"&&r(c.reason);return t().catch(r)})};(function(){const e=Object.defineProperty,t=globalThis,n=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let a=0;for(let i=0;i<n.length;i++){const r=n[i];try{e(t,r,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[r]}catch{}try{e(t,r,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[r]=="function"&&a++}if(a&&window!==top)try{parent.postMessage({__frame_rtc_lockdown_failed:a},"*")}catch{}})();var qe=1e4,Ie=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function re(e){for(const t of Ie)if(t.endsWith(":*"))try{const n=new URL(e);if(`${n.protocol}//${n.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var k=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),x=window.__FRAME_PREAMBLE?.transforms,$=window.__FRAME_PREAMBLE?.comments,z=window.__FRAME_PREAMBLE?.translate,q=/^[\w.-]+\.js$/,De=/^[a-z][a-z0-9_-]{0,63}$/,I=e=>Ue(()=>import("/_runtime/"+e),void 0);function Be(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:Y,pipe:()=>({wrap:(n,a)=>(...i)=>{try{return a(...i)}catch(r){return Promise.reject(r)}}})}}var ne=null,C=null;function F(e,t,n){try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var H=!1;function xe(e,t){const n=[];for(const a of e.elements){const i=document.querySelector(`[data-id="${a.target}"]`);if(!i){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if([...Object.keys(a.attrsSet??{}),...a.attrsRemoved??[]].some(r=>!de(r))){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if(a.text!==void 0&&!ve(i)){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}for(const[r,l]of Object.entries(a.attrsSet??{}))if(!oe(i,r)){try{i.setAttribute(r,l)}catch{}se(i,r,l)}for(const r of a.attrsRemoved??[])oe(i,r)||(i.removeAttribute(r),se(i,r,null));typeof a.text=="string"&&(i.textContent=a.text),n.push(a.target)}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function se(e,t,n){if(!(e instanceof HTMLInputElement))return;const a=t.toLowerCase();a==="checked"?e.checked=n!==null:a==="value"&&e.type!=="file"&&(e.value=n??"")}function oe(e,t){const n=t.toLowerCase(),a=e;return n==="data-id"||(n==="value"||n==="checked")&&(a.__artifactSecret===!0||/^(password|hidden|file)$/.test(a.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${a.autocomplete??""}`))}function ae(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,H=!0):H&&(delete t.dataset.theme,t.style.colorScheme="",H=!1)}var ie=256,N=Object.assign(Object.create(null),{mcp:Object.assign(Object.create(null),{watchTool:{handlerArg:3}}),db:Object.assign(Object.create(null),{subscribe:{handlerArg:1,errArg:2}}),room:Object.assign(Object.create(null),{on:{handlerArg:1,errArg:2},onPeers:{handlerArg:0,errArg:1},onConnection:{handlerArg:0,errArg:1}})}),$e=Object.assign(Object.create(null),{db:(e,t)=>Oe(e,t),room:(e,t,n)=>Te(e,n)}),j=new Map;function Y(e,t){const n=j.get(e);if(!n)return;const a=Object.assign(Object.create(null),t);Object.assign(n.impl,a),n.r(n.ns),n.impl.__settled=()=>Promise.reject({code:"capability_removed",message:`${e}: method not in this runtime`});const i=n.queue;n.queue=[];for(const r of i){const l=a[r.method];if(l)if(N[e]?.[r.method])try{r.resolve(l(...r.args))}catch{U(r,N[e][r.method],{code:"transform_error",message:`${e}.${r.method} rejected its arguments`})}else l(...r.args).then(r.resolve,r.reject);else{const c={code:"capability_removed",message:`${e}.${r.method} is not in this runtime`},d=N[e]?.[r.method];if(d){U(r,d,c);continue}r.reject(c)}}}function ze(e,t){const n=j.get(e);if(!n)return;n.impl.__settled=()=>Promise.reject(t),n.r(null);const a=n.queue;n.queue=[];for(const i of a){const r=N[e]?.[i.method];if(r){U(i,r,t);continue}i.reject(t)}}function le(e,t){if(typeof e=="function")try{return e(...t)}catch{return Object.create(null)}return Array.isArray(e)?[...e]:e!==null&&typeof e=="object"?{...e}:e}function D(e,t){const n=ee[e];if(!n){ze(e,t);return}j.get(e)?.r(null),Y(e,Object.fromEntries(Object.entries(n).map(([a,i])=>[a,(...r)=>Promise.resolve(le(i,r))])))}function U(e,t,n){if(e.syncState?.dead)return;const a=t.errArg===void 0?void 0:e.args[t.errArg],i=t.errArg===void 0?e.args[t.handlerArg]:a;typeof i=="function"&&queueMicrotask(()=>{if(!e.syncState?.dead)try{i(t.errArg===void 0?{type:"error",error:n}:n)}catch(r){we(r)}})}var W=Object.getOwnPropertyDescriptor(window,"claude");if(window!==top&&!(W&&W.writable===!1)){const e=x&&q.test(x)?I(x).catch(()=>{}):Promise.resolve(void 0),t=o=>{if(o.type==="auxclick"&&o.button!==1)return;const u=o.target,g=u&&u.closest?u.closest("a[href],area[href]"):null;if(!g)return;const f=g.getAttribute("href");if(!f)return;let p,P;try{p=new URL(f,document.baseURI),P=new URL(document.baseURI).origin}catch{return}if((p.protocol==="http:"||p.protocol==="https:")&&p.origin!==P){o.preventDefault();const w=(g.getAttribute("target")??"").toLowerCase(),y=o.type==="auxclick"||o.metaKey||o.ctrlKey||o.shiftKey||o.altKey||!["","_self","_top","_parent"].includes(w);parent.postMessage({__frame_nav:!0,url:p.href,newTab:y},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const n={},a=o=>{o.isTrusted&&(n.pointer=!0)},i=o=>{o.isTrusted&&(n.click=!0)};addEventListener("pointermove",a,{capture:!0,passive:!0}),addEventListener("click",i,{capture:!0,passive:!0}),e.then(o=>{o?.wireNav&&(o.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",a,!0),removeEventListener("click",i,!0),o.wireEngagement?.(n))});let r=null;try{r=Ne()}catch{}const l=W?.value??{};F(window,"claude",l);const c=o=>{let u;const g=new Promise(v=>{u=v}),f={impl:Object.create(null),queue:[],u:g,r:u,ns:null};j.set(o,f);const p=f.impl,P=v=>({code:"queue_overflow",message:`${o}.${v}: pre-init call queue is full`}),w=(v,s)=>{if(f.queue.length>=ie){const m=ee[o];return m&&v in m?Promise.resolve(le(m[v],s)):Promise.reject(P(v))}return new Promise((m,_)=>{f.queue.push({method:v,args:s,resolve:m,reject:_})})},y=Re[o],L=new Proxy(y===void 0?p:(()=>{}),{apply:(v,s,m)=>{const _=y,b=p[_]??p.__settled;return b?b(...m):w(_,m)},get:(v,s)=>{if(typeof s!="string"||s==="then"||s==="toJSON"||s==="valueOf")return;if(s==="toString")return Object.prototype.toString;if(y!==void 0&&(s==="call"||s==="apply"||s==="bind"))return Function.prototype[s];const m=N[o]?.[s];return m?(..._)=>{if(typeof _[m.handlerArg]!="function")throw new TypeError(`${o}.${s} requires a handler function`);const b=p[s];if(b)return b(..._);if(p.__settled){const S={dead:!1},Fe={args:[..._],syncState:S};return p.__settled().catch(He=>U(Fe,m,He)),()=>{S.dead=!0}}if(f.queue.length>=ie){const S={dead:!1};return U({args:[..._],syncState:S},m,P(s)),()=>{S.dead=!0}}let K=null;const G={dead:!1};return f.queue.push({method:s,args:_,resolve:S=>{K=typeof S=="function"?S:null,G.dead&&K?.()},reject:()=>{},syncState:G}),()=>{G.dead=!0,K?.()}}:(..._)=>{const b=p[s]??p.__settled;return b?b(..._):w(s,_)}},set:()=>!1});$e[o]?.(p,(v,s)=>L[v](...s),w),f.ns=L,F(l,o,L)};for(const o of Object.keys(k)){if(l[o]!==void 0){F(l,o,l[o]);continue}c(o)}if(l.use===void 0){const o=u=>{if(typeof u!="string"||!Object.hasOwn(k,u))return Promise.resolve(null);const g=j.get(u);return g?g.u:Promise.resolve(l[u]??null)};try{Object.defineProperty(l,"use",{value:o,writable:!0,configurable:!0,enumerable:!1})}catch{}}let d=null,E=null,T=0;const h=o=>{o.source!==parent||!re(o.origin)||ye(o.data)&&(d=o.data.__frame_init,C=o.origin,removeEventListener("message",h),clearTimeout(T),E?.())};addEventListener("message",h),parent.postMessage({__frame_connect:!0},"*");const R=new Promise(o=>{E=o,T=setTimeout(()=>{removeEventListener("message",h),o()},qe)}),A=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();A.then(()=>{try{r?.restore()}catch{}});const O={cb:null},M=o=>{if(!(o.source!==parent||!re(o.origin))&&be(o.data)){try{r?.promoted()}catch{}O.cb?.()}};addEventListener("message",M),R.then(async()=>{if(!d||!C){for(const s of j.keys())D(s,{code:"not_granted",message:"frame initialization did not arrive - capability unavailable"});return}ae(d.theme);const o=C;let u=!1,g=!1;addEventListener("message",s=>{if(s.source!==parent||s.origin!==o)return;Ee(s.data)&&ae(s.data.__frame_theme.theme),he(s.data)&&xe(s.data.__frame_patch,o);const m=s.data?.__fc_mode;m&&typeof m=="object"&&!u&&$&&q.test($)&&(u=!0,I($).then(b=>b.install?.(o,m.on===!0)).catch(()=>{}));const _=s.data?.__ft_cmd;_&&typeof _=="object"&&!g&&z&&q.test(z)&&(g=!0,I(z).then(b=>b.install?.(o,_)).catch(()=>{}))});const f=Object.keys(d.capabilities??{});for(const s of f)Object.hasOwn(k,s)||De.test(s)&&l[s]===void 0&&(c(s),D(s,{code:"capability_disabled",message:"capability not in this runtime generation"}));const p=f.filter(s=>Object.hasOwn(k,s)).map(s=>[s,k[s]]).filter(s=>typeof s[1]=="string"&&q.test(s[1])),P=await Promise.allSettled(p.map(([,s])=>I(s))),w=await e,y=C;w?.buildBoot||parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},y),ne=w?.buildBoot?w.buildBoot(d,w.TRANSFORMS??{},{shellOrigin:y,mount:Y},s=>parent.postMessage({__frame_cap_telemetry:s},y)):Be(d,y);const L=s=>parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:s}},y),v=ne;P.forEach((s,m)=>{const _=p[m][0];if(s.status!=="fulfilled"){L(_);return}try{s.value?.install?.(v)}catch{L(_)}});for(const[s,m]of j)if(m.impl.__settled===void 0){if(f.includes(s)){D(s,{code:"capability_disabled",message:"capability not available in this session"});continue}D(s,{code:"not_granted",message:"capability not available in this session"})}await A,parent.postMessage({__frame_ready:!0},C),e.then(s=>s?.installSizeReporter?.(y,O))})}})();</script><!-- /frame-runtime --><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>VeritasDocs Scope Gap</title>
+<style>
+  :root {
+    --ground: #fbfbfc;
+    --surface: #ffffff;
+    --surface-2: #f3f4f7;
+    --ink: #16181f;
+    --muted: #5c6273;
+    --hairline: #dde0e8;
+    --accent: #2a4b8d;
+    --accent-soft: #eaeff8;
+    --crit: #a02a30;
+    --crit-soft: #f8ecec;
+    --warn: #8a6412;
+    --warn-soft: #f9f2e4;
+    --ok: #2c6a4a;
+    --ok-soft: #eaf3ee;
+
+    --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --body: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+    --measure: 74ch;
+    --page: 62rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1116;
+      --surface: #161922;
+      --surface-2: #1c2029;
+      --ink: #e6e8ee;
+      --muted: #99a0b2;
+      --hairline: #272c39;
+      --accent: #8fb2ea;
+      --accent-soft: #1a2434;
+      --crit: #e58a91;
+      --crit-soft: #2c1a1d;
+      --warn: #d9a848;
+      --warn-soft: #2a2317;
+      --ok: #74c298;
+      --ok-soft: #16261f;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1116;
+    --surface: #161922;
+    --surface-2: #1c2029;
+    --ink: #e6e8ee;
+    --muted: #99a0b2;
+    --hairline: #272c39;
+    --accent: #8fb2ea;
+    --accent-soft: #1a2434;
+    --crit: #e58a91;
+    --crit-soft: #2c1a1d;
+    --warn: #d9a848;
+    --warn-soft: #2a2317;
+    --ok: #74c298;
+    --ok-soft: #16261f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: 0 1.5rem 6rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 3.5rem 0 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(2.1rem, 5.5vw, 3.1rem);
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    font-family: var(--display);
+    font-size: clamp(1.05rem, 2.2vw, 1.25rem);
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .filing {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem 1.5rem;
+    border-top: 1px solid var(--hairline);
+    padding-top: 1rem;
+    margin-top: 0.5rem;
+  }
+
+  .filing div { display: flex; flex-direction: column; gap: 0.15rem; }
+
+  .filing dt, .filing .k {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .filing .v { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+
+  /* ---------- sections ---------- */
+
+  section { padding-top: 3.25rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 0.4rem;
+    display: flex;
+    align-items: baseline;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+  }
+
+  h2 .ref {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: none;
+  }
+
+  h3 {
+    font-family: var(--body);
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.5rem;
+  }
+
+  .lede { max-width: var(--measure); color: var(--muted); margin: 0 0 1.5rem; }
+
+  p { max-width: var(--measure); }
+
+  /* ---------- stat tiles ---------- */
+
+  .tiles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+    margin-top: 1.5rem;
+  }
+
+  .tile {
+    background: var(--surface);
+    padding: 1.25rem 1.15rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.3rem;
+  }
+
+  .tile .num {
+    font-family: var(--display);
+    font-size: 2.4rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  .tile .label { font-size: 0.82rem; color: var(--muted); line-height: 1.4; }
+  .tile.is-crit .num { color: var(--crit); }
+  .tile.is-warn .num { color: var(--warn); }
+
+  /* ---------- module matrix ---------- */
+
+  .matrix {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+  }
+
+  .mrow {
+    background: var(--surface);
+    display: grid;
+    grid-template-columns: 2.4rem minmax(9rem, 1.1fr) 7rem minmax(10rem, 1.4fr);
+    gap: 1rem;
+    align-items: center;
+    padding: 0.85rem 1rem;
+    border-left: 3px solid transparent;
+  }
+
+  .mrow.lv-none { border-left-color: var(--crit); }
+  .mrow.lv-early { border-left-color: var(--warn); }
+  .mrow.lv-part { border-left-color: var(--ok); }
+
+  .mrow .letter {
+    font-family: var(--mono);
+    font-size: 0.95rem;
+    color: var(--muted);
+  }
+
+  .mrow .name { font-weight: 600; font-size: 0.95rem; }
+  .mrow .name small {
+    display: block;
+    font-family: var(--mono);
+    font-weight: 400;
+    font-size: 0.68rem;
+    color: var(--muted);
+    letter-spacing: 0.04em;
+  }
+
+  .bar {
+    height: 0.5rem;
+    background: var(--surface-2);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .bar span { display: block; height: 100%; }
+  .lv-none .bar span { background: var(--crit); }
+  .lv-early .bar span { background: var(--warn); }
+  .lv-part .bar span { background: var(--ok); }
+
+  .barwrap { display: flex; flex-direction: column; gap: 0.3rem; }
+  .barwrap .pct {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+  }
+
+  .mrow .verdict { font-size: 0.85rem; color: var(--muted); }
+
+  @media (max-width: 40rem) {
+    .mrow {
+      grid-template-columns: 2.4rem 1fr;
+      row-gap: 0.5rem;
+    }
+    .mrow .barwrap, .mrow .verdict { grid-column: 2; }
+  }
+
+  /* ---------- module detail ---------- */
+
+  .module {
+    border-top: 1px solid var(--hairline);
+    padding-top: 1.75rem;
+    margin-top: 1.75rem;
+  }
+
+  .module:first-of-type { border-top: 0; }
+
+  .module-head {
+    display: flex;
+    align-items: baseline;
+    gap: 0.7rem;
+    flex-wrap: wrap;
+    margin-bottom: 0.9rem;
+  }
+
+  .module-head h4 {
+    font-family: var(--display);
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .module-head .ref {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    color: var(--muted);
+  }
+
+  .pill {
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    letter-spacing: 0.09em;
+    text-transform: uppercase;
+    padding: 0.2rem 0.5rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .pill.p-none { background: var(--crit-soft); color: var(--crit); }
+  .pill.p-early { background: var(--warn-soft); color: var(--warn); }
+  .pill.p-part { background: var(--ok-soft); color: var(--ok); }
+
+  .cols {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+    gap: 1.5rem;
+  }
+
+  ul { margin: 0; padding-left: 1.1rem; }
+  li { margin-bottom: 0.4rem; }
+  li:last-child { margin-bottom: 0; }
+
+  ul.built li::marker { color: var(--ok); }
+  ul.gap li::marker { color: var(--crit); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.82em;
+    background: var(--surface-2);
+    padding: 0.08em 0.34em;
+    border-radius: 2px;
+    word-break: break-word;
+  }
+
+  /* ---------- tables ---------- */
+
+  .scroll { overflow-x: auto; border: 1px solid var(--hairline); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 34rem;
+    background: var(--surface);
+    font-size: 0.88rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.65rem 0.9rem;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: var(--body);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td { border-bottom: 0; }
+
+  /* ---------- callouts ---------- */
+
+  .escalation {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-left: 3px solid var(--crit);
+    padding: 1.1rem 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .stack { display: flex; flex-direction: column; gap: 1rem; }
+
+  .escalation .title {
+    font-family: var(--display);
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .escalation p { margin: 0; }
+
+  .note {
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    padding: 1.1rem 1.25rem;
+    font-size: 0.88rem;
+    color: var(--muted);
+  }
+
+  .note p { margin: 0 0 0.6rem; max-width: none; }
+  .note p:last-child { margin-bottom: 0; }
+  .note strong { color: var(--ink); }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, [tabindex]:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Scope baseline v0.3 · CR-001 · 05-Aug-2026</p>
+    <h1>VeritasDocs v1 — scope versus what is built</h1>
+    <p class="standfirst">The DMS repository read module by module against the Scope of Work. Two of ten modules have meaningful work in them. The four hostile-format handlers the SoW calls “the product’s core IP — highest engineering priority” have not been started.</p>
+    <div class="filing">
+      <div><span class="k">Baseline</span><span class="v">SoW VeritasDocs v1, v0.3</span></div>
+      <div><span class="k">Code assessed</span><span class="v">branch <code>dev</code> @ <code>5d8e1cb</code></span></div>
+      <div><span class="k">Assessed</span><span class="v">17-Aug-2026</span></div>
+      <div><span class="k">Method</span><span class="v">Source read, no test run</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>Where v1 stands</h2>
+    <p class="lede">Milestone-wise the repository sits at a partial <strong>M0</strong> plus a slice of <strong>M4</strong> search. Nothing from M1, M2, M3 or M5 exists.</p>
+    <div class="tiles">
+      <div class="tile is-warn">
+        <span class="num">2/10</span>
+        <span class="label">Modules with meaningful work. Six are at zero.</span>
+      </div>
+      <div class="tile is-crit">
+        <span class="num">0/4</span>
+        <span class="label">Hostile-format handlers built — §3.2, named highest engineering priority</span>
+      </div>
+      <div class="tile is-crit">
+        <span class="num">0/3</span>
+        <span class="label">§11 hard rules implemented or testable</span>
+      </div>
+      <div class="tile is-crit">
+        <span class="num">0/6</span>
+        <span class="label">§6 engineering standards currently met</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Module status <span class="ref">§3.1 – §3.10</span></h2>
+    <p class="lede">Percentages are an engineering judgement from reading the source, not a measured figure. They express how much of each module’s v1 (P0) scope is present.</p>
+
+    <div class="matrix">
+      <div class="mrow lv-early">
+        <span class="letter">(a)</span>
+        <span class="name">Ingestion &amp; Connectors<small>§3.1</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:20%"></span></span><span class="pct">~20%</span></span>
+        <span class="verdict">2 of 9 connectors; no abstraction layer</span>
+      </div>
+      <div class="mrow lv-early">
+        <span class="letter">(b)</span>
+        <span class="name">Processing Pipeline<small>§3.2</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:10%"></span></span><span class="pct">~10%</span></span>
+        <span class="verdict">Core IP absent; OCR is English-only</span>
+      </div>
+      <div class="mrow lv-none">
+        <span class="letter">(c)</span>
+        <span class="name">Verification Workbench<small>§3.3</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:2%"></span></span><span class="pct">0%</span></span>
+        <span class="verdict">Not started; no source coordinates stored</span>
+      </div>
+      <div class="mrow lv-none">
+        <span class="letter">(d)</span>
+        <span class="name">Entity &amp; Knowledge<small>§3.4</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:2%"></span></span><span class="pct">0%</span></span>
+        <span class="verdict">No graph schema; container model conflicts</span>
+      </div>
+      <div class="mrow lv-part">
+        <span class="letter">(e)</span>
+        <span class="name">Search &amp; Q&amp;A<small>§3.5</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:60%"></span></span><span class="pct">~60%</span></span>
+        <span class="verdict">Strongest module; citation rule unenforced</span>
+      </div>
+      <div class="mrow lv-none">
+        <span class="letter">(f)</span>
+        <span class="name">Records &amp; Versioning<small>§3.6</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:2%"></span></span><span class="pct">0%</span></span>
+        <span class="verdict">File revisions only, no amendment chains</span>
+      </div>
+      <div class="mrow lv-none">
+        <span class="letter">(g)</span>
+        <span class="name">Reports &amp; Analytics<small>§3.7</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:2%"></span></span><span class="pct">0%</span></span>
+        <span class="verdict">Usage counters exist, not gap scoring</span>
+      </div>
+      <div class="mrow lv-early">
+        <span class="letter">(h)</span>
+        <span class="name">Governance &amp; Audit<small>§3.8</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:15%"></span></span><span class="pct">~15%</span></span>
+        <span class="verdict">2 roles of 6; audit not tamper-evident</span>
+      </div>
+      <div class="mrow lv-none">
+        <span class="letter">(i)</span>
+        <span class="name">Data Operations<small>§3.9</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:2%"></span></span><span class="pct">0%</span></span>
+        <span class="verdict">No dedup, bulk edit, or export</span>
+      </div>
+      <div class="mrow lv-early">
+        <span class="letter">(j)</span>
+        <span class="name">Admin &amp; Deployment<small>§3.10</small></span>
+        <span class="barwrap"><span class="bar"><span style="width:25%"></span></span><span class="pct">~25%</span></span>
+        <span class="verdict">Air-gapped profile currently unreachable</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Module detail</h2>
+    <p class="lede">What exists, what is missing, and where the evidence sits in the tree.</p>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(a) Ingestion &amp; Connector Framework</h4>
+        <span class="ref">§3.1</span>
+        <span class="pill p-early">~20%</span>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Built</h3>
+          <ul class="built">
+            <li>Manual upload (UI) and a REST upload endpoint, single and bulk</li>
+            <li>SHA-256 computed at capture — <code>document_service.py:52</code></li>
+            <li>Object storage write plus async Celery hand-off</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Missing</h3>
+          <ul class="gap">
+            <li>Connector abstraction layer — the SoW’s designated extension point</li>
+            <li>Watched folders, FTP/SFTP, email-in, scanner (TWAIN)</li>
+            <li>Google Drive, SharePoint, NIC e-Office (CR-001, in v1)</li>
+            <li>PDF/A-2b conversion with original preserved alongside</li>
+            <li>Provenance record: source, connector identity, operator/system</li>
+            <li>Idempotent retry and failure alerting. <code>reindex_failed.py</code> is a manual bulk re-queue, not retry</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(b) Document Processing Pipeline</h4>
+        <span class="ref">§3.2</span>
+        <span class="pill p-early">~10%</span>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Built</h3>
+          <ul class="built">
+            <li>Text extraction across PDF, Office, image and text formats</li>
+            <li>Tesseract fallback when a PDF page yields no text</li>
+            <li>Token chunker, 512/64, with page numbers retained</li>
+            <li>One generic LLM metadata pass: title, author, date, type, topics, summary</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Missing</h3>
+          <ul class="gap">
+            <li><strong>All four hostile-format handlers</strong>: multi-page spread join, ditto-chain expansion, continuation-row merge, blob-cell second-stage parse with unit normalisation</li>
+            <li>Template registry keyed by statutory form and era, with per-template validation</li>
+            <li>Classification stage and unclassified queue</li>
+            <li>Marathi / Devanagari OCR — Tesseract is called with no <code>lang</code> argument, so it runs English-only (<code>extractor.py:43,73</code>)</li>
+            <li>VLM extraction path of any kind</li>
+            <li>Per-field confidence — the value is hardcoded <code>0.9</code> for every field (<code>worker.py:150</code>)</li>
+            <li>Handwritten / degraded content policy and marginalia routing</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(c) Human Verification Workbench</h4>
+        <span class="ref">§3.3</span>
+        <span class="pill p-none">Not started</span>
+      </div>
+      <p>Nothing in this module exists. No two-lane model, no <code>machine → in-review → human-verified</code> state machine, no confidence badges, no adjudication queues, no batch accept, no <code>sys_dg_config</code>.</p>
+      <p>The blocking one is provenance: <strong>source page coordinates are never stored</strong>. <code>pdfplumber</code> extracts word-level boxes, the chunker discards them and keeps only page width and height. Region click-through is mandatory across the product — Workbench, 360 views and Q&amp;A citations all depend on data the pipeline currently throws away.</p>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(d) Entity &amp; Knowledge Layer</h4>
+        <span class="ref">§3.4</span>
+        <span class="pill p-none">Not started</span>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Missing</h3>
+          <ul class="gap">
+            <li><code>entity_dg_nodes</code> / <code>entity_dg_edges</code> property-graph schema</li>
+            <li>Typed nodes and edges; structural, mention, identity, legal, association</li>
+            <li>Four-tier linking policy, escrowed identity links, machine badges</li>
+            <li>Bulk threshold confirmation with actor, threshold, corpus, policy version</li>
+            <li>Link reversibility with clean cascade</li>
+            <li>Threshold governance in <code>sys_dg_config</code></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Conflict to resolve</h3>
+          <p>§3.10 fixes the container model at <strong>two levels only</strong> — Workspace then Project — and rules out department or nested-folder hierarchy. The code has arbitrarily deep recursive folders via <code>folders.parent_id</code>, with a folder tree endpoint and sidebar UI built on it.</p>
+          <p>Either the folder tree goes, or this needs a change request under §10.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(e) Search &amp; Q&amp;A</h4>
+        <span class="ref">§3.5</span>
+        <span class="pill p-part">~60%</span>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Built</h3>
+          <ul class="built">
+            <li>Postgres full-text search plus pgvector HNSW, 1024-dimension BGE-M3</li>
+            <li>Reciprocal rank fusion across both legs, then Cohere rerank</li>
+            <li>Trilingual query expansion and a HyDE fallback when direct search returns nothing</li>
+            <li>Grounded answer generation with result cards attached</li>
+            <li>Availability guarantee holds — indexing never waits on verification, because no verification stage exists yet</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Missing</h3>
+          <ul class="gap">
+            <li><strong>Uncited-answer refusal</strong> — §11 hard rule (1). The extension is enabled but nothing enforces refusal</li>
+            <li>pg_trgm leg — extension is created in <code>0001_baseline_schema.py:26</code>, no trigram index exists and no query uses it</li>
+            <li>Region-level click-through; citations resolve to a page, not a highlighted area</li>
+            <li>Devanagari indexing risk: <code>content_tsv</code> is generated as <code>to_tsvector('english', content)</code> while Marathi queries are parsed with the <code>simple</code> configuration — the two legs disagree</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(f) Records &amp; Versioning</h4>
+        <span class="ref">§3.6</span>
+        <span class="pill p-none">Not started</span>
+      </div>
+      <p><code>document_versions</code> tracks file revisions and is always written as version 1. That is not what this module asks for.</p>
+      <ul class="gap">
+        <li>Amendment chains: base record → amendment sequence → derived current state</li>
+        <li>Deterministic re-derivation of current state — no mutable “current” that can drift</li>
+        <li>Legal-status layer as a filterable attribute: in force, set aside, under stay, superseded</li>
+        <li>Entity / Property 360 view</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(g) Reports &amp; Analytics</h4>
+        <span class="ref">§3.7</span>
+        <span class="pill p-none">Not started</span>
+      </div>
+      <p>The admin panel reports platform usage — user, document, folder, storage, chunk, chat and API-call counts. The SoW asks for something different in kind: <strong>completeness and reconciliation dashboards with gap scoring per corpus</strong>, plus on-demand exportable summary reports. Neither exists.</p>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(h) Governance &amp; Audit</h4>
+        <span class="ref">§3.8</span>
+        <span class="pill p-early">~15%</span>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Built</h3>
+          <ul class="built">
+            <li>Tenant isolation through Postgres row-level security</li>
+            <li>An <code>audit_logs</code> table with JSONB detail and API-call logging middleware</li>
+            <li>SHA-256 stored per document version</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Missing</h3>
+          <ul class="gap">
+            <li>RBAC for six personas — only <code>admin</code> and <code>user</code> exist, and the <code>permissions</code> table has <strong>zero code references</strong></li>
+            <li>Hash <em>chains</em>. A single hash per version is stored; nothing links them</li>
+            <li>Append-only, tamper-evident audit. The table is ordinary and mutable</li>
+            <li>Audit coverage — only auth, search and chat emit events. Document view, download, upload, edit and delete are unlogged</li>
+            <li>WORM archival storage</li>
+            <li>Section 63 (BSA 2023) certificate generation with dual signature blocks</li>
+            <li>Retention policy engine — only a 30-day trash purge exists</li>
+            <li>Verified-layer boundary for exports and certificates</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(i) Data Operations</h4>
+        <span class="ref">§3.9</span>
+        <span class="pill p-none">Not started</span>
+      </div>
+      <ul class="gap">
+        <li>Duplicate detection — the SHA-256 is computed and stored but never compared against anything</li>
+        <li>Bulk edit with audit capture</li>
+        <li>Export to CSV, JSON, XLSX, PDF and PDF/A. Only a presigned download of the original file exists</li>
+      </ul>
+    </div>
+
+    <div class="module">
+      <div class="module-head">
+        <h4>(j) Admin &amp; Deployment</h4>
+        <span class="ref">§3.10</span>
+        <span class="pill p-early">~25%</span>
+      </div>
+      <div class="cols">
+        <div>
+          <h3>Built</h3>
+          <ul class="built">
+            <li>SaaS multi-tenancy with row-level isolation</li>
+            <li>A provider abstraction over LLM, embedding, rerank and OCR back-ends</li>
+            <li>Docker Compose development stack</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Missing</h3>
+          <ul class="gap">
+            <li><strong>Air-gapped profile is currently unreachable.</strong> No local LLM or VLM provider exists, so metadata extraction, query expansion, HyDE, answer generation and Cohere rerank all send document text to external APIs</li>
+            <li>Local VLM reference implementation (Qwen2.5-VL-7B-Instruct on a 24 GB GPU)</li>
+            <li>Egress-zero verification</li>
+            <li>Kubernetes and Helm packaging</li>
+            <li>Licensing enforcement — subscription metering and capacity licensing</li>
+          </ul>
+        </div>
+      </div>
+      <p style="margin-top:1rem"><strong>Open decision already taken in code.</strong> §12 item 3 lists SaaS tenant isolation — schema-per-tenant versus row-level — as an open architecture decision needing security review. The code has already committed to row-level. Worth surfacing so the decision is ratified rather than inherited.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Engineering standards <span class="ref">§6 — binding on all modules</span></h2>
+    <p class="lede">These are cheap to fix now and expensive once production data lands. Every one is currently unmet.</p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Standard</th><th>Required</th><th>Current state</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Database naming</td>
+            <td><code>{module}_dg_*</code> tables, <code>fk_{table}_{ref}</code>, <code>idx_{table}_{cols}</code></td>
+            <td>Every table violates it — <code>documents</code>, <code>chunks</code>, <code>metadata</code>, <code>folders</code>, <code>audit_logs</code>. Indexes use the <code>ix_</code> prefix</td>
+          </tr>
+          <tr>
+            <td>Configuration-first</td>
+            <td>All thresholds and limits in <code>sys_dg_config</code>, nothing hardcoded</td>
+            <td>No such table. Hardcoded: relevance threshold <code>0.15</code>, RRF <code>k=60</code>, chunk 512/64, retention 30 days, confidence <code>0.9</code></td>
+          </tr>
+          <tr>
+            <td>Localisation</td>
+            <td>EN + MR from day one, strings via <code>i18n_dg_translations</code>, Devanagari rendering standard</td>
+            <td>No i18n library, no translation table, <code>&lt;html lang="en"&gt;</code>, English-only UI</td>
+          </tr>
+          <tr>
+            <td>Auditability</td>
+            <td>Every state-changing action emits an audit event</td>
+            <td>Auth, search and chat only. Document and folder mutations emit nothing</td>
+          </tr>
+          <tr>
+            <td>Provenance</td>
+            <td>Every extracted fact carries document ID, page and region coordinates. No orphan facts</td>
+            <td><code>metadata</code> rows carry a document ID only — no page, no region</td>
+          </tr>
+          <tr>
+            <td>Accessibility</td>
+            <td>GIGW 3.0 / WCAG 2.1 AA</td>
+            <td>No acceptance criteria, no audit performed</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Defects found while reading <span class="ref">outside the scope comparison</span></h2>
+    <p class="lede">Four things worth a ticket regardless of how the scope question is settled.</p>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Where</th><th>Issue</th><th>Why it matters</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>config.py:27</code></td>
+            <td>JWT access-token lifetime raised from 15 minutes to <strong>30 days</strong>; refresh from 7 to 60 days</td>
+            <td>A leaked access token stays valid for a month on a system that is meant to hold evidence-grade government records</td>
+          </tr>
+          <tr>
+            <td><code>extractor.py:48</code></td>
+            <td>Failed image OCR no longer sets <code>extraction_failed</code>; the document is indexed with the placeholder text <code>"Image document: &lt;filename&gt;"</code></td>
+            <td>An unreadable scan enters the corpus looking like a successful extraction. Silent-fallback class of bug, directly against the confidence and verification model</td>
+          </tr>
+          <tr>
+            <td><code>worker.py:150</code></td>
+            <td>Every extracted field is written with <code>confidence_score = 0.9</code></td>
+            <td>The column implies calibrated confidence and carries none. Any badge or threshold built on it would be meaningless</td>
+          </tr>
+          <tr>
+            <td><code>models/permission.py</code></td>
+            <td>The <code>permissions</code> table is defined and migrated but referenced by no code path</td>
+            <td>Reads as access control that does not exist. Either wire it or drop it before it is mistaken for working</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Built, but not in the v1 scope</h2>
+    <p>A material share of the repository implements a consumer file-drive product: folder tree with drag and drop, starring, trash with 30-day retention, context menus, suggested files and folders, drive statistics, persistent chat sessions with attachments, an offline mode and a PWA shell.</p>
+    <p>None of it appears in §2 or §3. §4 sets v1 as operator and officer facing, and §10 exists specifically to stop unplanned additions. This is not an argument to delete the work — it is an argument to get it recorded, either as an accepted change request or as deliberate out-of-scope, so the estimate against the milestones stays honest.</p>
+  </section>
+
+  <section>
+    <h2>Escalate before the next sprint is planned</h2>
+    <div class="stack">
+      <div class="escalation">
+        <span class="title">The three §11 hard rules have no implementation and no test</span>
+        <p>No uncited Q&amp;A answers. No identity or legal link promoted to the verified layer without a human confirmation event. No handwritten-source verified data without human confirmation. These are product-level acceptance gates for v1, not features to bolt on at the end — and two of the three depend on data structures that do not exist yet.</p>
+      </div>
+      <div class="escalation">
+        <span class="title">Air-gapped acceptance is binary, and currently unreachable</span>
+        <p>§3.10 makes zero outbound network calls a release blocker, verifiable by egress monitoring. Today every LLM call and the reranker send document text to external APIs, and there is no local model path. This blocks M5 and depends on assumption A2 (GPU availability), which should be confirmed now rather than at hardening.</p>
+      </div>
+      <div class="escalation">
+        <span class="title">Fix naming, config and provenance columns before more data lands</span>
+        <p>The §6 table-naming standard, the <code>sys_dg_config</code> table, and page and region coordinates on every extracted fact are one migration today. After ingestion at volume they are a migration plus a backfill plus a re-extraction of everything already processed.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>How this was assessed</h2>
+    <div class="note">
+      <p><strong>Method.</strong> Full read of the SoW, then a read of the backend source, ORM models, Alembic migrations and frontend routes on branch <code>dev</code> at <code>5d8e1cb</code>. No tests were executed and the application was not run.</p>
+      <p><strong>Confidence.</strong> Absence findings are strong — a missing table, endpoint or code path is verifiable by search. Percentages are a judgement call and should be treated as an order of magnitude, not a measurement.</p>
+      <p><strong>Not assessed.</strong> Test suite quality, runtime accuracy against real documents, infrastructure outside the compose file, and the PRD — which the SoW names as the requirements authority. Where this reading and the PRD disagree, §1 says escalate to the product owner rather than resolve it silently.</p>
+      <p><strong>Note on the source document.</strong> An earlier partial extract circulating as “scope of work” contains only sections 1, 3 and 5 of a different, client-facing framing with R-numbered requirements. This analysis uses the full internal SoW v0.3 as the baseline.</p>
+    </div>
+  </section>
+
+  <footer>Prepared 17-Aug-2026 · against SoW VeritasDocs v1 v0.3 · code at dev/5d8e1cb</footer>
+
+</div>
+
+</body></html>

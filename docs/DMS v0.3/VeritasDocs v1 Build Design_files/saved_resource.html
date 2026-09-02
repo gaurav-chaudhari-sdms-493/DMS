@@ -1,0 +1,1451 @@
+<!DOCTYPE html>
+<!-- saved from url=(0133)https://0b3b9f20-465c-4ef0-9969-e6f05f2331c8.frame.claudeusercontent.com/_f/1787045884-c7e0/?__frame_v=manifest.adf4d434a4a8615f.json -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><!-- frame-runtime --><!--<base href="/_f/1787045884-c7e0/">--><base href="."><script>window.__FRAME_PREAMBLE={"capabilities":{"artifact":"artifact.BWD0CGLd.js","assets":"assets.BkxVItX2.js","comments":"comments.CqCXYViZ.js","db":"db.5PgiKS-2.js","downloads":"downloads.C3GSvEDP.js","mcp":"mcp.D3B2EyQu.js","permissions":"permissions.BNySkLV5.js","room":"room.BgXZkiYR.js","sample":"sample.B5DdHYz7.js","self":"artifact.BWD0CGLd.js","user":"user.BpKav-Rf.js"},"transforms":"_transforms.BI3gXbbT.js","comments":"_comments.DOfpa5nr.js","translate":"_translate.5HCW4BJh.js"}</script><script>(function(){"use strict";var ce=["light","dark","system"],ue=/^[A-Za-z0-9_-]{1,64}$/,V=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,fe=new Set(["class","hidden","value","checked"]);function de(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||fe.has(t)}var pe="http://www.w3.org/1999/xhtml",me="http://www.w3.org/2000/svg",ge=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),_e=new Set(["script","style"]);function ve(e){const t=e.localName.toLowerCase();return e.namespaceURI===pe?!ge.has(t):e.namespaceURI===me?!_e.has(t):!1}function he(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_patch;if(t===null||typeof t!="object")return!1;const{seq:n,elements:a}=t;if(typeof n!="number"||!Number.isSafeInteger(n)||!Array.isArray(a)||a.length===0||a.length>64)return!1;for(const i of a){if(i===null||typeof i!="object")return!1;const r=i;if(typeof r.target!="string"||!ue.test(r.target)||r.text!==void 0&&typeof r.text!="string")return!1;if(r.attrsSet!==void 0){if(r.attrsSet===null||typeof r.attrsSet!="object")return!1;for(const[l,c]of Object.entries(r.attrsSet))if(!V.test(l)||typeof c!="string")return!1}if(r.attrsRemoved!==void 0){if(!Array.isArray(r.attrsRemoved))return!1;for(const l of r.attrsRemoved)if(typeof l!="string"||!V.test(l))return!1}}return!0}function ye(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function be(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function Ee(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const n=t.theme;return typeof n=="string"&&ce.includes(n)}function we(e){try{typeof reportError=="function"?reportError(e):setTimeout(()=>{throw e},0)}catch{}}var X=["#62744c","#b04e72","#5b7596","#a3651f","#7a6ba8","#3f7a75"];function J(e){let t=0;for(let n=0;n<e.length;n++)t=t*31+e.charCodeAt(n)>>>0;return X[t%X.length]??"#788c5d"}var Z="#c7c9d1",Ae=["data:image","/svg+xml,"].join("");function Q(e){return Ae+"%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Ccircle cx='1' cy='1' r='1' fill='"+encodeURIComponent(e)+"'/%3E%3C/svg%3E"}var Se=Object.freeze({id:null,name:"",avatarUrl:Q(Z),color:Z,email:null,isOwner:!1,canEdit:!1});function je(...e){const t=e[0],n=typeof t=="string"?[t]:Array.isArray(t)?t.filter(i=>typeof i=="string"):[],a=Object.create(null);for(const i of n)a[i]={id:i,name:"",avatarUrl:Q(J(i)),color:J(i),email:null,isMe:!1};return a}var ee=Object.freeze(Object.assign(Object.create(null),{user:Object.freeze(Object.assign(Object.create(null),{id:null,isOwner:!1,canEdit:!1,me:Se,profiles:je,name:"",avatarUrl:null,search:Object.freeze([]),email:null}))})),Re={sample:"sample"};function te(){const e=new Uint8Array(20);try{crypto.getRandomValues(e)}catch{for(let n=0;n<e.length;n++)e[n]=Math.floor(Math.random()*256)}let t="";for(const n of e)t+=(n%36).toString(36);return t}function Oe(e,t){const n=r=>{const l={path:r},c=r.split("/");return{id:c[c.length-1],path:r,get:()=>t("get",[l]),set:d=>t("set",[l,d]),update:d=>t("update",[l,d]),delete:()=>t("delete",[l]),acquire:d=>t("acquire",[l,d]),onSnapshot:(d,E)=>t("subscribe",[l,d,E]),collection:d=>i(r+"/"+String(d))}},a=r=>({where:(l,c,d)=>a({...r,where:[...r.where??[],{f:String(l),op:String(c),v:d}]}),orderBy:(l,c)=>a({...r,orderBy:{f:String(l),dir:c===void 0?"asc":String(c)}}),limit:l=>a({...r,limit:Number(l)}),get:()=>t("query",[r]),onSnapshot:(l,c)=>t("subscribe",[r,l,c])}),i=r=>({...a({collection:r}),path:r,doc:l=>n(r+"/"+(l===void 0?te():String(l))),add:l=>{const c=n(r+"/"+te());return Promise.resolve(c.set(l)).then(()=>c)}});e.doc=r=>n(String(r)),e.collection=r=>i(String(r))}var Pe=Object.freeze([]);function Te(e,t){let n=null,a=null;const i=()=>e.__settled;e.peers=()=>Pe,e.connected=()=>!1,e.emit=()=>i()?.()??Promise.resolve(),e.presence=r=>{const l=i();if(l)return l();let c=null;if(r!==null&&typeof r=="object")try{Array.isArray(r)||(c={...r})}catch{}return c===null?Promise.reject({code:"invalid_argument",message:"presence takes an object"}):(n===null&&(n=Object.create(null),a=Promise.resolve(t("presence",[n]))),Object.assign(n,c),a)}}var B="__frame_scroll",Me=150,Le=310,ke=160,Ce=3e4;function Ne(){let e=0,t=!1,n=!1,a=!1,i=0,r=null;const l=u=>{try{sessionStorage.setItem(B,JSON.stringify({y:u}))}catch{}},c=()=>{if(clearTimeout(e),r===null)return;const u=r;r=null,l(u)},d=()=>{if(t){t=!1;return}n=!0,r=scrollY,clearTimeout(e),e=setTimeout(c,Me)};try{addEventListener("scroll",d,{passive:!0}),addEventListener("pagehide",c)}catch{}const E=()=>{let u;try{u=sessionStorage.getItem(B)}catch{return null}if(u===null)return null;let g;try{g=JSON.parse(u)}catch{g=null}const f=g?.y;if(!(typeof f=="number"&&Number.isFinite(f)&&f>=0)){try{sessionStorage.removeItem(B)}catch{}return null}return f};let T=!1;const h=u=>{try{const g=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),i=u,a=!0,clearTimeout(e),r=null,l(u);const f=scrollY;f!==g&&(t=!0),f!==u&&!T&&(T=!0,addEventListener("load",()=>{try{if(scrollY===f){const p=E();h(p!==null?p:i)}}catch{}},{once:!0}))}catch{}},R=()=>{try{return!!location.hash}catch{return!0}};let A=!1;const O=()=>{try{if(A||innerWidth>Le||innerHeight>ke)return;A=!0;const u=Date.now(),g=()=>{try{removeEventListener("resize",g)}catch{}if(Date.now()-u>Ce||n||R())return;const f=E();h(f!==null?f:i)};addEventListener("resize",g)}catch{}};let M=!1,o=!1;return{restore(){if(M||(M=!0,R()))return;const u=E();u!==null&&(h(u),O())},promoted(){if(o||(o=!0,R()))return;const u=E();u!==null?(h(u),O()):a&&h(i)}}}var Ye="modulepreload",We=function(e){return"/"+e},Ke={},Ue=function(t,n,a){let i=Promise.resolve();function r(l){const c=new Event("vite:preloadError",{cancelable:!0});if(c.payload=l,window.dispatchEvent(c),!c.defaultPrevented)throw l}return i.then(l=>{for(const c of l||[])c.status==="rejected"&&r(c.reason);return t().catch(r)})};(function(){const e=Object.defineProperty,t=globalThis,n=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let a=0;for(let i=0;i<n.length;i++){const r=n[i];try{e(t,r,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[r]}catch{}try{e(t,r,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[r]=="function"&&a++}if(a&&window!==top)try{parent.postMessage({__frame_rtc_lockdown_failed:a},"*")}catch{}})();var qe=1e4,Ie=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function re(e){for(const t of Ie)if(t.endsWith(":*"))try{const n=new URL(e);if(`${n.protocol}//${n.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var k=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),x=window.__FRAME_PREAMBLE?.transforms,$=window.__FRAME_PREAMBLE?.comments,z=window.__FRAME_PREAMBLE?.translate,q=/^[\w.-]+\.js$/,De=/^[a-z][a-z0-9_-]{0,63}$/;function I(e){return Ue(()=>import("/_runtime/"+e),void 0)}function Be(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:Y,pipe:()=>({wrap:(n,a)=>(...i)=>{try{return a(...i)}catch(r){return Promise.reject(r)}}})}}var ne=null,C=null;function F(e,t,n){try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var H=!1;function xe(e,t){const n=[];for(const a of e.elements){const i=document.querySelector(`[data-id="${a.target}"]`);if(!i){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if([...Object.keys(a.attrsSet??{}),...a.attrsRemoved??[]].some(r=>!de(r))){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if(a.text!==void 0&&!ve(i)){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}for(const[r,l]of Object.entries(a.attrsSet??{}))if(!oe(i,r)){try{i.setAttribute(r,l)}catch{}se(i,r,l)}for(const r of a.attrsRemoved??[])oe(i,r)||(i.removeAttribute(r),se(i,r,null));typeof a.text=="string"&&(i.textContent=a.text),n.push(a.target)}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function se(e,t,n){if(!(e instanceof HTMLInputElement))return;const a=t.toLowerCase();a==="checked"?e.checked=n!==null:a==="value"&&e.type!=="file"&&(e.value=n??"")}function oe(e,t){const n=t.toLowerCase(),a=e;return n==="data-id"||(n==="value"||n==="checked")&&(a.__artifactSecret===!0||/^(password|hidden|file)$/.test(a.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${a.autocomplete??""}`))}function ae(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,H=!0):H&&(delete t.dataset.theme,t.style.colorScheme="",H=!1)}var ie=256,N=Object.assign(Object.create(null),{mcp:Object.assign(Object.create(null),{watchTool:{handlerArg:3}}),db:Object.assign(Object.create(null),{subscribe:{handlerArg:1,errArg:2}}),room:Object.assign(Object.create(null),{on:{handlerArg:1,errArg:2},onPeers:{handlerArg:0,errArg:1},onConnection:{handlerArg:0,errArg:1}})}),$e=Object.assign(Object.create(null),{db:(e,t)=>Oe(e,t),room:(e,t,n)=>Te(e,n)}),j=new Map;function Y(e,t){const n=j.get(e);if(!n)return;const a=Object.assign(Object.create(null),t);Object.assign(n.impl,a),n.r(n.ns),n.impl.__settled=()=>Promise.reject({code:"capability_removed",message:`${e}: method not in this runtime`});const i=n.queue;n.queue=[];for(const r of i){const l=a[r.method];if(l)if(N[e]?.[r.method])try{r.resolve(l(...r.args))}catch{U(r,N[e][r.method],{code:"transform_error",message:`${e}.${r.method} rejected its arguments`})}else l(...r.args).then(r.resolve,r.reject);else{const c={code:"capability_removed",message:`${e}.${r.method} is not in this runtime`},d=N[e]?.[r.method];if(d){U(r,d,c);continue}r.reject(c)}}}function ze(e,t){const n=j.get(e);if(!n)return;n.impl.__settled=()=>Promise.reject(t),n.r(null);const a=n.queue;n.queue=[];for(const i of a){const r=N[e]?.[i.method];if(r){U(i,r,t);continue}i.reject(t)}}function le(e,t){if(typeof e=="function")try{return e(...t)}catch{return Object.create(null)}return Array.isArray(e)?[...e]:e!==null&&typeof e=="object"?{...e}:e}function D(e,t){const n=ee[e];if(!n){ze(e,t);return}j.get(e)?.r(null),Y(e,Object.fromEntries(Object.entries(n).map(([a,i])=>[a,(...r)=>Promise.resolve(le(i,r))])))}function U(e,t,n){if(e.syncState?.dead)return;const a=t.errArg===void 0?void 0:e.args[t.errArg],i=t.errArg===void 0?e.args[t.handlerArg]:a;typeof i=="function"&&queueMicrotask(()=>{if(!e.syncState?.dead)try{i(t.errArg===void 0?{type:"error",error:n}:n)}catch(r){we(r)}})}var W=Object.getOwnPropertyDescriptor(window,"claude");if(window!==top&&!(W&&W.writable===!1)){const e=x&&q.test(x)?I(x).catch(()=>{}):Promise.resolve(void 0),t=o=>{if(o.type==="auxclick"&&o.button!==1)return;const u=o.target,g=u&&u.closest?u.closest("a[href],area[href]"):null;if(!g)return;const f=g.getAttribute("href");if(!f)return;let p,P;try{p=new URL(f,document.baseURI),P=new URL(document.baseURI).origin}catch{return}if((p.protocol==="http:"||p.protocol==="https:")&&p.origin!==P){o.preventDefault();const w=(g.getAttribute("target")??"").toLowerCase(),y=o.type==="auxclick"||o.metaKey||o.ctrlKey||o.shiftKey||o.altKey||!["","_self","_top","_parent"].includes(w);parent.postMessage({__frame_nav:!0,url:p.href,newTab:y},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const n={},a=o=>{o.isTrusted&&(n.pointer=!0)},i=o=>{o.isTrusted&&(n.click=!0)};addEventListener("pointermove",a,{capture:!0,passive:!0}),addEventListener("click",i,{capture:!0,passive:!0}),e.then(o=>{o?.wireNav&&(o.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",a,!0),removeEventListener("click",i,!0),o.wireEngagement?.(n))});let r=null;try{r=Ne()}catch{}const l=W?.value??{};F(window,"claude",l);const c=o=>{let u;const g=new Promise(v=>{u=v}),f={impl:Object.create(null),queue:[],u:g,r:u,ns:null};j.set(o,f);const p=f.impl,P=v=>({code:"queue_overflow",message:`${o}.${v}: pre-init call queue is full`}),w=(v,s)=>{if(f.queue.length>=ie){const m=ee[o];return m&&v in m?Promise.resolve(le(m[v],s)):Promise.reject(P(v))}return new Promise((m,_)=>{f.queue.push({method:v,args:s,resolve:m,reject:_})})},y=Re[o],L=new Proxy(y===void 0?p:(()=>{}),{apply:(v,s,m)=>{const _=y,b=p[_]??p.__settled;return b?b(...m):w(_,m)},get:(v,s)=>{if(typeof s!="string"||s==="then"||s==="toJSON"||s==="valueOf")return;if(s==="toString")return Object.prototype.toString;if(y!==void 0&&(s==="call"||s==="apply"||s==="bind"))return Function.prototype[s];const m=N[o]?.[s];return m?(..._)=>{if(typeof _[m.handlerArg]!="function")throw new TypeError(`${o}.${s} requires a handler function`);const b=p[s];if(b)return b(..._);if(p.__settled){const S={dead:!1},Fe={args:[..._],syncState:S};return p.__settled().catch(He=>U(Fe,m,He)),()=>{S.dead=!0}}if(f.queue.length>=ie){const S={dead:!1};return U({args:[..._],syncState:S},m,P(s)),()=>{S.dead=!0}}let K=null;const G={dead:!1};return f.queue.push({method:s,args:_,resolve:S=>{K=typeof S=="function"?S:null,G.dead&&K?.()},reject:()=>{},syncState:G}),()=>{G.dead=!0,K?.()}}:(..._)=>{const b=p[s]??p.__settled;return b?b(..._):w(s,_)}},set:()=>!1});$e[o]?.(p,(v,s)=>L[v](...s),w),f.ns=L,F(l,o,L)};for(const o of Object.keys(k)){if(l[o]!==void 0){F(l,o,l[o]);continue}c(o)}if(l.use===void 0){const o=u=>{if(typeof u!="string"||!Object.hasOwn(k,u))return Promise.resolve(null);const g=j.get(u);return g?g.u:Promise.resolve(l[u]??null)};try{Object.defineProperty(l,"use",{value:o,writable:!0,configurable:!0,enumerable:!1})}catch{}}let d=null,E=null,T=0;const h=o=>{o.source!==parent||!re(o.origin)||ye(o.data)&&(d=o.data.__frame_init,C=o.origin,removeEventListener("message",h),clearTimeout(T),E?.())};addEventListener("message",h),parent.postMessage({__frame_connect:!0},"*");const R=new Promise(o=>{E=o,T=setTimeout(()=>{removeEventListener("message",h),o()},qe)}),A=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();A.then(()=>{try{r?.restore()}catch{}});const O={cb:null},M=o=>{if(!(o.source!==parent||!re(o.origin))&&be(o.data)){try{r?.promoted()}catch{}O.cb?.()}};addEventListener("message",M),R.then(async()=>{if(!d||!C){for(const s of j.keys())D(s,{code:"not_granted",message:"frame initialization did not arrive - capability unavailable"});return}ae(d.theme);const o=C;let u=!1,g=!1;addEventListener("message",s=>{if(s.source!==parent||s.origin!==o)return;Ee(s.data)&&ae(s.data.__frame_theme.theme),he(s.data)&&xe(s.data.__frame_patch,o);const m=s.data?.__fc_mode;m&&typeof m=="object"&&!u&&$&&q.test($)&&(u=!0,I($).then(b=>b.install?.(o,m.on===!0)).catch(()=>{}));const _=s.data?.__ft_cmd;_&&typeof _=="object"&&!g&&z&&q.test(z)&&(g=!0,I(z).then(b=>b.install?.(o,_)).catch(()=>{}))});const f=Object.keys(d.capabilities??{});for(const s of f)Object.hasOwn(k,s)||De.test(s)&&l[s]===void 0&&(c(s),D(s,{code:"capability_disabled",message:"capability not in this runtime generation"}));const p=f.filter(s=>Object.hasOwn(k,s)).map(s=>[s,k[s]]).filter(s=>typeof s[1]=="string"&&q.test(s[1])),P=await Promise.allSettled(p.map(([,s])=>I(s))),w=await e,y=C;w?.buildBoot||parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},y),ne=w?.buildBoot?w.buildBoot(d,w.TRANSFORMS??{},{shellOrigin:y,mount:Y},s=>parent.postMessage({__frame_cap_telemetry:s},y)):Be(d,y);const L=s=>parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:s}},y),v=ne;P.forEach((s,m)=>{const _=p[m][0];if(s.status!=="fulfilled"){L(_);return}try{s.value?.install?.(v)}catch{L(_)}});for(const[s,m]of j)if(m.impl.__settled===void 0){if(f.includes(s)){D(s,{code:"capability_disabled",message:"capability not available in this session"});continue}D(s,{code:"not_granted",message:"capability not available in this session"})}await A,parent.postMessage({__frame_ready:!0},C),e.then(s=>s?.installSizeReporter?.(y,O))})}})();</script><!-- /frame-runtime --><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>VeritasDocs v1 Build Design</title>
+<style>
+  :root {
+    --ground: #fbfbfc;
+    --surface: #ffffff;
+    --surface-2: #f3f4f7;
+    --ink: #16181f;
+    --muted: #5c6273;
+    --hairline: #dde0e8;
+    --accent: #2a4b8d;
+    --accent-soft: #eaeff8;
+    --crit: #a02a30;
+    --crit-soft: #f8ecec;
+    --warn: #8a6412;
+    --warn-soft: #f9f2e4;
+    --ok: #2c6a4a;
+    --ok-soft: #eaf3ee;
+
+    --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --body: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+    --measure: 74ch;
+    --page: 66rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1116;
+      --surface: #161922;
+      --surface-2: #1c2029;
+      --ink: #e6e8ee;
+      --muted: #99a0b2;
+      --hairline: #272c39;
+      --accent: #8fb2ea;
+      --accent-soft: #1a2434;
+      --crit: #e58a91;
+      --crit-soft: #2c1a1d;
+      --warn: #d9a848;
+      --warn-soft: #2a2317;
+      --ok: #74c298;
+      --ok-soft: #16261f;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1116;
+    --surface: #161922;
+    --surface-2: #1c2029;
+    --ink: #e6e8ee;
+    --muted: #99a0b2;
+    --hairline: #272c39;
+    --accent: #8fb2ea;
+    --accent-soft: #1a2434;
+    --crit: #e58a91;
+    --crit-soft: #2c1a1d;
+    --warn: #d9a848;
+    --warn-soft: #2a2317;
+    --ok: #74c298;
+    --ok-soft: #16261f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap {
+    max-width: var(--page);
+    margin: 0 auto;
+    padding: 3.5rem 1.5rem 5rem;
+  }
+
+  .masthead {
+    border-bottom: 3px solid var(--ink);
+    padding-bottom: 1.5rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 0 0.9rem;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-size: clamp(2rem, 4.6vw, 3rem);
+    line-height: 1.08;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 1rem;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    font-size: 1.08rem;
+    color: var(--muted);
+    max-width: var(--measure);
+    margin: 0 0 1.6rem;
+  }
+
+  .filing {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 1rem 1.5rem;
+    border-top: 1px solid var(--hairline);
+    padding-top: 1rem;
+  }
+
+  .filing div { display: flex; flex-direction: column; gap: 0.15rem; }
+
+  .filing .k {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .filing .v { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+
+  section { padding-top: 3.25rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-size: 1.6rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0 0 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--hairline);
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  h2 .ref {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 400;
+  }
+
+  h3 {
+    font-family: var(--body);
+    font-size: 1rem;
+    font-weight: 650;
+    margin: 2rem 0 0.6rem;
+    letter-spacing: -0.005em;
+  }
+
+  h4 {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    margin: 1.5rem 0 0.5rem;
+  }
+
+  p { max-width: var(--measure); }
+  .lede { max-width: var(--measure); color: var(--muted); margin: 0 0 1.5rem; }
+
+  ul, ol { margin: 0 0 1rem; padding-left: 1.15rem; max-width: var(--measure); }
+  li { margin-bottom: 0.4rem; }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.86em;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 3px;
+    padding: 0.05em 0.35em;
+  }
+
+  pre {
+    font-family: var(--mono);
+    font-size: 0.8rem;
+    line-height: 1.55;
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    padding: 0.9rem 1rem;
+    overflow-x: auto;
+    margin: 0 0 1rem;
+  }
+
+  pre code { background: none; border: 0; padding: 0; font-size: 1em; }
+
+  .scroll { overflow-x: auto; border: 1px solid var(--hairline); border-radius: 4px; }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    font-size: 0.87rem;
+    background: var(--surface);
+    min-width: 34rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.8rem;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 600;
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td { border-bottom: 0; }
+
+  figure {
+    margin: 1.5rem 0 2rem;
+    padding: 1.25rem;
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+  }
+
+  figure svg { display: block; max-width: 100%; height: auto; margin: 0 auto; color: var(--ink); }
+  figure svg .new { stroke: var(--crit); }
+  figure svg .keep { stroke: currentColor; }
+  figure svg .hot { stroke: var(--accent); }
+  figure svg text.hot { fill: var(--accent); stroke: none; }
+
+  .spec { display: grid; grid-template-columns: repeat(auto-fit, minmax(13rem, 1fr)); gap: 1rem; margin: 1.25rem 0; }
+  .spec .box { background: var(--surface); border: 1px solid var(--hairline); border-top: 3px solid var(--accent); border-radius: 0 0 4px 4px; padding: 0.9rem 1rem; }
+  .spec .box .h { font-family: var(--mono); font-size: 0.66rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); display: block; margin-bottom: 0.35rem; }
+  .spec .box p { margin: 0; font-size: 0.88rem; max-width: none; }
+
+  .accept { background: var(--ok-soft); border: 1px solid var(--hairline); border-left: 3px solid var(--ok); border-radius: 0 4px 4px 0; padding: 0.85rem 1rem; font-size: 0.88rem; margin: 1rem 0 0; }
+  .accept .h { font-family: var(--mono); font-size: 0.64rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ok); display: block; margin-bottom: 0.25rem; }
+  .accept p { margin: 0; max-width: none; }
+
+  .tag { font-family: var(--mono); font-size: 0.66rem; color: var(--accent); background: var(--accent-soft); border-radius: 3px; padding: 0.1rem 0.4rem; white-space: nowrap; }
+
+  figcaption {
+    font-size: 0.82rem;
+    color: var(--muted);
+    margin-top: 1rem;
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--hairline);
+    max-width: none;
+  }
+
+  .legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem 1.25rem;
+    font-size: 0.76rem;
+    color: var(--muted);
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .legend li { display: flex; align-items: center; gap: 0.4rem; margin: 0; }
+  .legend .swatch { width: 1.4rem; height: 0; border-top: 2px solid currentColor; }
+  .legend .built { color: var(--accent); }
+  .legend .missing { color: var(--crit); }
+  .legend .contract { color: var(--warn); }
+
+  .note {
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    border-left: 3px solid var(--accent);
+    border-radius: 0 4px 4px 0;
+    padding: 1rem 1.1rem;
+    font-size: 0.9rem;
+  }
+
+  .note p { margin: 0 0 0.6rem; max-width: none; }
+  .note p:last-child { margin-bottom: 0; }
+  .note strong { color: var(--ink); }
+  .note.is-crit { border-left-color: var(--crit); }
+  .note.is-warn { border-left-color: var(--warn); }
+
+  .stack { display: flex; flex-direction: column; gap: 1rem; }
+
+  .steps { counter-reset: step; list-style: none; padding: 0; max-width: none; }
+
+  .steps > li {
+    counter-increment: step;
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: 0.9rem;
+    padding: 0.7rem 0;
+    border-bottom: 1px solid var(--hairline);
+    margin: 0;
+  }
+
+  .steps > li:last-child { border-bottom: 0; }
+
+  .steps > li::before {
+    content: counter(step);
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-radius: 3px;
+    height: 1.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .steps .what { font-weight: 600; font-size: 0.92rem; display: block; }
+  .steps .where { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); display: block; margin-top: 0.15rem; }
+  .steps .why { font-size: 0.88rem; color: var(--muted); display: block; margin-top: 0.3rem; }
+
+  .pill {
+    font-family: var(--mono);
+    font-size: 0.62rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.15rem 0.45rem;
+    border-radius: 3px;
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .pill.p-built { background: var(--ok-soft); color: var(--ok); }
+  .pill.p-part { background: var(--warn-soft); color: var(--warn); }
+  .pill.p-none { background: var(--crit-soft); color: var(--crit); }
+
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); gap: 1rem; }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--hairline);
+    border-radius: 4px;
+    padding: 1rem;
+  }
+
+  .card h3 { margin-top: 0; }
+  .card p { margin: 0 0 0.5rem; font-size: 0.88rem; }
+  .card p:last-child { margin-bottom: 0; }
+
+  .toc { columns: 2; column-gap: 2.5rem; font-size: 0.9rem; padding: 0; list-style: none; max-width: none; }
+  .toc li { break-inside: avoid; margin-bottom: 0.45rem; display: flex; gap: 0.6rem; }
+  .toc .n { font-family: var(--mono); font-size: 0.74rem; color: var(--muted); min-width: 1.4rem; }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  @media (max-width: 40rem) {
+    .toc { columns: 1; }
+    h2 { font-size: 1.35rem; }
+  }
+
+  .companions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.25rem;
+    align-items: baseline;
+    margin-top: 1.5rem;
+    font-size: 0.82rem;
+  }
+  .companions .k {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .companions .here { color: var(--muted); }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">What we are building · with pictures</p>
+    <h1>VeritasDocs v1 — what we are building</h1>
+    <p class="standfirst">A picture of every part of v1 before we build it. What each part does, how the pieces fit together, and how we test it. The code we already have appears only where we build on top of it. Section 0 explains the words used.</p>
+    <div class="filing">
+      <div><span class="k">Scope baseline</span><span class="v">SoW VeritasDocs v1, v0.3 · CR-001</span></div>
+      <div><span class="k">Task ids</span><span class="v">match the build backlog</span></div>
+      <div><span class="k">Written</span><span class="v">18-Aug-2026</span></div>
+      <div><span class="k">Against code at</span><span class="v">branch <code>dev</code> @ <code>3e78636</code></span></div>
+    </div>
+  </header>
+
+  <nav class="companions"><span class="k">Companion documents</span><a href="https://claude.ai/code/artifact/efab1f85-92f7-4f6b-9c4b-84abbb9be6d1">Scope gap</a><a href="https://claude.ai/code/artifact/7789e35f-bec7-46db-b1ee-23849ce5e8ef">Build backlog</a><span class="here">Build design — you are here</span></nav>
+
+  <section>
+    <h2>What is in here</h2>
+    <p class="lede">Fifteen short sections. Each answers three questions: what are we building, what does it look like, and how do we know it works? The T-numbers are task ids from the build backlog.</p>
+    <ul class="toc">
+      <li><span class="n">0</span><span>Words you will see</span></li>
+      <li><span class="n">1</span><span>What the finished system looks like</span></li>
+      <li><span class="n">2</span><span>Where each fact came from</span></li>
+      <li><span class="n">3</span><span>How a fact goes from machine-read to checked</span></li>
+      <li><span class="n">4</span><span>Four page layouts that break normal reading</span></li>
+      <li><span class="n">5</span><span>The checking screen</span></li>
+      <li><span class="n">6</span><span>Linking records to people and property</span></li>
+      <li><span class="n">7</span><span>Records that change over the years</span></li>
+      <li><span class="n">8</span><span>Search, sources, and saying “no answer”</span></li>
+      <li><span class="n">9</span><span>Proving nothing was changed later</span></li>
+      <li><span class="n">10</span><span>Export, duplicates and bulk edits</span></li>
+      <li><span class="n">11</span><span>Two ways we install it</span></li>
+      <li><span class="n">12</span><span>New tables and columns</span></li>
+      <li><span class="n">13</span><span>What to build first</span></li>
+      <li><span class="n">14</span><span>How we know each part is finished</span></li>
+      <li><span class="n">15</span><span>What already exists in the code</span></li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Words you will see <span class="ref">read once, then skip</span></h2>
+    <p class="lede">Terms from the Scope of Work that appear throughout. Nothing here is jargon for its own sake — each one names something the product has to do.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Word</th><th>What it means here</th></tr></thead>
+        <tbody>
+          <tr><td>fact</td><td>One value pulled out of a document — a name, an area, a date. Facts are what we check, cite and export.</td></tr>
+          <tr><td>region</td><td>The rectangle on the scanned page that a fact came from. Lets us highlight the source.</td></tr>
+          <tr><td>provenance</td><td>Where something came from: which file, which page, which spot on the page, from which office, and when. We say “source location” in this document.</td></tr>
+          <tr><td>machine / human-verified</td><td>Two states for a fact. Machine means the software read it. Human-verified means a person accepted it. Only the second counts as evidence.</td></tr>
+          <tr><td>adjudication</td><td>The Scope of Work’s word for the review queue: anything the software could not decide, waiting for a person.</td></tr>
+          <tr><td>corpus / collection</td><td>One set of documents, usually from one office or one register series.</td></tr>
+          <tr><td>held link</td><td>A link between two records that is probably right but not confirmed. Usable in the product, shown with a badge, kept out of exports.</td></tr>
+          <tr><td>7/12 extract (satbara)</td><td>The Maharashtra land record showing survey number, holder, area and crop. One of the document types we will be reading.</td></tr>
+          <tr><td>ferfar</td><td>A mutation entry — the record of a change of holder, usually after a sale, succession or court order.</td></tr>
+          <tr><td>shuddhipatrak</td><td>A correction issued later against an earlier entry. Corrections are why records need an amendment chain.</td></tr>
+          <tr><td>sanad</td><td>A grant or title deed issued by government. Links from a sanad are legal links, so a person must confirm them.</td></tr>
+          <tr><td>khatedar</td><td>The holder named in a land record.</td></tr>
+          <tr><td>shera</td><td>The remarks column in a register.</td></tr>
+          <tr><td>survey no. / CTS no.</td><td>How a plot is identified — survey number in rural areas, City Survey (CTS) number in towns.</td></tr>
+          <tr><td>guntha · are · hectare</td><td>Area units used side by side in these records. 1 hectare = 100 are; 1 guntha ≈ 101 sq m.</td></tr>
+          <tr><td>register</td><td>The old bound books these documents come from. Their layout is why the four handlers exist.</td></tr>
+          <tr><td>spread</td><td>One entry printed across two facing pages.</td></tr>
+          <tr><td>ditto mark</td><td>A mark meaning "same as the row above" instead of repeating the value.</td></tr>
+          <tr><td>air-gapped</td><td>Installed on a network with no internet at all.</td></tr>
+          <tr><td>PDF/A</td><td>A version of PDF meant for long-term archives. Required on ingest, with the original file kept too.</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>1 · What the finished system looks like <span class="ref">Scope of Work 3.1 – 3.10</span></h2>
+    <p class="lede">A scanned Waqf register or 7/12 extract arrives. We record where it came from, read it, and pull out the facts. Then the path splits. The document becomes searchable straight away. The facts only count as evidence after a person has checked them.</p>
+
+    <figure>
+      <svg viewBox="0 0 900 620" role="img" aria-label="Target architecture. Eight source types feed a connector layer, then ingestion, then processing with classification, templates, extraction, four handlers and confidence. Output splits two ways: into the search index immediately, and into the verification workbench, whose output forms the verified layer that feeds the entity graph, records, governance and export. Search reads both the index and records, and answers pass a citation and refusal gate.">
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke-width="1.4">
+          <rect x="20" y="20" width="95" height="34" rx="3" class="keep"></rect>
+          <rect x="125" y="20" width="95" height="34" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="230" y="20" width="95" height="34" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="335" y="20" width="95" height="34" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="440" y="20" width="95" height="34" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="545" y="20" width="95" height="34" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="650" y="20" width="95" height="34" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="755" y="20" width="95" height="34" rx="3" class="new" stroke-dasharray="5 4"></rect>
+
+          <rect x="20" y="86" width="830" height="40" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="20" y="150" width="830" height="40" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="20" y="214" width="830" height="86" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="34" y="246" width="150" height="40" rx="2" class="keep" opacity="0.55"></rect>
+          <rect x="196" y="246" width="150" height="40" rx="2" class="new" stroke-dasharray="4 3"></rect>
+          <rect x="358" y="246" width="150" height="40" rx="2" class="new" stroke-dasharray="4 3"></rect>
+          <rect x="520" y="246" width="150" height="40" rx="2" class="new" stroke-dasharray="4 3"></rect>
+          <rect x="682" y="246" width="154" height="40" rx="2" class="new" stroke-dasharray="4 3"></rect>
+
+          <rect x="20" y="340" width="400" height="54" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="470" y="340" width="380" height="54" rx="3" class="keep"></rect>
+          <rect x="20" y="414" width="400" height="40" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="20" y="478" width="190" height="44" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="230" y="478" width="190" height="44" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="20" y="542" width="400" height="44" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="470" y="414" width="380" height="44" rx="3" class="keep"></rect>
+          <rect x="470" y="478" width="380" height="44" rx="3" class="new" stroke-dasharray="5 4"></rect>
+        </g>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="67" y="42" font-size="10.5" text-anchor="middle">upload</text>
+          <text x="172" y="42" font-size="10.5" text-anchor="middle">watched folder</text>
+          <text x="277" y="42" font-size="10.5" text-anchor="middle">FTP / SFTP</text>
+          <text x="382" y="42" font-size="10.5" text-anchor="middle">email-in</text>
+          <text x="487" y="42" font-size="10.5" text-anchor="middle">scanner</text>
+          <text x="592" y="42" font-size="10.5" text-anchor="middle">Google Drive</text>
+          <text x="697" y="42" font-size="10.5" text-anchor="middle">SharePoint</text>
+          <text x="802" y="42" font-size="10.5" text-anchor="middle">NIC e-Office</text>
+
+          <text x="435" y="103" font-size="12.5" font-weight="600" text-anchor="middle">connector layer — one ingestion contract</text>
+          <text x="435" y="118" font-size="10.5" text-anchor="middle" opacity="0.75">a new source must never require a pipeline change</text>
+
+          <text x="435" y="167" font-size="12.5" font-weight="600" text-anchor="middle">mandatory on ingest</text>
+          <text x="435" y="182" font-size="10.5" text-anchor="middle" opacity="0.75">PDF/A-2b with original kept · hash · record of where it came from · safe retry — running it twice changes nothing · failure alert</text>
+
+          <text x="435" y="236" font-size="12.5" font-weight="600" text-anchor="middle">processing</text>
+          <text x="109" y="271" font-size="10.5" text-anchor="middle">OCR + chunk</text>
+          <text x="271" y="265" font-size="10.5" text-anchor="middle">classify</text>
+          <text x="271" y="279" font-size="10.5" text-anchor="middle" opacity="0.75">+ unclassified queue</text>
+          <text x="433" y="265" font-size="10.5" text-anchor="middle">template registry</text>
+          <text x="433" y="279" font-size="10.5" text-anchor="middle" opacity="0.75">form × era</text>
+          <text x="595" y="265" font-size="10.5" text-anchor="middle">VLM extraction</text>
+          <text x="595" y="279" font-size="10.5" text-anchor="middle" opacity="0.75">+ four handlers</text>
+          <text x="759" y="265" font-size="10.5" text-anchor="middle">confidence</text>
+          <text x="759" y="279" font-size="10.5" text-anchor="middle" opacity="0.75">per field + region</text>
+
+          <text x="220" y="363" font-size="12.5" font-weight="600" text-anchor="middle">verification workbench</text>
+          <text x="220" y="380" font-size="10.5" text-anchor="middle" opacity="0.75">two lanes · review queues · batch accept</text>
+          <text x="660" y="363" font-size="12.5" font-weight="600" text-anchor="middle">search index</text>
+          <text x="660" y="380" font-size="10.5" text-anchor="middle" opacity="0.75">chunks, vectors, records</text>
+
+          <text x="220" y="440" font-size="12.5" font-weight="600" text-anchor="middle">verified layer</text>
+          <text x="115" y="500" font-size="11.5" font-weight="600" text-anchor="middle">entity graph</text>
+          <text x="115" y="514" font-size="10" text-anchor="middle" opacity="0.75">nodes · tiered edges</text>
+          <text x="325" y="500" font-size="11.5" font-weight="600" text-anchor="middle">records</text>
+          <text x="325" y="514" font-size="10" text-anchor="middle" opacity="0.75">amendment chains · status</text>
+          <text x="220" y="564" font-size="11.5" font-weight="600" text-anchor="middle">governance · export · reports</text>
+          <text x="220" y="578" font-size="10" text-anchor="middle" opacity="0.75">audit chain · Section 63 certificate · completeness</text>
+
+          <text x="660" y="437" font-size="11.5" font-weight="600" text-anchor="middle">search &amp; Q&amp;A</text>
+          <text x="660" y="500" font-size="11.5" font-weight="600" text-anchor="middle">citation binding + refusal gate</text>
+          <text x="660" y="514" font-size="10" text-anchor="middle" opacity="0.75">no passage, no answer</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.2" marker-end="url(#a1)" opacity="0.85">
+          <path d="M 67 54 L 67 78"></path><path d="M 172 54 L 172 78"></path><path d="M 277 54 L 277 78"></path><path d="M 382 54 L 382 78"></path>
+          <path d="M 487 54 L 487 78"></path><path d="M 592 54 L 592 78"></path><path d="M 697 54 L 697 78"></path><path d="M 802 54 L 802 78"></path>
+          <path d="M 435 126 L 435 142"></path>
+          <path d="M 435 190 L 435 206"></path>
+          <path d="M 220 300 L 220 332"></path>
+          <path d="M 660 300 L 660 332"></path>
+          <path d="M 220 394 L 220 406"></path>
+          <path d="M 115 454 L 115 470"></path>
+          <path d="M 325 454 L 325 470"></path>
+          <path d="M 115 522 L 115 534"></path>
+          <path d="M 325 522 L 325 534"></path>
+          <path d="M 660 394 L 660 406"></path>
+          <path d="M 660 458 L 660 470"></path>
+          <path d="M 420 496 L 445 496 L 445 432 L 462 432"></path>
+        </g>
+
+        <g font-family="ui-monospace, monospace" font-size="10" fill="currentColor" opacity="0.75">
+          <text x="230" y="322">facts needing a human</text>
+          <text x="670" y="322">indexed at once — search never waits</text>
+          <text x="452" y="470">records are searchable too</text>
+        </g>
+      </svg>
+      <ul class="legend">
+        <li><span class="swatch"></span>Exists — the starting point</li>
+        <li class="missing"><span class="swatch"></span>To build</li>
+      </ul>
+      <figcaption>The split under processing is the important part. Searching and checking happen side by side, not one after the other. A document can be found as soon as it is processed. Checked facts build up behind it at human speed. Only checked facts may be exported, certified or used in legal work.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>2 · Where each fact came from — agree this first <span class="ref">T04 · T05 · T06</span></h2>
+    <p class="lede">Every fact we store has to point at the exact spot on the page it came from. Three parts of the product draw that spot on screen: the checking screen, the 360 view, and the citations under an answer. None of them can be started until we agree how a spot is described.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 320" role="img" aria-label="Provenance contract. A page with a highlighted region on the left; on the right the chain from fact to region to page to document, with the region referring to normalised coordinates on the page.">
+        <defs>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <rect x="60" y="46" width="220" height="240" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+        <rect x="92" y="120" width="156" height="34" rx="2" fill="none" class="hot" stroke-width="2"></rect>
+        <g stroke="currentColor" stroke-width="1" opacity="0.45">
+          <path d="M 92 88 L 248 88"></path><path d="M 92 100 L 210 100"></path>
+          <path d="M 92 176 L 248 176"></path><path d="M 92 188 L 226 188"></path><path d="M 92 200 L 248 200"></path><path d="M 92 212 L 180 212"></path>
+        </g>
+        <g fill="none" stroke="currentColor" stroke-width="1.1" marker-end="url(#a2)" opacity="0.8">
+          <path d="M 60 36 L 140 36"></path>
+          <path d="M 50 46 L 50 126"></path>
+        </g>
+
+        <g font-family="ui-monospace, monospace" fill="currentColor">
+          <text x="60" y="28" font-size="10" opacity="0.75">x →</text>
+          <text x="24" y="140" font-size="10" opacity="0.75">y ↓</text>
+          <text x="66" y="60" font-size="9.5" opacity="0.75">(0,0)</text>
+          <text x="280" y="300" font-size="9.5" text-anchor="end" opacity="0.75">(1,1)</text>
+          <text x="170" y="142" font-size="10" class="hot" text-anchor="middle">region</text>
+        </g>
+
+        <g fill="none" stroke-width="1.4">
+          <rect x="380" y="40" width="230" height="46" rx="3" class="hot"></rect>
+          <rect x="380" y="112" width="230" height="46" rx="3" class="keep"></rect>
+          <rect x="380" y="184" width="230" height="46" rx="3" class="keep"></rect>
+          <rect x="380" y="256" width="230" height="46" rx="3" class="keep"></rect>
+        </g>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="495" y="60" font-size="12" font-weight="600" text-anchor="middle">fact</text>
+          <text x="495" y="76" font-size="10.5" text-anchor="middle" opacity="0.75">area = 1 ha 25 are · confidence 0.82</text>
+          <text x="495" y="132" font-size="12" font-weight="600" text-anchor="middle">region</text>
+          <text x="495" y="148" font-size="10.5" text-anchor="middle" opacity="0.75">x0 y0 x1 y1, normalised · rotation</text>
+          <text x="495" y="204" font-size="12" font-weight="600" text-anchor="middle">page</text>
+          <text x="495" y="220" font-size="10.5" text-anchor="middle" opacity="0.75">number · width · height · skew</text>
+          <text x="495" y="276" font-size="12" font-weight="600" text-anchor="middle">7/12 extract · Washim</text>
+          <text x="495" y="292" font-size="10.5" text-anchor="middle" opacity="0.75">file hash · source office · date</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a2)" opacity="0.9">
+          <path d="M 495 86 L 495 104"></path>
+          <path d="M 495 158 L 495 176"></path>
+          <path d="M 495 230 L 495 248"></path>
+        </g>
+        <path d="M 372 135 L 256 135" fill="none" class="hot" stroke-width="1.4" stroke-dasharray="5 4" marker-end="url(#a2)"></path>
+        <text x="314" y="126" font-size="10" font-family="ui-monospace, monospace" class="hot" text-anchor="middle">resolves to</text>
+      </svg>
+      <figcaption>Four links, and none may be empty. If a fact has no region, we refuse to save it. A fact we cannot show on the page is a fact nobody can check.</figcaption>
+    </figure>
+
+    <h3>What has to be decided, in writing, before code</h3>
+    <div class="spec">
+      <div class="box"><span class="h">Where (0,0) sits</span><p>The top-left corner is (0,0) and y grows downward, the way the scan looks. Agree it once, so the extractor, the API and the viewer cannot disagree.</p></div>
+      <div class="box"><span class="h">What the numbers mean</span><p>Store values from 0 to 1, as a fraction of the page width and height. Not pixels. The box then stays correct at any zoom and any screen size.</p></div>
+      <div class="box"><span class="h">Crooked scans</span><p>Store the rotation and skew per page and let the viewer apply it. Old registers were photographed crooked. Ignore skew and the highlight lands on the wrong row.</p></div>
+      <div class="box"><span class="h">Facts from more than one place</span><p>One value can come from two pages. Store a list of regions, not a single one. Build the column as a list from day one.</p></div>
+    </div>
+
+    <div class="accept">
+      <span class="h">How we test it</span>
+      <p>Load a crooked scan. Every fact has a region, every region sits inside its page, and clicking a fact highlights the right part of the image. Then try to save a fact with no region: it must fail.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>3 · How a fact goes from machine-read to checked <span class="ref">T23 · T51 · T55</span></h2>
+    <p class="lede">One flow with fixed steps, enforced by the database rather than by the screen. Two of the three product rules are steps in this flow.</p>
+
+    <figure>
+      <svg viewBox="0 0 900 300" role="img" aria-label="State machine. A document goes from ingested to classified to machine-extracted. From machine-extracted it is indexed for search immediately, and separately enters review, then human-verified. Unclassified documents go to a queue; disputed rows go to the review queue and return.">
+        <defs>
+          <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke-width="1.4">
+          <rect x="20" y="60" width="140" height="52" rx="26" class="keep"></rect>
+          <rect x="196" y="60" width="140" height="52" rx="26" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="372" y="60" width="160" height="52" rx="26" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="568" y="60" width="140" height="52" rx="26" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="744" y="60" width="140" height="52" rx="26" class="hot"></rect>
+          <rect x="196" y="200" width="140" height="46" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="372" y="200" width="160" height="46" rx="3" class="keep"></rect>
+          <rect x="568" y="200" width="140" height="46" rx="3" class="new" stroke-dasharray="5 4"></rect>
+        </g>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="90" y="92" font-size="12" font-weight="600" text-anchor="middle">ingested</text>
+          <text x="266" y="92" font-size="12" font-weight="600" text-anchor="middle">classified</text>
+          <text x="452" y="86" font-size="12" font-weight="600" text-anchor="middle">machine-extracted</text>
+          <text x="452" y="101" font-size="10" text-anchor="middle" opacity="0.75">confidence per field</text>
+          <text x="638" y="92" font-size="12" font-weight="600" text-anchor="middle">in review</text>
+          <text x="814" y="86" font-size="12" font-weight="600" text-anchor="middle" class="hot">human-verified</text>
+          <text x="814" y="101" font-size="10" text-anchor="middle" opacity="0.75">evidence grade</text>
+          <text x="266" y="222" font-size="11" font-weight="600" text-anchor="middle">unclassified queue</text>
+          <text x="266" y="236" font-size="10" text-anchor="middle" opacity="0.75">a human names the form</text>
+          <text x="452" y="222" font-size="11" font-weight="600" text-anchor="middle">indexed for search</text>
+          <text x="452" y="236" font-size="10" text-anchor="middle" opacity="0.75">badged as machine</text>
+          <text x="638" y="222" font-size="11" font-weight="600" text-anchor="middle">review queue</text>
+          <text x="638" y="236" font-size="10" text-anchor="middle" opacity="0.75">marginalia · join mismatch</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a3)" opacity="0.9">
+          <path d="M 160 86 L 188 86"></path>
+          <path d="M 336 86 L 364 86"></path>
+          <path d="M 532 86 L 560 86"></path>
+          <path d="M 266 112 L 266 192"></path>
+          <path d="M 452 112 L 452 192"></path>
+          <path d="M 660 112 L 660 192"></path>
+          <path d="M 616 192 L 616 112"></path>
+        </g>
+        <path d="M 708 86 L 736 86" fill="none" class="hot" stroke-width="2" marker-end="url(#a3)"></path>
+
+        <g font-family="ui-monospace, monospace" font-size="10" fill="currentColor" opacity="0.8">
+          <text x="174" y="76" text-anchor="middle">·</text>
+          <text x="350" y="76" text-anchor="middle">·</text>
+          <text x="276" y="160">no template match</text>
+          <text x="462" y="160">at once</text>
+          <text x="672" y="160">dispute</text>
+          <text x="530" y="160" text-anchor="end">resolved</text>
+        </g>
+        <text x="722" y="132" font-size="10" font-family="ui-monospace, monospace" class="hot" text-anchor="middle">requires actor event</text>
+      </svg>
+      <figcaption>The blue step is a rule, not a habit. A row becomes human-verified only when a real person accepts it, and the system records who. If the value was handwritten, that person has to confirm it as well. Enforce this where data is saved. Hiding the button in the screen is not enough.</figcaption>
+    </figure>
+
+    <div class="accept">
+      <span class="h">How we test it</span>
+      <p>Call the API directly, with no user attached, and try to mark a row verified. It must fail. Try again on a handwritten row with no confirmation. It must fail too. Both are tests, not something checked by hand.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>4 · Four page layouts that break normal reading <span class="ref">SoW 3.2 · T26 – T29</span></h2>
+    <p class="lede">These four page layouts break normal table reading. The Scope of Work calls them the most important engineering work in the product. Each one turns a messy page into clean records. Each one also has a case where it must stop and ask a person instead of guessing.</p>
+
+    <h3>Handler 1 — multi-page spread join <span class="tag">T26</span></h3>
+    <figure>
+      <svg viewBox="0 0 860 240" role="img" aria-label="Spread join. One register entry is split across a left page holding serial, name and area, and a right page holding remarks and valuation. The handler joins them by serial number and row order into single records.">
+        <defs>
+          <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+        <g fill="none" stroke="currentColor" stroke-width="1.3">
+          <rect x="20" y="40" width="230" height="150" rx="2"></rect>
+          <rect x="270" y="40" width="230" height="150" rx="2"></rect>
+          <rect x="600" y="40" width="240" height="150" rx="2" class="hot" stroke-width="1.6"></rect>
+        </g>
+        <g stroke="currentColor" stroke-width="0.8" opacity="0.5">
+          <path d="M 20 70 L 250 70"></path><path d="M 20 100 L 250 100"></path><path d="M 20 130 L 250 130"></path><path d="M 20 160 L 250 160"></path>
+          <path d="M 60 40 L 60 190"></path><path d="M 170 40 L 170 190"></path>
+          <path d="M 270 70 L 500 70"></path><path d="M 270 100 L 500 100"></path><path d="M 270 130 L 500 130"></path><path d="M 270 160 L 500 160"></path>
+          <path d="M 310 40 L 310 190"></path><path d="M 420 40 L 420 190"></path>
+          <path d="M 600 70 L 840 70"></path><path d="M 600 100 L 840 100"></path><path d="M 600 130 L 840 130"></path><path d="M 600 160 L 840 160"></path>
+          <path d="M 640 40 L 640 190"></path>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="10" fill="currentColor">
+          <text x="40" y="60" text-anchor="middle" opacity="0.8">no.</text>
+          <text x="115" y="60" text-anchor="middle" opacity="0.8">khatedar</text>
+          <text x="210" y="60" text-anchor="middle" opacity="0.8">area</text>
+          <text x="40" y="90" text-anchor="middle">12</text><text x="40" y="120" text-anchor="middle">13</text><text x="40" y="150" text-anchor="middle">14</text><text x="40" y="180" text-anchor="middle">15</text>
+          <text x="290" y="60" text-anchor="middle" opacity="0.8">no.</text>
+          <text x="365" y="60" text-anchor="middle" opacity="0.8">shera</text>
+          <text x="460" y="60" text-anchor="middle" opacity="0.8">value</text>
+          <text x="290" y="90" text-anchor="middle">12</text><text x="290" y="120" text-anchor="middle">13</text><text x="290" y="150" text-anchor="middle">14</text><text x="290" y="180" text-anchor="middle">15</text>
+          <text x="620" y="60" text-anchor="middle" opacity="0.8">no.</text>
+          <text x="745" y="60" text-anchor="middle" opacity="0.8">khatedar · area · shera · value</text>
+          <text x="620" y="90" text-anchor="middle">12</text><text x="620" y="120" text-anchor="middle">13</text><text x="620" y="150" text-anchor="middle">14</text><text x="620" y="180" text-anchor="middle">15</text>
+        </g>
+        <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="currentColor">
+          <text x="135" y="212" text-anchor="middle" opacity="0.8">left page</text>
+          <text x="385" y="212" text-anchor="middle" opacity="0.8">right page — same entries continue</text>
+          <text x="720" y="212" text-anchor="middle" class="hot">one record per entry</text>
+        </g>
+        <path d="M 505 115 L 592 115" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a4)"></path>
+        <text x="548" y="106" font-size="10" font-family="ui-monospace, monospace" text-anchor="middle" opacity="0.8">join on serial</text>
+      </svg>
+      <figcaption>A Form A register entry runs across two facing pages. Match the two halves by serial number, and check the row order as well. If the halves disagree on how many rows they have, do not join them — send them to a person. A wrong join puts one family's valuation on another family's land.</figcaption>
+    </figure>
+
+    <h3>Handler 2 — ditto-chain expansion <span class="tag">T27</span></h3>
+    <figure>
+      <svg viewBox="0 0 860 240" role="img" aria-label="Ditto chain expansion. Rows containing ditto marks inherit the value above them, per column, until a new value breaks the chain.">
+        <defs>
+          <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+        <g fill="none" stroke="currentColor" stroke-width="1.3">
+          <rect x="20" y="40" width="330" height="160" rx="2"></rect>
+          <rect x="510" y="40" width="330" height="160" rx="2" class="hot" stroke-width="1.6"></rect>
+        </g>
+        <g stroke="currentColor" stroke-width="0.8" opacity="0.5">
+          <path d="M 20 70 L 350 70"></path><path d="M 20 102 L 350 102"></path><path d="M 20 134 L 350 134"></path><path d="M 20 166 L 350 166"></path>
+          <path d="M 60 40 L 60 200"></path><path d="M 220 40 L 220 200"></path>
+          <path d="M 510 70 L 840 70"></path><path d="M 510 102 L 840 102"></path><path d="M 510 134 L 840 134"></path><path d="M 510 166 L 840 166"></path>
+          <path d="M 550 40 L 550 200"></path><path d="M 710 40 L 710 200"></path>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="10" fill="currentColor">
+          <text x="40" y="60" text-anchor="middle" opacity="0.8">no.</text><text x="140" y="60" text-anchor="middle" opacity="0.8">khatedar</text><text x="285" y="60" text-anchor="middle" opacity="0.8">village</text>
+          <text x="40" y="90" text-anchor="middle">21</text><text x="140" y="90" text-anchor="middle">Ramrao Patil</text><text x="285" y="90" text-anchor="middle">Basmath</text>
+          <text x="40" y="122" text-anchor="middle">22</text><text x="140" y="122" text-anchor="middle" font-size="13">,,</text><text x="285" y="122" text-anchor="middle" font-size="13">,,</text>
+          <text x="40" y="154" text-anchor="middle">23</text><text x="140" y="154" text-anchor="middle" font-size="13">,,</text><text x="285" y="154" text-anchor="middle">Kalamnuri</text>
+          <text x="40" y="186" text-anchor="middle">24</text><text x="140" y="186" text-anchor="middle">Sitabai Deshmukh</text><text x="285" y="186" text-anchor="middle" font-size="13">,,</text>
+
+          <text x="530" y="60" text-anchor="middle" opacity="0.8">no.</text><text x="630" y="60" text-anchor="middle" opacity="0.8">khatedar</text><text x="775" y="60" text-anchor="middle" opacity="0.8">village</text>
+          <text x="530" y="90" text-anchor="middle">21</text><text x="630" y="90" text-anchor="middle">Ramrao Patil</text><text x="775" y="90" text-anchor="middle">Basmath</text>
+          <text x="530" y="122" text-anchor="middle">22</text><text x="630" y="122" text-anchor="middle" class="hot">Ramrao Patil</text><text x="775" y="122" text-anchor="middle" class="hot">Basmath</text>
+          <text x="530" y="154" text-anchor="middle">23</text><text x="630" y="154" text-anchor="middle" class="hot">Ramrao Patil</text><text x="775" y="154" text-anchor="middle">Kalamnuri</text>
+          <text x="530" y="186" text-anchor="middle">24</text><text x="630" y="186" text-anchor="middle">Sitabai Deshmukh</text><text x="775" y="186" text-anchor="middle" class="hot">Kalamnuri</text>
+        </g>
+        <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="currentColor">
+          <text x="185" y="222" text-anchor="middle" opacity="0.8">as written in the register</text>
+          <text x="675" y="222" text-anchor="middle" class="hot">as stored, each value labelled inherited</text>
+        </g>
+        <path d="M 358 120 L 500 120" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a5)"></path>
+        <text x="429" y="111" font-size="10" font-family="ui-monospace, monospace" text-anchor="middle" opacity="0.8">expand per column</text>
+      </svg>
+      <figcaption>Each column has its own chain. Row 23 keeps the same khatedar but starts a new village, and row 24 then copies that new village. Chains can run past ten rows and carry on to the next page. Store every copied value with a label saying it was copied, so the person checking knows it was never written on the page.</figcaption>
+    </figure>
+
+    <h3>Handler 3 — continuation-row merge <span class="tag">T28</span></h3>
+    <figure>
+      <svg viewBox="0 0 860 230" role="img" aria-label="Continuation merge. The last row of a page continues at the top of the next page with a blank serial number, and the handler merges the fragment backwards into the previous record.">
+        <defs>
+          <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+        <g fill="none" stroke="currentColor" stroke-width="1.3">
+          <rect x="20" y="30" width="300" height="80" rx="2"></rect>
+          <rect x="20" y="130" width="300" height="70" rx="2"></rect>
+          <rect x="560" y="70" width="280" height="90" rx="2" class="hot" stroke-width="1.6"></rect>
+        </g>
+        <g stroke="currentColor" stroke-width="0.8" opacity="0.5">
+          <path d="M 20 60 L 320 60"></path><path d="M 20 85 L 320 85"></path>
+          <path d="M 20 160 L 320 160"></path>
+          <path d="M 70 30 L 70 110"></path><path d="M 70 130 L 70 200"></path>
+          <path d="M 560 100 L 840 100"></path><path d="M 610 70 L 610 160"></path>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="10" fill="currentColor">
+          <text x="45" y="50" text-anchor="middle" opacity="0.8">no.</text><text x="195" y="50" text-anchor="middle" opacity="0.8">description of the property</text>
+          <text x="45" y="78" text-anchor="middle">47</text><text x="195" y="78" text-anchor="middle">kabrastan, survey no. 47, north —</text>
+          <text x="195" y="102" text-anchor="middle">road, south — well, east —</text>
+          <text x="45" y="152" text-anchor="middle" opacity="0.8">no.</text><text x="195" y="152" text-anchor="middle" opacity="0.8">description of the property</text>
+          <text x="45" y="180" text-anchor="middle" opacity="0.6">—</text><text x="195" y="180" text-anchor="middle">school, west — road</text>
+          <text x="585" y="90" text-anchor="middle" opacity="0.8">no.</text><text x="725" y="90" text-anchor="middle" opacity="0.8">description</text>
+          <text x="585" y="120" text-anchor="middle">47</text><text x="725" y="120" text-anchor="middle" class="hot">…north road, south well, east school,</text>
+          <text x="725" y="140" text-anchor="middle" class="hot">west road — one record</text>
+        </g>
+        <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="currentColor">
+          <text x="170" y="126" text-anchor="middle" opacity="0.75">page 4, last row</text>
+          <text x="170" y="216" text-anchor="middle" opacity="0.75">page 5, first row — serial blank</text>
+        </g>
+        <path d="M 330 165 L 400 165 L 400 115 L 552 115" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a6)"></path>
+        <text x="440" y="106" font-size="10" font-family="ui-monospace, monospace" text-anchor="middle" opacity="0.8">merge backwards</text>
+      </svg>
+      <figcaption>A blank serial number in the first row of a page means the entry above is still running. Read it as its own row and you get a half record. Merge it and the real record is complete. The merged record points at two pages, which is why a fact stores a list of regions.</figcaption>
+    </figure>
+
+    <h3>Handler 4 — blob-cell parse <span class="tag">T29</span></h3>
+    <figure>
+      <svg viewBox="0 0 860 230" role="img" aria-label="Blob cell parse. One free-text cell containing survey numbers, area in mixed units and open space is parsed into typed normalised fields.">
+        <defs>
+          <marker id="a7" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+        <rect x="20" y="60" width="330" height="110" rx="2" fill="none" stroke="currentColor" stroke-width="1.3"></rect>
+        <g font-family="ui-monospace, monospace" font-size="10.5" fill="currentColor">
+          <text x="36" y="86">मौजे वाशिम — S.No. 121/2A &amp; 121/2B,</text>
+          <text x="36" y="106">area 1 हे 25 आर, construction 4500 sqft,</text>
+          <text x="36" y="126">open space 300 चौ.मी., CTS 88, Akker 2.5</text>
+        </g>
+        <text x="185" y="192" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif" text-anchor="middle" opacity="0.75">one cell, as scanned</text>
+
+        <g fill="none" stroke-width="1.4" class="hot">
+          <rect x="540" y="30" width="300" height="34" rx="2"></rect>
+          <rect x="540" y="74" width="300" height="34" rx="2"></rect>
+          <rect x="540" y="118" width="300" height="34" rx="2"></rect>
+          <rect x="540" y="162" width="300" height="34" rx="2"></rect>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="10.5" fill="currentColor">
+          <text x="556" y="51">survey_numbers = [121/2A, 121/2B], cts = 88</text>
+          <text x="556" y="95">area_sqm = 12500  · from 1 ha 25 are</text>
+          <text x="556" y="139">built_sqm = 418.06  · from 4500 sqft</text>
+          <text x="556" y="183">open_space_sqm = 300 · akker 2.5 flagged</text>
+        </g>
+        <path d="M 358 115 L 532 115" fill="none" stroke="currentColor" stroke-width="1.4" marker-end="url(#a7)"></path>
+        <text x="445" y="106" font-size="10" font-family="ui-monospace, monospace" text-anchor="middle" opacity="0.8">parse + normalise</text>
+      </svg>
+      <figcaption>One cell of a Washim register, mixing Marathi and English. Convert every area into one unit and keep the original text beside it. These registers use square metres, square feet, hectares, ares, gunthas and “Akker”. Akker means different things in different districts, so flag it for a person instead of guessing a number.</figcaption>
+    </figure>
+
+    <div class="accept">
+      <span class="h">How we test it — the regression corpus <span class="tag">T31 · T32</span></span>
+      <p>Keep one sample document per handler, each with the correct answer written out by a person, and run them in CI. Check that the records come out exactly right. Also check the safety path: a spread with mismatched rows goes to a person, and an unknown unit never quietly becomes a number. The accuracy figures from this run are a deliverable in their own right. Note that nobody has agreed yet how accurate is accurate enough (decision D-4).</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>5 · The checking screen <span class="ref">SoW 3.3 · T51 – T55</span></h2>
+    <p class="lede">The screen an operator uses all day. It is the whole verification module, and the largest front-end job in v1.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 420" role="img" aria-label="Workbench wireframe. A header naming the template, era and page; a left pane showing the scanned page with three highlighted regions, one active; a right pane listing extracted fields with confidence badges and states; and a keyboard-driven action bar.">
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="20" y="20" width="840" height="380" rx="4"></rect>
+          <rect x="20" y="20" width="840" height="42" rx="4"></rect>
+          <rect x="36" y="78" width="440" height="270" rx="2"></rect>
+          <rect x="492" y="78" width="352" height="270" rx="2"></rect>
+        </g>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="36" y="46" font-size="12" font-weight="600">Waqf register, Form A · Basmath · 1974 · page 4 of 12</text>
+          <text x="560" y="46" font-size="11" opacity="0.75">queue: 128 rows · claimed by you</text>
+          <text x="844" y="46" font-size="11" text-anchor="end" opacity="0.75">operator</text>
+        </g>
+
+        <g stroke="currentColor" stroke-width="0.8" opacity="0.4">
+          <path d="M 60 110 L 452 110"></path><path d="M 60 126 L 400 126"></path>
+          <path d="M 60 210 L 452 210"></path><path d="M 60 226 L 430 226"></path><path d="M 60 242 L 452 242"></path>
+          <path d="M 60 300 L 452 300"></path><path d="M 60 316 L 380 316"></path>
+        </g>
+        <rect x="56" y="146" width="240" height="26" rx="2" fill="none" class="hot" stroke-width="2.2"></rect>
+        <rect x="56" y="256" width="300" height="26" rx="2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.7"></rect>
+        <rect x="56" y="180" width="180" height="22" rx="2" fill="none" stroke="currentColor" stroke-width="1.2" stroke-dasharray="4 3" opacity="0.7"></rect>
+        <text x="176" y="164" font-size="10" font-family="ui-monospace, monospace" class="hot" text-anchor="middle">active field</text>
+        <text x="256" y="370" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif" text-anchor="middle" opacity="0.75">scanned page, rotation applied</text>
+
+        <g stroke="currentColor" stroke-width="0.8" opacity="0.45">
+          <path d="M 492 112 L 844 112"></path><path d="M 492 152 L 844 152"></path><path d="M 492 192 L 844 192"></path>
+          <path d="M 492 232 L 844 232"></path><path d="M 492 272 L 844 272"></path><path d="M 492 312 L 844 312"></path>
+        </g>
+        <g font-family="ui-sans-serif, system-ui, sans-serif" font-size="11" fill="currentColor">
+          <text x="508" y="100" font-size="10" opacity="0.7">FIELD</text>
+          <text x="700" y="100" font-size="10" opacity="0.7">VALUE</text>
+          <text x="836" y="100" font-size="10" opacity="0.7" text-anchor="end">CONF · STATE</text>
+
+          <text x="508" y="136">survey no.</text><text x="700" y="136">121/2A</text><text x="836" y="136" text-anchor="end" opacity="0.75">0.99 · verified</text>
+          <text x="508" y="176" class="hot">holder</text><text x="700" y="176" class="hot">Ramrao Patil</text><text x="836" y="176" text-anchor="end" class="hot">0.71 · in review</text>
+          <text x="508" y="216">village</text><text x="700" y="216">Basmath</text><text x="836" y="216" text-anchor="end" opacity="0.75">0.94 · inherited</text>
+          <text x="508" y="256">area</text><text x="700" y="256">1 ha 25 are</text><text x="836" y="256" text-anchor="end" opacity="0.75">0.88 · machine</text>
+          <text x="508" y="296">chatai sima</text><text x="700" y="296">handwritten</text><text x="836" y="296" text-anchor="end" opacity="0.75">— · review queue</text>
+          <text x="508" y="336">valuation</text><text x="700" y="336">Rs. 1,240</text><text x="836" y="336" text-anchor="end" opacity="0.75">0.62 · machine</text>
+        </g>
+
+        <g font-family="ui-monospace, monospace" font-size="10.5" fill="currentColor">
+          <text x="36" y="384" opacity="0.85">[A] accept   [C] correct   [D] send to the review queue   [Tab] next field   [Shift+A] accept all above 0.90</text>
+        </g>
+      </svg>
+      <figcaption>The operator sees the scanned Form A page on the left and its fields on the right. Click a field and its area lights up on the scan. Click an area and the field is selected. Both work as soon as the source-location rules exists, and neither works before it. The state column shows the flow from the previous section, one state per row rather than per document.</figcaption>
+    </figure>
+
+    <div class="spec">
+      <div class="box"><span class="h">Two lanes of work <span class="tag">T51</span></span><p>One lane for clean rows accepted in batches, one lane for anything flagged. A row can move between lanes, and every move is logged.</p></div>
+      <div class="box"><span class="h">One person per row <span class="tag">T52</span></span><p>Separate queues for notes in the margin, join mismatches, low-confidence fields and handwritten areas. When someone opens an item it is hidden from everyone else, so two people never check the same row.</p></div>
+      <div class="box"><span class="h">Keyboard first <span class="tag">T54</span></span><p>An operator should never need the mouse for a clean row. Allow accepting everything above a chosen confidence in one go, and keep that number in config rather than in code.</p></div>
+      <div class="box"><span class="h">Checking never blocks search <span class="tag">SoW 3.5</span></span><p>Checking decides what counts as evidence, not what can be found. An unchecked document still appears in search, marked as unchecked.</p></div>
+    </div>
+
+    <div class="accept">
+      <span class="h">How we test it</span>
+      <p>One operator checks fifty rows using the keyboard only. Every accept writes a log entry with the user, the row, the previous state and the confidence. A handwritten row cannot be accepted without confirming it. A second operator never sees a row someone else has open.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>6 · Linking records to people and property <span class="ref">SoW 3.4 · T10 · T56 – T59</span></h2>
+    <p class="lede">People, properties and offices become nodes. Links between them become edges. The safety comes from tiers: the tier decides what a link is allowed to be used for.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 330" role="img" aria-label="Tier ladder. Tiers one and two auto-commit as machine-labelled edges and never cross into the verified layer. Tier three is held and crosses only through a human confirmation gate. Tier four legal links require a human at any confidence.">
+        <defs>
+          <marker id="a8" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="20" y="30" width="260" height="52" rx="3"></rect>
+          <rect x="20" y="94" width="260" height="52" rx="3"></rect>
+          <rect x="20" y="158" width="260" height="52" rx="3"></rect>
+          <rect x="20" y="222" width="260" height="52" rx="3"></rect>
+          <rect x="370" y="30" width="190" height="52" rx="3"></rect>
+        </g>
+        <rect x="370" y="150" width="190" height="60" rx="3" fill="none" class="hot" stroke-width="1.8"></rect>
+        <rect x="660" y="30" width="200" height="244" rx="3" fill="none" class="hot" stroke-width="1.8"></rect>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="36" y="52" font-size="11.5" font-weight="600">Tier 1 — structural</text>
+          <text x="36" y="70" font-size="10.5" opacity="0.75">Form A page 4 contains this row</text>
+          <text x="36" y="116" font-size="11.5" font-weight="600">Tier 2 — mention</text>
+          <text x="36" y="134" font-size="10.5" opacity="0.75">this row names “Ramrao Patil”</text>
+          <text x="36" y="180" font-size="11.5" font-weight="600">Tier 3 — identity</text>
+          <text x="36" y="198" font-size="10.5" opacity="0.75">Ramrao Patil = R. B. Patil, 1998 ferfar</text>
+          <text x="36" y="244" font-size="11.5" font-weight="600">Tier 4 — legal</text>
+          <text x="36" y="262" font-size="10.5" opacity="0.75">this sanad transfers survey no. 121/2A</text>
+
+          <text x="465" y="52" font-size="11.5" font-weight="600" text-anchor="middle">machine layer</text>
+          <text x="465" y="70" font-size="10.5" text-anchor="middle" opacity="0.75">auto-commit, labelled machine</text>
+          <text x="465" y="174" font-size="11.5" font-weight="600" text-anchor="middle" class="hot">human confirmation</text>
+          <text x="465" y="192" font-size="10.5" text-anchor="middle" opacity="0.8">actor · threshold · corpus · policy version</text>
+
+          <text x="760" y="56" font-size="12" font-weight="600" text-anchor="middle" class="hot">verified layer</text>
+          <text x="760" y="80" font-size="10.5" text-anchor="middle" opacity="0.8">the only source for</text>
+          <text x="760" y="100" font-size="10.5" text-anchor="middle" opacity="0.8">exports · certificates</text>
+          <text x="760" y="120" font-size="10.5" text-anchor="middle" opacity="0.8">legal derivation</text>
+          <text x="760" y="160" font-size="10.5" text-anchor="middle" opacity="0.8">held edges are</text>
+          <text x="760" y="180" font-size="10.5" text-anchor="middle" opacity="0.8">usable and badged</text>
+          <text x="760" y="200" font-size="10.5" text-anchor="middle" opacity="0.8">everywhere else</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a8)" opacity="0.9">
+          <path d="M 280 56 L 362 56"></path>
+          <path d="M 280 120 L 320 120 L 320 66 L 362 66"></path>
+          <path d="M 280 184 L 362 184"></path>
+          <path d="M 280 248 L 330 248 L 330 200 L 362 200"></path>
+        </g>
+        <path d="M 560 180 L 652 180" fill="none" class="hot" stroke-width="1.8" marker-end="url(#a8)"></path>
+        <path d="M 560 56 L 620 56" fill="none" stroke="currentColor" stroke-width="1.3" stroke-dasharray="5 4" opacity="0.7"></path>
+        <g stroke="currentColor" stroke-width="1.6" opacity="0.8">
+          <path d="M 626 48 L 642 64"></path><path d="M 642 48 L 626 64"></path>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="10" fill="currentColor" opacity="0.8">
+          <text x="600" y="40" text-anchor="middle">never crosses</text>
+          <text x="606" y="172" text-anchor="middle" class="hot">crosses</text>
+          <text x="322" y="240">always, at any confidence</text>
+        </g>
+      </svg>
+      <figcaption>Bulk confirm is the same gate at scale. A person accepts every held link above a chosen score for one collection, in one action. Record the user, the score, the collection and the rule version — on the log and on every link it touched. Undoing it must remove those links cleanly. A link the machine created keeps that label for good, even after a person has looked at it.</figcaption>
+    </figure>
+
+    <div class="accept">
+      <span class="h">How we test it <span class="tag">T67</span></span>
+      <p>Export data from a collection that contains held links. They are left out, or clearly marked — decision D-8 says which. Enforce it in the query layer, so an export format added next year gets the rule without anyone remembering to add it.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>7 · Records that change over the years <span class="ref">SoW 3.6 · T60 – T62</span></h2>
+    <p class="lede">A land record is not a document. It is a first entry plus every change made to it since, sometimes over fifty years. Work out the current state from those changes. Never store a current value and edit it in place.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 270" role="img" aria-label="Amendment chain. A base entry from 1974 followed by two amendments, each citing its source page, producing a derived current state that can be recomputed from the chain at any time.">
+        <defs>
+          <marker id="a9" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="20" y="50" width="200" height="76" rx="3"></rect>
+          <rect x="260" y="50" width="200" height="76" rx="3"></rect>
+          <rect x="500" y="50" width="200" height="76" rx="3"></rect>
+        </g>
+        <rect x="660" y="160" width="200" height="76" rx="3" fill="none" class="hot" stroke-width="1.8"></rect>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="36" y="72" font-size="11.5" font-weight="600">Form A entry · Basmath · 1974</text>
+          <text x="36" y="92" font-size="10.5" opacity="0.8">holder Ramrao Patil</text>
+          <text x="36" y="110" font-size="10.5" opacity="0.8">1 ha 25 are · Rs. 1,240 · p. 4</text>
+
+          <text x="276" y="72" font-size="11.5" font-weight="600">ferfar no. 1123 · 1998</text>
+          <text x="276" y="92" font-size="10.5" opacity="0.8">holder → Sitabai Deshmukh</text>
+          <text x="276" y="110" font-size="10.5" opacity="0.8">succession order · p. 17</text>
+
+          <text x="516" y="72" font-size="11.5" font-weight="600">shuddhipatrak · 2021</text>
+          <text x="516" y="92" font-size="10.5" opacity="0.8">value → Rs. 12,40,000</text>
+          <text x="516" y="110" font-size="10.5" opacity="0.8">gazette correction · p. 3</text>
+
+          <text x="676" y="184" font-size="11.5" font-weight="600" class="hot">current state · derived</text>
+          <text x="676" y="204" font-size="10.5" opacity="0.85">Sitabai Deshmukh</text>
+          <text x="676" y="222" font-size="10.5" opacity="0.85">Rs. 12,40,000 · in force</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a9)" opacity="0.9">
+          <path d="M 220 88 L 252 88"></path>
+          <path d="M 460 88 L 492 88"></path>
+          <path d="M 700 110 L 740 110 L 740 152"></path>
+        </g>
+        <path d="M 120 126 L 120 200 L 652 200" fill="none" class="hot" stroke-width="1.5" stroke-dasharray="6 4" marker-end="url(#a9)"></path>
+        <g font-family="ui-monospace, monospace" font-size="10" fill="currentColor">
+          <text x="330" y="212" class="hot" text-anchor="middle">re-derivable from the chain at any time — never a stored mutable "current"</text>
+          <text x="236" y="80" text-anchor="middle" opacity="0.75">·</text>
+        </g>
+      </svg>
+      <figcaption>A 1974 Form A entry, a 1998 ferfar transferring it on succession, and a 2021 shuddhipatrak fixing the valuation. Every change points at the page that authorised it, so “why does this record say this?” can be answered with a page image. Legal status sits alongside: in force, set aside, under stay, superseded. A record takes the status of a source that is in court, which is what makes it possible to filter on.</figcaption>
+    </figure>
+
+    <div class="accept">
+      <span class="h">How we test it</span>
+      <p>Add a shuddhipatrak decades after the first entry, one that changes a valuation from Rs. 1,240 to Rs. 12,40,000. Then check three things: the original view, the current view and the full history are all readable; each one cites its source page; and rebuilding from the chain gives exactly the current view. Write this test first in the records module — it is the one that catches a stored, editable current value sneaking in.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>8 · Search, sources, and saying “no answer” <span class="ref">SoW 3.5 · hard rule 1 · T70 · T71 · T73</span></h2>
+    <p class="lede">Search already works. What v1 adds is the rule around the answer: every statement is tied to a passage, and there is no answer at all when the passages do not support one.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 280" role="img" aria-label="Answer path. Retrieval produces passages, the model drafts claims, each claim is bound to a passage, and a gate either returns a cited answer or refuses when grounding is absent.">
+        <defs>
+          <marker id="a10" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="20" y="40" width="170" height="56" rx="3"></rect>
+          <rect x="230" y="40" width="170" height="56" rx="3"></rect>
+        </g>
+        <g fill="none" stroke-width="1.5">
+          <rect x="440" y="40" width="180" height="56" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="660" y="20" width="200" height="56" rx="3" class="hot"></rect>
+          <rect x="660" y="110" width="200" height="56" rx="3" class="new" stroke-dasharray="5 4"></rect>
+          <rect x="230" y="180" width="390" height="56" rx="3" class="new" stroke-dasharray="5 4"></rect>
+        </g>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="105" y="66" font-size="12" font-weight="600" text-anchor="middle">retrieval</text>
+          <text x="105" y="82" font-size="10.5" text-anchor="middle" opacity="0.75">hybrid + rerank, built</text>
+          <text x="315" y="66" font-size="12" font-weight="600" text-anchor="middle">draft claims</text>
+          <text x="315" y="82" font-size="10.5" text-anchor="middle" opacity="0.75">model reads passages</text>
+          <text x="530" y="66" font-size="12" font-weight="600" text-anchor="middle">bind each claim</text>
+          <text x="530" y="82" font-size="10.5" text-anchor="middle" opacity="0.75">to a passage + region</text>
+          <text x="760" y="44" font-size="12" font-weight="600" text-anchor="middle" class="hot">cited answer</text>
+          <text x="760" y="60" font-size="10.5" text-anchor="middle" opacity="0.8">every claim clicks to a region</text>
+          <text x="760" y="134" font-size="12" font-weight="600" text-anchor="middle">refusal</text>
+          <text x="760" y="150" font-size="10.5" text-anchor="middle" opacity="0.8">“the corpus does not say”</text>
+          <text x="425" y="204" font-size="12" font-weight="600" text-anchor="middle">also searched: extracted records</text>
+          <text x="425" y="220" font-size="10.5" text-anchor="middle" opacity="0.75">structured fields, not only chunk text — a query can filter on area, village or status</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a10)" opacity="0.9">
+          <path d="M 190 68 L 222 68"></path>
+          <path d="M 400 68 L 432 68"></path>
+          <path d="M 620 60 L 652 52"></path>
+          <path d="M 620 82 L 652 128"></path>
+          <path d="M 425 172 L 425 104"></path>
+        </g>
+        <g font-family="ui-monospace, monospace" font-size="10" fill="currentColor" opacity="0.85">
+          <text x="642" y="36" text-anchor="end">bound</text>
+          <text x="642" y="120" text-anchor="end">unbound or weak</text>
+        </g>
+      </svg>
+      <figcaption>This gate is a product rule, not a setting to tune. A confident, well-written answer with no source is exactly the failure this product exists to prevent. Clicking a citation opens the page at the highlighted area, using the same viewer as the checking screen. Build that viewer once.</figcaption>
+    </figure>
+
+    <div class="accept">
+      <span class="h">How we test it</span>
+      <p>Ask something the documents cannot answer — “which Waqf plots in Washim are under stay?” when no such record was scanned. The system says it cannot answer. Ask something they can: every sentence carries a citation, and each citation opens the page at the right spot. This has to work whichever model provider is configured.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>9 · Proving nothing was changed later <span class="ref">SoW 3.8 · T63 – T67</span></h2>
+    <p class="lede">This is what lets us call the records evidence. A log table on its own is not enough. The record has to be able to show it was not changed afterwards.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 250" role="img" aria-label="Audit hash chain. Each event stores the hash of the previous event plus its own payload, so altering any event breaks every hash after it. A verification tool walks the chain, archives are held in write-once storage, and a Section 63 certificate is issued from the chain.">
+        <defs>
+          <marker id="a11" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke-width="1.4" class="new" stroke-dasharray="5 4">
+          <rect x="20" y="40" width="180" height="70" rx="3"></rect>
+          <rect x="240" y="40" width="180" height="70" rx="3"></rect>
+          <rect x="460" y="40" width="180" height="70" rx="3"></rect>
+          <rect x="240" y="160" width="180" height="56" rx="3"></rect>
+          <rect x="460" y="160" width="180" height="56" rx="3"></rect>
+          <rect x="680" y="40" width="180" height="70" rx="3"></rect>
+        </g>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="110" y="62" font-size="11.5" font-weight="600" text-anchor="middle">capture</text>
+          <text x="110" y="80" font-size="10" text-anchor="middle" opacity="0.8">file hash anchors the chain</text>
+          <text x="110" y="97" font-size="10" text-anchor="middle" opacity="0.8">h₀ = sha256(file)</text>
+          <text x="330" y="62" font-size="11.5" font-weight="600" text-anchor="middle">event</text>
+          <text x="330" y="80" font-size="10" text-anchor="middle" opacity="0.8">actor · action · target</text>
+          <text x="330" y="97" font-size="10" text-anchor="middle" opacity="0.8">h₁ = sha256(h₀ ‖ payload)</text>
+          <text x="550" y="62" font-size="11.5" font-weight="600" text-anchor="middle">event</text>
+          <text x="550" y="80" font-size="10" text-anchor="middle" opacity="0.8">verification accepted</text>
+          <text x="550" y="97" font-size="10" text-anchor="middle" opacity="0.8">h₂ = sha256(h₁ ‖ payload)</text>
+          <text x="770" y="62" font-size="11.5" font-weight="600" text-anchor="middle">Section 63 certificate</text>
+          <text x="770" y="80" font-size="10" text-anchor="middle" opacity="0.8">hash · algorithm name</text>
+          <text x="770" y="97" font-size="10" text-anchor="middle" opacity="0.8">dual signature blocks</text>
+          <text x="330" y="184" font-size="11.5" font-weight="600" text-anchor="middle">integrity checker</text>
+          <text x="330" y="201" font-size="10" text-anchor="middle" opacity="0.8">walks the chain, reports the first break</text>
+          <text x="550" y="184" font-size="11.5" font-weight="600" text-anchor="middle">WORM archive</text>
+          <text x="550" y="201" font-size="10" text-anchor="middle" opacity="0.8">cannot be deleted early</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a11)" opacity="0.9">
+          <path d="M 200 75 L 232 75"></path>
+          <path d="M 420 75 L 452 75"></path>
+          <path d="M 640 75 L 672 75"></path>
+          <path d="M 330 152 L 330 118"></path>
+          <path d="M 550 118 L 550 152"></path>
+        </g>
+      </svg>
+      <figcaption>Make the log append-only in the database itself: the application user gets no permission to update or delete rows. The chain turns “our logs say so” into something an auditor can check for themselves. The certificate cannot ship until legal has reviewed the template (assumption A3).</figcaption>
+    </figure>
+
+    <div class="spec">
+      <div class="box"><span class="h">Log everything <span class="tag">T07</span></span><p>Log every change, plus views and downloads. Today only sign-in, search and chat are logged, so widening coverage comes first, before any chaining.</p></div>
+      <div class="box"><span class="h">Always know who did it <span class="tag">T08</span></span><p>Refuse any change that has no user attached. A chain full of empty user fields proves nothing.</p></div>
+      <div class="box"><span class="h">Six user roles <span class="tag">T50</span></span><p>Six roles: records officer, operator, department head, legal counsel, IT admin, and auditor with read-only access. Department scope is a group over projects, not another folder level.</p></div>
+      <div class="box"><span class="h">How long we keep things <span class="tag">T66</span></span><p>How long to keep each class of record, replacing today's single rule of emptying trash after 30 days. The classes and defaults are decision D-7.</p></div>
+    </div>
+  </section>
+
+  <section>
+    <h2>10 · Export, duplicates and bulk edits <span class="ref">SoW 3.9 · T78 – T80</span></h2>
+    <div class="cards">
+      <div class="card">
+        <h3>Export <span class="tag">T78</span></h3>
+        <p>CSV, JSON, XLSX, PDF and PDF/A. Every export is logged with the user, what was exported and in which format. It reads only checked data.</p>
+      </div>
+      <div class="card">
+        <h3>Duplicate detection <span class="tag">T79</span></h3>
+        <p>Compare hashes first. The SHA-256 is already stored but never compared, so the same file is processed again in full today. Then add fuzzy matching for pages scanned twice. Show both to an operator to decide — never drop a file quietly.</p>
+      </div>
+      <div class="card">
+        <h3>Bulk edit <span class="tag">T80</span></h3>
+        <p>Show a preview before applying, log every row changed, and allow a limited undo. It cannot mark machine values as checked; that only happens on the checking screen.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>11 · Two ways we install it <span class="ref">SoW 3.10 · T90 – T93</span></h2>
+    <p class="lede">The same product ships two ways: as a hosted service, and inside a government network with no internet. The second one is pass or fail: a single outbound call fails it.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 330" role="img" aria-label="Deployment profiles. In SaaS, LLM, reranker and OCR calls go to external APIs. In the air-gapped profile the same interfaces resolve to local models on a GPU, and a missing local model raises rather than falling back to an API.">
+        <defs>
+          <marker id="a12" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <rect x="20" y="60" width="180" height="200" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="110" y="46" font-size="11.5" font-weight="600" text-anchor="middle">provider interfaces</text>
+          <text x="110" y="92" font-size="10.5" text-anchor="middle">LLM</text>
+          <text x="110" y="122" font-size="10.5" text-anchor="middle">VLM / OCR</text>
+          <text x="110" y="152" font-size="10.5" text-anchor="middle">embeddings</text>
+          <text x="110" y="182" font-size="10.5" text-anchor="middle">reranker</text>
+          <text x="110" y="222" font-size="10" text-anchor="middle" opacity="0.75">one abstraction,</text>
+          <text x="110" y="238" font-size="10" text-anchor="middle" opacity="0.75">two resolutions</text>
+        </g>
+
+        <rect x="330" y="30" width="230" height="120" rx="3" fill="none" stroke="currentColor" stroke-width="1.4"></rect>
+        <rect x="330" y="180" width="230" height="120" rx="3" fill="none" class="new" stroke-dasharray="5 4" stroke-width="1.5"></rect>
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="445" y="54" font-size="12" font-weight="600" text-anchor="middle">SaaS profile</text>
+          <text x="445" y="76" font-size="10.5" text-anchor="middle" opacity="0.8">external APIs · metered subscription</text>
+          <text x="445" y="98" font-size="10.5" text-anchor="middle" opacity="0.8">Groq / OpenAI / Anthropic · Cohere</text>
+          <text x="445" y="126" font-size="10.5" text-anchor="middle" opacity="0.8">embeddings already local</text>
+
+          <text x="445" y="204" font-size="12" font-weight="600" text-anchor="middle">air-gapped profile</text>
+          <text x="445" y="226" font-size="10.5" text-anchor="middle" opacity="0.8">Qwen2.5-VL-7B on a 24 GB GPU</text>
+          <text x="445" y="248" font-size="10.5" text-anchor="middle" opacity="0.8">PaddleOCR / Surya / Docling</text>
+          <text x="445" y="270" font-size="10.5" text-anchor="middle" opacity="0.8">node or GPU capacity licence</text>
+        </g>
+
+        <rect x="660" y="180" width="200" height="120" rx="3" fill="none" class="hot" stroke-width="1.8"></rect>
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="760" y="206" font-size="11.5" font-weight="600" text-anchor="middle" class="hot">fails closed</text>
+          <text x="760" y="228" font-size="10.5" text-anchor="middle" opacity="0.85">a missing local model</text>
+          <text x="760" y="246" font-size="10.5" text-anchor="middle" opacity="0.85">raises an error</text>
+          <text x="760" y="270" font-size="10.5" text-anchor="middle" opacity="0.85">never silently calls an API</text>
+        </g>
+        <rect x="660" y="30" width="200" height="120" rx="3" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="4 3" opacity="0.7"></rect>
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor" opacity="0.85">
+          <text x="760" y="56" font-size="11.5" font-weight="600" text-anchor="middle">egress monitor</text>
+          <text x="760" y="78" font-size="10.5" text-anchor="middle">CI job asserts zero</text>
+          <text x="760" y="96" font-size="10.5" text-anchor="middle">outbound connections</text>
+          <text x="760" y="120" font-size="10.5" text-anchor="middle">cloud connectors excluded</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a12)" opacity="0.9">
+          <path d="M 200 120 L 260 120 L 260 90 L 322 90"></path>
+          <path d="M 200 200 L 260 200 L 260 240 L 322 240"></path>
+          <path d="M 560 240 L 652 240"></path>
+          <path d="M 560 90 L 652 90"></path>
+        </g>
+      </svg>
+      <figcaption>Both setups use the same four interfaces, so no feature depends on which one is running. Failing closed matters because the alternative is worse: quietly calling a cloud API when the local model is missing would send government records outside, and still look like a working install.</figcaption>
+    </figure>
+
+    <div class="accept">
+      <span class="h">How we test it <span class="tag">T92 · T93</span></span>
+      <p>Start everything with outbound network blocked. Loading documents, checking them and searching all still work on local models. Then remove a local model and confirm the call fails instead of falling back to an API. Finally, have someone who did not build it install the whole thing from the runbook.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>12 · New tables and columns <span class="ref">engineering standards · T01 – T05 · T10</span></h2>
+    <p class="lede">All of this is a single migration today. Once real documents are loaded, each item becomes a migration plus a data backfill plus re-processing everything already loaded.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Add</th><th>Holds</th><th>Why now</th></tr></thead>
+        <tbody>
+          <tr><td><code>sys_dg_config</code> <span class="tag">T02</span></td><td>Every threshold and limit in one place, with documented defaults</td><td>The Scope of Work says settings belong in config. Nine values are written into the code today, including the search relevance threshold and the accept-all level the checking screen needs</td></tr>
+          <tr><td>Source-location columns <span class="tag">T04</span></td><td>Page number and list of spots on the page for every fact. Never allowed to be empty</td><td>Blocks the checking screen, the 360 views and every citation. The pipeline already works out word positions and then throws them away</td></tr>
+          <tr><td>Verification state <span class="tag">T51</span></td><td>Per-row state, lane, claiming operator, confidence, actor event reference</td><td>The fact lifecycle lives here, not in the UI</td></tr>
+          <tr><td><code>entity_dg_nodes</code> · <code>entity_dg_edges</code> <span class="tag">T10</span></td><td>Typed nodes; edges with type, confidence, status, creating actor or policy version, timestamp, evidence pointer</td><td>Use Postgres tables for the graph. That decision is already recorded — do not re-open it</td></tr>
+          <tr><td>Record and amendment tables <span class="tag">T60</span></td><td>Base entries, ordered amendments, legal status, each citing a source page</td><td><code>document_versions</code> tracks uploaded files, which is a different thing</td></tr>
+          <tr><td>Template registry <span class="tag">T24</span></td><td>Statutory form × era, field definitions, per-template validation rules</td><td>Driven by data, not code. Validation rules are written per template, never once for everything</td></tr>
+          <tr><td>Audit chain columns <span class="tag">T63</span></td><td>Previous-hash and event-hash on the audit table, append-only grants</td><td>Adding a chain later proves nothing about rows written before it</td></tr>
+          <tr><td>Renaming pass <span class="tag">T01</span></td><td><code>{module}_dg_*</code> tables, <code>fk_*</code>, <code>idx_*</code></td><td>Touches hand-written SQL in the search and chat services, and the security policies. Cheapest to do before more tables exist</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>13 · What to build first <span class="ref">waves W0 – W5</span></h2>
+    <p class="lede">Modules run at the same time. The waves keep the order right between them. One path runs through nearly everything.</p>
+
+    <figure>
+      <svg viewBox="0 0 880 330" role="img" aria-label="Wave dependency graph. Foundations in wave zero feed the pipeline in wave one and the workbench in wave two; the workbench feeds the graph, records and governance in wave three; those feed search, reports, connectors and data operations in wave four; deployment and localisation come last in wave five.">
+        <defs>
+          <marker id="a13" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z" fill="currentColor"></path>
+          </marker>
+        </defs>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.4">
+          <rect x="20" y="40" width="150" height="70" rx="3"></rect>
+          <rect x="210" y="40" width="150" height="70" rx="3"></rect>
+          <rect x="400" y="40" width="150" height="70" rx="3"></rect>
+          <rect x="590" y="40" width="150" height="70" rx="3"></rect>
+          <rect x="210" y="180" width="150" height="70" rx="3"></rect>
+          <rect x="400" y="180" width="150" height="70" rx="3"></rect>
+          <rect x="590" y="180" width="150" height="70" rx="3"></rect>
+        </g>
+
+        <g font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor">
+          <text x="95" y="64" font-size="11.5" font-weight="600" text-anchor="middle">W0 foundations</text>
+          <text x="95" y="82" font-size="10" text-anchor="middle" opacity="0.8">T01–T09 · source location</text>
+          <text x="95" y="98" font-size="10" text-anchor="middle" opacity="0.8">config · audit · D2</text>
+
+          <text x="285" y="64" font-size="11.5" font-weight="600" text-anchor="middle">W1 pipeline</text>
+          <text x="285" y="82" font-size="10" text-anchor="middle" opacity="0.8">T20–T33 · templates</text>
+          <text x="285" y="98" font-size="10" text-anchor="middle" opacity="0.8">handlers · Marathi OCR</text>
+
+          <text x="475" y="64" font-size="11.5" font-weight="600" text-anchor="middle">W2 workbench</text>
+          <text x="475" y="82" font-size="10" text-anchor="middle" opacity="0.8">T50–T55 · lanes</text>
+          <text x="475" y="98" font-size="10" text-anchor="middle" opacity="0.8">queues · click-through</text>
+
+          <text x="665" y="64" font-size="11.5" font-weight="600" text-anchor="middle">W3 evidence</text>
+          <text x="665" y="82" font-size="10" text-anchor="middle" opacity="0.8">T56–T67 · graph</text>
+          <text x="665" y="98" font-size="10" text-anchor="middle" opacity="0.8">records · audit chain</text>
+
+          <text x="285" y="204" font-size="11.5" font-weight="600" text-anchor="middle">W1 connectors</text>
+          <text x="285" y="222" font-size="10" text-anchor="middle" opacity="0.8">T40–T44 · abstraction</text>
+          <text x="285" y="238" font-size="10" text-anchor="middle" opacity="0.8">folder · FTP · email</text>
+
+          <text x="475" y="204" font-size="11.5" font-weight="600" text-anchor="middle">W4 surfaces</text>
+          <text x="475" y="222" font-size="10" text-anchor="middle" opacity="0.8">T70–T80 · citations</text>
+          <text x="475" y="238" font-size="10" text-anchor="middle" opacity="0.8">reports · export · cloud</text>
+
+          <text x="665" y="204" font-size="11.5" font-weight="600" text-anchor="middle">W5 shipping</text>
+          <text x="665" y="222" font-size="10" text-anchor="middle" opacity="0.8">T90–T97 · local models</text>
+          <text x="665" y="238" font-size="10" text-anchor="middle" opacity="0.8">Helm · i18n · a11y</text>
+        </g>
+
+        <g fill="none" stroke="currentColor" stroke-width="1.3" marker-end="url(#a13)" opacity="0.9">
+          <path d="M 170 75 L 202 75"></path>
+          <path d="M 360 75 L 392 75"></path>
+          <path d="M 550 75 L 582 75"></path>
+          <path d="M 95 110 L 95 215 L 202 215"></path>
+          <path d="M 360 215 L 392 215"></path>
+          <path d="M 550 215 L 582 215"></path>
+          <path d="M 475 110 L 475 172"></path>
+          <path d="M 665 110 L 700 110 L 700 172"></path>
+        </g>
+        <path d="M 95 40 L 95 20 L 475 20 L 475 32" fill="none" class="hot" stroke-width="1.8" stroke-dasharray="6 4" marker-end="url(#a13)"></path>
+        <text x="285" y="14" font-size="10" font-family="ui-monospace, monospace" class="hot" text-anchor="middle">critical path — T06 signed, then T04 and T05, or the workbench cannot start</text>
+        <text x="440" y="300" font-size="11" font-family="ui-sans-serif, system-ui, sans-serif" fill="currentColor" text-anchor="middle" opacity="0.8">Decisions D-1, D-3, D-4, D-5, D-8 and assumptions A1, A2, A3 gate work inside these waves and belong to people, not sprints.</text>
+      </svg>
+      <figcaption>One thing blocks everything else: agreeing how coordinates are written down. It is a short document and one meeting. Until it is signed, nobody can start the checking screen, the 360 views or citation click-through.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>14 · How we know each part is finished <span class="ref">what "done" means</span></h2>
+    <p class="lede">Written as tests, because these are what should be running in CI when a module is finished. Several need sample documents with answers written out by a person, which we do not have yet (assumption A1, owned outside the team).</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Module</th><th>The test that proves it</th><th>Needs</th></tr></thead>
+        <tbody>
+          <tr><td>Foundations</td><td>Every extracted fact has a page and a region inside the page box; a write with a null region raises; every threshold in use is read from <code>sys_dg_config</code>, none from a literal</td><td>T02, T04, T06</td></tr>
+          <tr><td>(a) Ingestion</td><td>The same file arriving through two different connectors produces one document, one record of where it came from naming each source, and a PDF/A rendition with the original preserved. A failing connector alerts rather than dropping</td><td>T40, T41</td></tr>
+          <tr><td>(b) Processing</td><td>The four sample documents come out matching the answers a person wrote; a spread with mismatched rows and an unknown unit both go to the review queue instead of into the data; a Marathi 7/12 extract gives Devanagari text, not empty strings</td><td>T21, T26–T32, A1, D-4</td></tr>
+          <tr><td>(c) Workbench</td><td>Promotion with no actor is rejected at the write layer; a handwritten row needs explicit confirmation; fifty rows verified with the keyboard alone, each producing an audit event; a claimed row is invisible to a second operator</td><td>T51, T55</td></tr>
+          <tr><td>(d) Entity</td><td>Tier 3 links are usable in search and badged, and absent from an export; bulk accept records the user, the score, the collection and the rule version on every link; undo removes them cleanly and the machine label stays</td><td>T56–T59, T67</td></tr>
+          <tr><td>(e) Search</td><td>An unanswerable question is refused; every claim in an answer carries a citation that opens the highlighted region; a document is findable by metadata before its indexing finishes; a query typed in Marathi finds a Marathi 7/12 extract</td><td>T70, T71, T74, T75</td></tr>
+          <tr><td>(f) Records</td><td>The correction test — base, current and history all retrievable, all cited, and the current view exactly re-derivable from the chain</td><td>T60</td></tr>
+          <tr><td>(g) Reports</td><td>A corpus with known gaps produces the expected completeness score, and every number drills through to the affected records</td><td>T76</td></tr>
+          <tr><td>(h) Governance</td><td>Altering one audit row is detected by the integrity checker at exactly that row; the application role cannot update or delete audit rows; a certificate carries hash, algorithm and both signature blocks</td><td>T63, T65, A3</td></tr>
+          <tr><td>(i) Data ops</td><td>Re-uploading an identical file is detected rather than re-ingested; a bulk edit previews, audits per row, and cannot mark anything verified</td><td>T79, T80</td></tr>
+          <tr><td>(j) Deployment</td><td>The egress test, and a clean install from the runbook by someone who did not build it</td><td>T90–T93, A2</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note" style="margin-top:1.5rem">
+      <p><strong>Where the suite stands today.</strong> Nine files, 540 lines, covering authentication, tenant isolation, document and folder services, chat and search edges. Nothing covers the ingestion pipeline, the OCR path, the chunker or the migrations, and CI has no coverage threshold, so a thin suite cannot fail. Task T98 sets the threshold at today's number and raises it as these tests land.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>15 · What already exists in the code <span class="ref">branch <code>dev</code> @ <code>3e78636</code></span></h2>
+    <p class="lede">Only the parts that matter for the work above. The full reading of the code, with evidence, is in the scope gap document.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>What exists</th><th>How it helps</th><th>What has to change</th></tr></thead>
+        <tbody>
+          <tr><td>Upload, MinIO storage, Celery hand-off, atomic ingest transaction</td><td>The upload path is solid. A document either finishes completely or fails cleanly</td><td>Becomes one implementation behind the connector interface</td></tr>
+          <tr><td>Text extraction per format with a Tesseract fallback</td><td>Where templates, the vision model and the handlers will hook in</td><td>Tesseract runs English-only; the image path marks failed OCR as success; word boxes are computed and discarded</td></tr>
+          <tr><td>Hybrid search — pgvector, full text, rank fusion, rerank, trilingual expansion, HyDE</td><td>The best-built part of the code, and close to what the Scope of Work asks for</td><td>Add citations, the refusal gate, record search, the trigram leg, and validate Devanagari indexing</td></tr>
+          <tr><td>Tenant isolation through row-level security</td><td>The hosted, multi-customer setup already works</td><td>Confirm the isolation approach (D-2); add the six user roles on top</td></tr>
+          <tr><td>Provider abstraction over LLM, embeddings, rerank and OCR</td><td>Exactly where local models will plug in</td><td>Add local implementations and make the toggle fail closed</td></tr>
+          <tr><td>An audit table, request logging, a hash per version</td><td>The columns we need for the chain already exist</td><td>Widen coverage, chain the hashes, make the table append-only</td></tr>
+          <tr><td>A drive product — folder tree, star, trash, chat, offline shell</td><td>Finished front-end code and components we can reuse</td><td>Appears nowhere in the Scope of Work. Record it as an accepted change or as out of scope (decision D-9), and settle whether nested folders survive (decision D-1)</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="note is-crit" style="margin-top:1.5rem">
+      <p><strong>Two defects to fix on the way past, not later.</strong> Failed image OCR no longer sets <code>extraction_failed</code>, so an unreadable scan indexes with placeholder text as if it had succeeded — the software says it succeeded when it did not, which is the failure this product exists to prevent. And the JWT access token lives 30 days with a 60-day refresh, on a system meant to hold evidence. Tasks T33 and T99.</p>
+    </div>
+  </section>
+
+  <footer>Build design · 18-Aug-2026 · SoW VeritasDocs v1 v0.3 · task ids match the build backlog</footer>
+
+</div>
+
+</body></html>

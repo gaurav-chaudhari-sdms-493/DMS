@@ -58,11 +58,14 @@ class DocumentDetailResponse(BaseModel):
     current_version: Optional[Dict[str, Any]]
     metadata: List[Dict[str, Any]]
     versions: List[Dict[str, Any]]
+    possible_duplicate_candidates: Optional[List[Dict[str, Any]]] = None
 
 
 class DriveStatsResponse(BaseModel):
     total_files: int
     total_folders: int
-    total_size_bytes: int
+    total_size_bytes: int = 0
+    total_bytes: int = 0
     total_starred: int
     total_trashed: int
+

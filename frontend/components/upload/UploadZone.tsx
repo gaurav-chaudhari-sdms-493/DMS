@@ -1,6 +1,7 @@
 "use client";
 import React, { useCallback, useState, useRef } from "react";
 import { UploadCloud, File as FileIcon, X } from "lucide-react";
+import { onKeyActivate } from "@/lib/a11y";
 
 interface UploadZoneProps {
   onFilesSelected?: (files: File[]) => void;
@@ -12,7 +13,7 @@ interface UploadZoneProps {
 export const UploadZone: React.FC<UploadZoneProps> = ({
   onFilesSelected,
   onFileSelected,
-  accept = ".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.md,.csv,.rtf,.json,.txt,.png,.jpg,.jpeg,.webp",
+  accept = ".pdf,.docx,.doc,.xlsx,.xls,.pptx,.ppt,.md,.csv,.rtf,.json,.txt,.png,.jpg,.jpeg,.webp,.bmp,.py,.js,.jsx,.ts,.tsx,.java,.c,.cpp,.h,.hpp,.cs,.go,.rb,.php,.sh,.bash,.sql,.yaml,.yml,.xml,.html,.css,.scss,.log,.ini,.toml,.conf",
 
   maxSizeMB = 10,
 }) => {
@@ -105,11 +106,15 @@ export const UploadZone: React.FC<UploadZoneProps> = ({
           ? "border-primary bg-primary/5 scale-[1.02] shadow-[0_0_30px_rgba(99,102,241,0.2)]"
           : "border-borderDark hover:border-primary/50 hover:bg-surface animate-[pulseGlow_4s_infinite]"
       }`}
+      role="button"
+      tabIndex={0}
+      aria-label="Upload files — click to browse or drag and drop"
       onDragEnter={handleDragEnter}
       onDragOver={handleDragEnter}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
       onClick={() => inputRef.current?.click()}
+      onKeyDown={onKeyActivate(() => inputRef.current?.click())}
     >
       <input
         type="file"

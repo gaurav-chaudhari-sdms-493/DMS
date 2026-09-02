@@ -2,6 +2,7 @@
 import React, { useState } from "react";
 import { FileText, FileSpreadsheet, FileCode, Image, File, Download, ExternalLink, Star, Trash2, Edit2, FolderInput, RotateCcw, MoreVertical, Eye, Loader2, CheckCircle, AlertCircle, Sparkles } from "lucide-react";
 import type { DocumentListItem } from "@/types";
+import { onKeyActivate } from "@/lib/a11y";
 
 interface DocumentRowProps {
   doc: DocumentListItem;
@@ -37,7 +38,8 @@ export function DocumentRow({
       return <FileSpreadsheet className="w-5 h-5 text-emerald-400" />;
     }
     if (["png", "jpg", "jpeg", "svg", "webp"].includes(ext)) {
-      return <Image className="w-5 h-5 text-purple-400" />;
+      // eslint-disable-next-line jsx-a11y/alt-text -- lucide-react's <Image> icon, not an <img> element
+      return <Image aria-hidden="true" className="w-5 h-5 text-purple-400" />;
     }
     if (["json", "py", "js", "ts", "html"].includes(ext)) {
       return <FileCode className="w-5 h-5 text-amber-400" />;
@@ -83,8 +85,12 @@ export function DocumentRow({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={() => onSelect(doc)}
       onDoubleClick={() => onPreview(doc)}
+      onKeyDown={onKeyActivate(() => onPreview(doc))}
+      aria-label={doc.title}
       className={`group flex items-center justify-between px-4 py-3 border-b border-borderDark/40 transition-colors cursor-pointer select-none ${
         isSelected
           ? "bg-primary/15 text-textMain"
@@ -149,7 +155,7 @@ export function DocumentRow({
 
         {showMenu && (
           <>
-            <div className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
+            <div role="presentation" className="fixed inset-0 z-40" onClick={() => setShowMenu(false)} />
             <div className="absolute right-0 top-8 z-50 w-48 glass rounded-2xl shadow-2xl border border-borderDark p-1.5 animate-fadeIn text-sm">
               <button
                 onClick={(e) => {

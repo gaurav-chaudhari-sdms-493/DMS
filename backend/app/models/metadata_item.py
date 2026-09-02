@@ -18,13 +18,13 @@ class MetadataItem(Base):
     The value column is JSONB to support both scalar and structured values.
     """
 
-    __tablename__ = "metadata"
+    __tablename__ = "doc_dg_metadata_items"
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
     )
     document_id: Mapped[uuid.UUID] = mapped_column(
-        ForeignKey("documents.id", ondelete="CASCADE"), index=True, nullable=False
+        ForeignKey("doc_dg_documents.id", ondelete="CASCADE"), index=True, nullable=False
     )
     key: Mapped[str] = mapped_column(Text, nullable=False, index=True)
     value: Mapped[Any] = mapped_column(JSONB, nullable=False)

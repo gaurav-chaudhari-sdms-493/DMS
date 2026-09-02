@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -19,6 +19,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { api } from "@/lib/api";
+import { onKeyActivate } from "@/lib/a11y";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
 
@@ -49,11 +50,73 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [selectedExt, setSelectedExt] = useState<string | null>(null);
+  const [extDocs, setExtDocs] = useState<any[]>([]);
+  const [loadingExtDocs, setLoadingExtDocs] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
+  const [showChangePassword, setShowChangePassword] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [changePasswordError, setChangePasswordError] = useState("");
+  const [changePasswordLoading, setChangePasswordLoading] = useState(false);
+  const [changePasswordSuccess, setChangePasswordSuccess] = useState(false);
+
+  const closeChangePasswordModal = () => {
+    setShowChangePassword(false);
+    setCurrentPassword("");
+    setNewPassword("");
+    setConfirmPassword("");
+    setChangePasswordError("");
+    setChangePasswordSuccess(false);
+  };
+
+  const handleChangePassword = async (e: FormEvent) => {
+    e.preventDefault();
+    setChangePasswordError("");
+    if (newPassword.length < 8) {
+      setChangePasswordError("New password must be at least 8 characters.");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setChangePasswordError("New password and confirmation don't match.");
+      return;
+    }
+    setChangePasswordLoading(true);
+    try {
+      await api.auth.changePassword(currentPassword, newPassword);
+      setChangePasswordSuccess(true);
+      setCurrentPassword("");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      setChangePasswordError(err?.message || "Failed to change password. Check your current password and try again.");
+    } finally {
+      setChangePasswordLoading(false);
+    }
+  };
 
   useEffect(() => {
     fetchProfile();
   }, []);
+
+  const handleSelectExtension = async (ext: string) => {
+    const extClean = ext.toLowerCase().replace(".", "");
+    setSelectedExt(extClean);
+    setLoadingExtDocs(true);
+    try {
+      const allDocs = await api.documents.list({ is_trashed: false });
+      const filtered = allDocs.filter((d: any) => {
+        const dExt = (d.title.split(".").pop() || "").toLowerCase();
+        return dExt === extClean;
+      });
+      setExtDocs(filtered);
+    } catch (err) {
+      console.error("Failed to load documents for extension:", err);
+    } finally {
+      setLoadingExtDocs(false);
+    }
+  };
 
   const fetchProfile = async () => {
     setLoading(true);
@@ -163,12 +226,10 @@ export default function ProfilePage() {
                 </div>
 
                 <div className="flex items-center gap-3 w-full md:w-auto">
-                  <Link href="/forgot-password" className="w-full md:w-auto">
-                    <Button variant="secondary" size="md" className="w-full">
-                      <KeyRound className="w-4 h-4 mr-2 text-primary" />
-                      <span>Change Password</span>
-                    </Button>
-                  </Link>
+                  <Button variant="secondary" size="md" className="w-full md:w-auto" onClick={() => setShowChangePassword(true)}>
+                    <KeyRound className="w-4 h-4 mr-2 text-primary" />
+                    <span>Change Password</span>
+                  </Button>
                 </div>
               </div>
             </Card>
@@ -229,41 +290,55 @@ export default function ProfilePage() {
                   <PieChart className="w-5 h-5 text-primary" />
                   <span>File Formats Distribution</span>
                 </h3>
-                <span className="text-xs text-textMuted">Supported: PDF, Word, Excel, CSV, PPT, TXT, JSON, MD, RTF</span>
+                <span className="text-xs text-textMuted">Click any format to view all matching files</span>
               </div>
 
               {profile.file_types_breakdown && profile.file_types_breakdown.length > 0 ? (
-                <div className="space-y-4">
+                <div className="max-h-[360px] overflow-y-auto pr-2 space-y-4 custom-scrollbar">
                   {profile.file_types_breakdown.map((item, idx) => {
                     const pct = profile.total_files > 0 ? Math.round((item.count / profile.total_files) * 100) : 0;
                     const extUpper = (item.extension || "OTHER").toUpperCase();
 
+                    // T96 — bg-*-500/400 shades don't clear WCAG 4.5:1
+                    // against the badge's fixed white text for most of
+                    // this palette (e.g. red-500 measured 3.76:1 live).
+                    // -600/-700 reliably do, across this whole family.
                     const colorMap: Record<string, string> = {
-                      PDF: "bg-red-500 text-red-400",
-                      DOCX: "bg-blue-500 text-blue-400",
-                      DOC: "bg-blue-400 text-blue-300",
-                      XLSX: "bg-emerald-500 text-emerald-400",
-                      XLS: "bg-emerald-400 text-emerald-300",
-                      CSV: "bg-teal-500 text-teal-400",
-                      PPTX: "bg-amber-500 text-amber-400",
-                      PPT: "bg-amber-400 text-amber-300",
-                      TXT: "bg-purple-500 text-purple-400",
-                      JSON: "bg-cyan-500 text-cyan-400",
-                      MD: "bg-indigo-500 text-indigo-400",
-                      RTF: "bg-pink-500 text-pink-400",
+                      PDF: "bg-red-700",
+                      DOCX: "bg-blue-700",
+                      DOC: "bg-blue-600",
+                      XLSX: "bg-emerald-700",
+                      XLS: "bg-emerald-600",
+                      CSV: "bg-teal-700",
+                      PPTX: "bg-amber-700",
+                      PPT: "bg-amber-600",
+                      TXT: "bg-purple-700",
+                      JSON: "bg-cyan-700",
+                      MD: "bg-indigo-700",
+                      RTF: "bg-pink-700",
+                      PNG: "bg-sky-700",
+                      JPG: "bg-indigo-700",
+                      JPEG: "bg-indigo-700",
                     };
 
-                    const badgeColor = colorMap[extUpper] || "bg-gray-500 text-gray-400";
-                    const bgColorClass = badgeColor.split(" ")[0];
+                    const bgColorClass = colorMap[extUpper] || "bg-gray-700";
 
                     return (
-                      <div key={idx} className="space-y-1.5">
+                      <div
+                        key={idx}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => handleSelectExtension(item.extension)}
+                        onKeyDown={onKeyActivate(() => handleSelectExtension(item.extension))}
+                        className="space-y-1.5 p-2 rounded-xl hover:bg-surface/80 transition-all cursor-pointer group border border-transparent hover:border-primary/20"
+                        title={`Click to view all .${item.extension} files`}
+                      >
                         <div className="flex items-center justify-between text-sm">
                           <div className="flex items-center gap-2.5">
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold text-white ${bgColorClass}`}>
+                            <span className={`px-2.5 py-0.5 rounded text-xs font-bold text-white shadow-xs group-hover:scale-105 transition-transform ${bgColorClass}`}>
                               {extUpper}
                             </span>
-                            <span className="font-medium text-textMain">{item.count} files</span>
+                            <span className="font-semibold text-textMain group-hover:text-primary transition-colors">{item.count} files</span>
                           </div>
                           <span className="text-xs text-textMuted font-mono">
                             {formatSize(item.size_bytes)} ({pct}%)
@@ -286,6 +361,64 @@ export default function ProfilePage() {
               )}
             </Card>
 
+            {/* Filtered Files Modal */}
+            {selectedExt && (
+              <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
+                <Card glow className="p-6 max-w-2xl w-full space-y-4 max-h-[85vh] flex flex-col">
+                  <div className="flex items-center justify-between border-b border-borderDark/60 pb-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="px-3 py-1 rounded-lg bg-primary/20 text-primary font-bold text-xs uppercase tracking-wider border border-primary/30">
+                        .{selectedExt}
+                      </div>
+                      <h4 className="text-lg font-bold text-textMain">
+                        All .{selectedExt.toUpperCase()} Files ({extDocs.length})
+                      </h4>
+                    </div>
+                    <Button variant="secondary" size="sm" onClick={() => setSelectedExt(null)}>
+                      Close
+                    </Button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                    {loadingExtDocs ? (
+                      <div className="flex items-center justify-center py-12 gap-2 text-textMuted text-sm">
+                        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+                        <span>Fetching .{selectedExt} documents...</span>
+                      </div>
+                    ) : extDocs.length === 0 ? (
+                      <div className="text-center py-12 text-sm text-textMuted">
+                        No .{selectedExt} documents found.
+                      </div>
+                    ) : (
+                      extDocs.map((doc) => (
+                        <div
+                          key={doc.id}
+                          className="p-3.5 rounded-xl bg-surface/50 border border-borderDark/60 hover:border-primary/40 flex items-center justify-between gap-4 transition-all"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <FileText className="w-5 h-5 text-primary shrink-0" />
+                            <div className="min-w-0">
+                              <p className="font-semibold text-sm text-textMain truncate">{doc.title}</p>
+                              <p className="text-xs text-textMuted">
+                                {formatSize(doc.file_size_bytes || 0)} • Created {new Date(doc.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          </div>
+
+                          <Link
+                            href="/drive"
+                            className="px-3 py-1.5 bg-primary/10 hover:bg-primary/20 text-primary text-xs font-semibold rounded-lg border border-primary/20 transition-all shrink-0"
+                          >
+                            Open in Drive
+                          </Link>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </Card>
+              </div>
+            )}
+
             {/* Logout Modal Confirmation */}
             {showLogoutConfirm && (
               <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn">
@@ -305,6 +438,99 @@ export default function ProfilePage() {
                       Log Out
                     </Button>
                   </div>
+                </Card>
+              </div>
+            )}
+
+            {/* Change Password Modal — in-place, authenticated change.
+                Previously this button just linked to /forgot-password,
+                forcing an unnecessary email round-trip for a user who's
+                already logged in and knows their current password. */}
+            {showChangePassword && (
+              <div
+                role="presentation"
+                className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fadeIn"
+                onClick={closeChangePasswordModal}
+              >
+                <Card
+                  glow
+                  className="p-6 max-w-md w-full space-y-4"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <h4 className="text-lg font-bold text-textMain flex items-center gap-2">
+                    <KeyRound className="w-5 h-5 text-primary" />
+                    <span>Change Password</span>
+                  </h4>
+
+                  {changePasswordSuccess ? (
+                    <>
+                      <p className="text-sm text-emerald-400">
+                        Your password has been changed successfully.
+                      </p>
+                      <div className="flex justify-end pt-2">
+                        <Button variant="primary" size="md" onClick={closeChangePasswordModal}>
+                          Done
+                        </Button>
+                      </div>
+                    </>
+                  ) : (
+                    <form onSubmit={handleChangePassword} className="space-y-3">
+                      <div>
+                        <label htmlFor="current-password-input" className="text-xs font-medium text-textMuted mb-1 block">Current password</label>
+                        <input
+                          id="current-password-input"
+                          type="password"
+                          value={currentPassword}
+                          onChange={(e) => setCurrentPassword(e.target.value)}
+                          autoComplete="current-password"
+                          required
+                          className="w-full px-3 py-2 rounded-lg bg-surface border border-borderDark text-sm text-textMain focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="new-password-input" className="text-xs font-medium text-textMuted mb-1 block">New password</label>
+                        <input
+                          id="new-password-input"
+                          type="password"
+                          value={newPassword}
+                          onChange={(e) => setNewPassword(e.target.value)}
+                          autoComplete="new-password"
+                          required
+                          minLength={8}
+                          className="w-full px-3 py-2 rounded-lg bg-surface border border-borderDark text-sm text-textMain focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="confirm-password-input" className="text-xs font-medium text-textMuted mb-1 block">Confirm new password</label>
+                        <input
+                          id="confirm-password-input"
+                          type="password"
+                          value={confirmPassword}
+                          onChange={(e) => setConfirmPassword(e.target.value)}
+                          autoComplete="new-password"
+                          required
+                          minLength={8}
+                          className="w-full px-3 py-2 rounded-lg bg-surface border border-borderDark text-sm text-textMain focus:outline-none focus:ring-2 focus:ring-primary/40"
+                        />
+                      </div>
+
+                      {changePasswordError && (
+                        <div className="flex items-center gap-2 text-xs text-red-400">
+                          <AlertCircle className="w-4 h-4 shrink-0" />
+                          <span>{changePasswordError}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-end gap-3 pt-2">
+                        <Button type="button" variant="secondary" size="md" onClick={closeChangePasswordModal}>
+                          Cancel
+                        </Button>
+                        <Button type="submit" variant="primary" size="md" loading={changePasswordLoading}>
+                          Change Password
+                        </Button>
+                      </div>
+                    </form>
+                  )}
                 </Card>
               </div>
             )}

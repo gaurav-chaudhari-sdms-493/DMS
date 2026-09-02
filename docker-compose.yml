@@ -69,6 +69,47 @@ services:
     networks:
       - default
 
+  sftp:
+    image: atmoz/sftp:latest
+    ports:
+      - "2222:22"
+    # The named volume below is created root-owned on first use, which leaves
+    # the connector user (uid 1001) able to list/read but not write into its
+    # own upload dir. Chown it (and pre-create the processed/failed subdirs)
+    # before handing off to the image's real entrypoint.
+    entrypoint: >
+      sh -c "mkdir -p /home/connector/upload/processed /home/connector/upload/failed &&
+             chown -R 1001:1001 /home/connector/upload &&
+             exec /entrypoint connector:${SFTP_PASSWORD:-connector123}:1001:1001:upload"
+    volumes:
+      - sftp_data:/home/connector/upload
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - default
+
+  # Local mail server for the email-in connector demo. GREENMAIL_OPTS below
+  # pins one fixed mailbox (connector@dms.local / connector123) so the demo
+  # doesn't depend on real internet email delivery — send to this box over
+  # SMTP on port 3025, the backend polls it over IMAP on port 3143.
+  mailserver:
+    image: greenmail/standalone:latest
+    ports:
+      - "3025:3025"
+      - "3143:3143"
+    environment:
+      GREENMAIL_OPTS: "-Dgreenmail.setup.test.smtp -Dgreenmail.setup.test.imap -Dgreenmail.hostname=0.0.0.0 -Dgreenmail.users=connector:connector123@dms.local -Dgreenmail.auth.disabled=false"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - default
+
   backend:
     build: ./backend
     ports:
@@ -82,9 +123,16 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env
+    environment:
+      OMP_NUM_THREADS: "2"
+      OMP_WAIT_POLICY: "PASSIVE"
+      MKL_NUM_THREADS: "2"
     volumes:
       - ./backend:/app
       - hf_cache:/root/.cache/huggingface
+      - ./connector_inbox/watched_folder:/app/watched_inbox
+      - "/home/stark/Stark Drive :/app/stark_drive_inbox"
+      - connector_state:/app/_state
     working_dir: /app
     command: >
       sh -c "alembic upgrade head && echo 'Backend API Docs: http://localhost:8000/api/docs' && uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -107,6 +155,10 @@ services:
         condition: service_healthy
     env_file:
       - ./backend/.env
+    environment:
+      OMP_NUM_THREADS: "2"
+      OMP_WAIT_POLICY: "PASSIVE"
+      MKL_NUM_THREADS: "2"
     volumes:
       - ./backend:/app
       - hf_cache:/root/.cache/huggingface
@@ -157,7 +209,7 @@ services:
       - /app/node_modules
       - /app/.next
     command: >
-      sh -c "echo 'Frontend Application: http://localhost:3000' && npm run build && npm start"
+      sh -c "echo 'Frontend Application: http://localhost:3000' && rm -rf .next/* out && npm run build && npm start"
     logging:
       driver: "json-file"
       options:
@@ -171,6 +223,8 @@ volumes:
   redis_data:
   minio_data:
   hf_cache:
+  sftp_data:
+  connector_state:
 
 networks:
   default:

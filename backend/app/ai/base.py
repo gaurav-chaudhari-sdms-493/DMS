@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import Optional, List
+from typing import List
 
 @dataclass
 class Message:
@@ -45,8 +45,24 @@ class RerankerProvider(ABC):
 
 class OCRProvider(ABC):
     """Abstract interface for OCR/document parsing providers."""
-    
+
     @abstractmethod
     async def extract_pages(self, file_bytes: bytes, filename: str) -> List[dict]:
         """Extract text from document. Returns list of {page_number, text, bbox}. """
+        ...
+
+class VLMProvider(ABC):
+    """T22 — abstract interface for vision-language extraction providers.
+
+    Unlike OCRProvider (plain text out), a VLM call is given a rendered page
+    image plus a field schema and is asked to both read and locate each
+    field, so the result can be written as facts with regions (T06), not
+    just text.
+    """
+
+    @abstractmethod
+    async def extract_structured(self, image_bytes: bytes, prompt: str) -> str:
+        """Send one page image + instructions to the model. Returns the raw
+        text response (expected to be JSON per the prompt's own contract —
+        parsing/validation is the caller's job, not the provider's)."""
         ...

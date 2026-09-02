@@ -5,6 +5,7 @@ import Link from "next/link";
 import { Zap, Search as SearchIcon, FileText } from "lucide-react";
 import { isAuthenticated } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
+import BackendUrlConfig from "@/components/BackendUrlConfig";
 
 export default function Home() {
   const router = useRouter();
@@ -18,11 +19,8 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-[calc(100vh-8rem)] text-center py-20 animate-fadeIn relative">
       {/* Stark Logo Header */}
-      <div className="mb-6 flex items-center justify-center gap-3">
-        <div className="bg-[#1e1e24] px-4 py-2 rounded-xl border border-primary/30 shadow-lg">
-          <img src="/stark-logo-white.avif" alt="Stark Logo" className="h-8 w-auto object-contain" />
-        </div>
-        <span className="text-2xl font-bold text-textMain tracking-tight">DMS</span>
+      <div className="mb-8 flex items-center justify-center">
+        <img src="/stark-drive.svg" alt="Stark Drive Logo" className="h-24 md:h-32 lg:h-36 w-auto object-contain drop-shadow-md" />
       </div>
 
       <h1 className="text-5xl md:text-7xl font-extrabold tracking-tight mb-6 leading-tight">
@@ -34,13 +32,18 @@ export default function Home() {
         Upload your documents and let our AI find answers, extract summaries, and connect the dots instantly. Stop searching, start knowing.
       </p>
 
-      <div className="flex items-center gap-4 mb-20">
+      <div className="flex items-center gap-4 mb-12">
         <Link href="/login">
           <Button size="lg" className="w-40 text-lg group">
             Get Started
             <Zap className="w-5 h-5 ml-2 group-hover:text-yellow-400 transition-colors" />
           </Button>
         </Link>
+      </div>
+
+      {/* Backend Server Configuration (Dev Phase) */}
+      <div className="w-full max-w-2xl mb-16 text-left">
+        <BackendUrlConfig />
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 w-full max-w-5xl">

@@ -1,0 +1,123 @@
+# VeritasDocs — default values.yaml (SaaS/API-connected profile).
+# For the air-gapped profile, layer values-airgapped.yaml on top:
+#   helm install veritasdocs ./helm/veritasdocs -f values-airgapped.yaml
+#
+# SCOPE NOTE (T93): this chart deploys the full stack air-gapped-capable
+# for embeddings (bgem3), reranking (bgem3) and OCR (pdfplumber or
+# paddleocr — paddleocr has real Devanagari/Marathi support, T90), all of
+# which run as genuinely local models. It cannot yet deploy a working
+# *air-gapped* LLM or VLM path — no local provider for those exists in
+# this codebase (T90's VLM half is unverified scaffolding, no GPU
+# available to validate it). With airGapped.enabled=true the
+# backend/worker refuse to start any call that would reach an external
+# LLM/VLM API rather than silently calling out; see
+# backend/app/ai/airgapped.py. Closing that gap for real requires a
+# GPU-verified local Qwen2.5-VL provider — separate follow-up work.
+
+global:
+  storageClass: ""   # "" = cluster default StorageClass
+
+image:
+  registry: ""        # e.g. "registry.airgapped.local:5000/" — include trailing slash; "" for Docker Hub / public
+  backend:
+    repository: veritasdocs-backend
+    tag: latest
+    pullPolicy: IfNotPresent
+  frontend:
+    repository: veritasdocs-frontend
+    tag: latest
+    pullPolicy: IfNotPresent
+
+imagePullSecrets: []   # e.g. [{name: airgapped-registry-creds}]
+
+# ─── Air-gapped toggle (T91, partial) ────────────────────────────────────
+airGapped:
+  enabled: false
+
+# ─── App-level config (non-secret) ───────────────────────────────────────
+app:
+  env: production
+  corsOrigins: '["http://localhost:3000"]'
+  ai:
+    llmProvider: openai
+    embedProvider: bgem3
+    embedFallbackProvider: none
+    rerankProvider: cohere
+    ocrProvider: pdfplumber
+    vlmProvider: gemini
+
+# ─── Secrets (values below are INSECURE PLACEHOLDERS) ───────────────────
+# Do not deploy to a real environment with these defaults. Override with
+# --set or a private values file kept out of git (see the runbook).
+secrets:
+  postgresPassword: "change_me_in_production"
+  redisPassword: "change_me_in_production"
+  jwtSecretKey: "generate_with_openssl_rand_hex_32__min_32_chars"
+  s3AccessKeyId: "minioadmin"
+  s3SecretAccessKey: "minioadmin"
+  openaiApiKey: ""
+  anthropicApiKey: ""
+  groqApiKey: ""
+  googleApiKey: ""
+  cohereApiKey: ""
+  llamaparseApiKey: ""
+
+# ─── Bundled stateful dependencies ───────────────────────────────────────
+# Self-contained StatefulSets (no external chart repo dependency) so an
+# air-gapped mirror only has to carry these three extra images.
+postgres:
+  image: ankane/pgvector:latest
+  storageSize: 20Gi
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 2Gi }
+
+redis:
+  image: redis:7-alpine
+  storageSize: 5Gi
+  resources:
+    requests: { cpu: 100m, memory: 128Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+minio:
+  image: minio/minio:latest
+  storageSize: 50Gi
+  resources:
+    requests: { cpu: 250m, memory: 512Mi }
+    limits: { cpu: "1", memory: 2Gi }
+  buckets:
+    - docsearch-documents
+    - docsearch-archive
+
+# ─── Application components ──────────────────────────────────────────────
+backend:
+  replicas: 2
+  resources:
+    requests: { cpu: 500m, memory: 1Gi }
+    limits: { cpu: "2", memory: 4Gi }
+
+worker:
+  replicas: 2
+  resources:
+    requests: { cpu: 500m, memory: 2Gi }
+    limits: { cpu: "2", memory: 6Gi }
+
+flower:
+  enabled: true
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+frontend:
+  replicas: 2
+  resources:
+    requests: { cpu: 100m, memory: 256Mi }
+    limits: { cpu: 500m, memory: 512Mi }
+
+ingress:
+  enabled: false
+  className: nginx
+  host: veritasdocs.local
+  tls:
+    enabled: false
+    secretName: ""

@@ -77,19 +77,19 @@ export function UploadWidget({ uploads, onDismiss }: UploadWidgetProps) {
                   </div>
                 )}
                 {item.status === "indexing" && (
-                  <div className="flex items-center gap-1 text-[10px] text-amber-400 font-semibold">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400 animate-spin" />
+                  <div className="flex items-center gap-1 text-[10px] text-amber-700 font-semibold">
+                    <Sparkles className="w-3.5 h-3.5 text-amber-600 animate-spin" />
                     <span>Indexing AI</span>
                   </div>
                 )}
                 {item.status === "completed" && (
-                  <div className="flex items-center gap-1 text-[10px] text-emerald-400 font-semibold">
+                  <div className="flex items-center gap-1 text-[10px] text-emerald-700 font-semibold">
                     <CheckCircle className="w-3.5 h-3.5" />
                     <span>Ready</span>
                   </div>
                 )}
                 {item.status === "error" && (
-                  <div className="flex items-center gap-1 text-[10px] text-red-400 font-semibold">
+                  <div className="flex items-center gap-1 text-[10px] text-red-700 font-semibold">
                     <AlertCircle className="w-3.5 h-3.5" />
                     <span>Error</span>
                   </div>
@@ -106,13 +106,13 @@ export function UploadWidget({ uploads, onDismiss }: UploadWidgetProps) {
               )}
 
               {item.status === "indexing" && (
-                <p className="text-[10px] text-amber-300/90 font-mono animate-pulse">
+                <p className="text-[10px] text-amber-700 font-mono animate-pulse">
                   Generating OCR, chunks & 1024d embeddings...
                 </p>
               )}
 
               {item.status === "error" && item.errorMsg && (
-                <p className="text-[10px] text-red-400">{item.errorMsg}</p>
+                <p className="text-[10px] text-red-700">{item.errorMsg}</p>
               )}
             </div>
           ))}

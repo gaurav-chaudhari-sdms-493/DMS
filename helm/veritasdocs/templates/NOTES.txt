@@ -1,0 +1,21 @@
+VeritasDocs deployed as release "{{ .Release.Name }}" in namespace "{{ .Release.Namespace }}".
+
+Air-gapped mode: {{ .Values.airGapped.enabled }}
+{{- if .Values.airGapped.enabled }}
+  LLM and VLM calls will be REFUSED (AirGappedViolation) until a local
+  provider is wired up — see backlog T90. Embeddings (bgem3), reranking
+  (bgem3) and OCR (pdfplumber) run fully local already.
+{{- end }}
+
+Check rollout status:
+  kubectl -n {{ .Release.Namespace }} get pods
+
+{{- if .Values.ingress.enabled }}
+Access the app at http://{{ .Values.ingress.host }}/
+{{- else }}
+No Ingress is enabled. Port-forward to reach the app:
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "veritasdocs.fullname" . }}-frontend 3000:3000
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "veritasdocs.fullname" . }}-backend 8000:8000
+{{- end }}
+
+Backend API docs: /api/docs on the backend service/ingress path.

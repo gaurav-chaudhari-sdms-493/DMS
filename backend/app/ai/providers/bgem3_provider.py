@@ -1,6 +1,7 @@
 from typing import List
 import logging
 from app.ai.base import EmbeddingProvider
+from app.services.config_service import get_int
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,13 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
         if not texts:
             return []
 
+        import asyncio
+        from functools import partial
+
+        loop = asyncio.get_running_loop()
+
         try:
-            self._load_model()
+            await loop.run_in_executor(None, self._load_model)
         except Exception as e:
             if self._allow_fake:
                 logger.warning("Using FAKE deterministic vectors — test mode only")
@@ -49,11 +55,8 @@ class BGEM3EmbeddingProvider(EmbeddingProvider):
                 "Install sentence-transformers, or set AI_EMBED_PROVIDER to a configured API provider."
             ) from e
 
-        import asyncio
-        from functools import partial
-
-        loop = asyncio.get_running_loop()
-        func = partial(self._model.encode, texts, convert_to_numpy=True, show_progress_bar=False)
+        batch_size = await get_int("embed_local_batch_size", 32)
+        func = partial(self._model.encode, texts, batch_size=batch_size, convert_to_numpy=True, show_progress_bar=False)
         embeddings_np = await loop.run_in_executor(None, func)
         return embeddings_np.tolist()
 

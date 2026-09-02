@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 from fastapi import UploadFile, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func, update, delete
+from sqlalchemy import select, func, delete
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 
@@ -20,7 +20,9 @@ from ..schemas.document import (
     DocumentUpdate,
     DriveStatsResponse,
 )
-from ..services.storage_service import upload_file, generate_presigned_url, delete_file
+from ..services.storage_service import upload_file, generate_presigned_url, delete_file, download_file, archive_file_with_retention
+from ..services.audit_service import log_action
+from ..services.license_service import check_upload_allowed
 from ..pipeline.ingestion import ingest_document
 
 logger = logging.getLogger(__name__)
@@ -32,8 +34,16 @@ async def upload_document(
     user_id: UUID,
     db: AsyncSession,
     folder_id: Optional[UUID] = None,
+    force: bool = False,
 ) -> DocumentUploadResponse:
     """Upload a document to MinIO S3, create DB records, and schedule async ingestion."""
+    # T81 — the metered action. Blocks new ingestion only; already-stored
+    # documents stay fully readable/searchable/exportable regardless of
+    # license state (see license_service module docstring).
+    license_check = await check_upload_allowed(db, tenant_id)
+    if not license_check.allowed:
+        raise HTTPException(status_code=402, detail=license_check.reason)
+
     if folder_id:
         folder = await db.get(Folder, folder_id)
         if not folder or folder.tenant_id != tenant_id:
@@ -50,6 +60,34 @@ async def upload_document(
         raise HTTPException(status_code=413, detail=f"File exceeds the {settings.max_upload_size_mb} MB limit")
 
     file_hash = hashlib.sha256(file_bytes).hexdigest()
+
+    # T79: the hash was always stored but never compared — surface an exact
+    # duplicate to the operator instead of silently re-processing it. Never
+    # drop the file: `force=True` lets the operator upload it anyway.
+    if not force:
+        dup_stmt = (
+            select(Document, DocumentVersion)
+            .join(DocumentVersion, DocumentVersion.document_id == Document.id)
+            .where(
+                DocumentVersion.file_hash == file_hash,
+                Document.tenant_id == tenant_id,
+                Document.is_trashed == False,
+            )
+            .limit(1)
+        )
+        dup_res = await db.execute(dup_stmt)
+        dup_row = dup_res.first()
+        if dup_row:
+            existing_doc, existing_version = dup_row
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "message": "An identical file already exists in your drive.",
+                    "existing_document_id": str(existing_doc.id),
+                    "existing_document_title": existing_doc.title,
+                    "existing_uploaded_at": existing_version.created_at.isoformat(),
+                },
+            )
 
     doc_id = uuid.uuid4()
     version_id = uuid.uuid4()
@@ -84,6 +122,8 @@ async def upload_document(
     doc.current_version_id = version_id
     await db.commit()
     await db.refresh(doc)
+
+    await log_action(db, user_id, tenant_id, "document.create", resource_type="document", resource_id=doc.id, details={"title": doc.title})
 
     # Schedule async ingestion
     await ingest_document(
@@ -187,6 +227,7 @@ async def get_document(
     document_id: UUID,
     tenant_id: UUID,
     db: AsyncSession,
+    actor_id: UUID,
 ) -> DocumentDetailResponse:
     """Retrieve a document with its versions, presigned download link, and metadata."""
     stmt = (
@@ -233,6 +274,8 @@ async def get_document(
         for m in doc.metadata_items
     ]
 
+    await log_action(db, actor_id, tenant_id, "document.view", resource_type="document", resource_id=doc.id)
+
     return DocumentDetailResponse(
         document_id=doc.id,
         title=doc.title,
@@ -246,6 +289,7 @@ async def get_document(
         current_version=curr_version,
         metadata=meta,
         versions=versions,
+        possible_duplicate_candidates=doc.possible_duplicate_candidates,
     )
 
 
@@ -254,6 +298,7 @@ async def update_document(
     document_id: UUID,
     tenant_id: UUID,
     doc_in: DocumentUpdate,
+    actor_id: UUID,
 ) -> DocumentListItem:
     stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
     res = await db.execute(stmt)
@@ -261,18 +306,23 @@ async def update_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    changes = {}
     if doc_in.folder_id is not None:
         folder = await db.get(Folder, doc_in.folder_id)
         if not folder or folder.tenant_id != tenant_id:
             raise HTTPException(status_code=404, detail="Target folder not found")
         doc.folder_id = doc_in.folder_id
+        changes["folder_id"] = str(doc_in.folder_id)
 
     if doc_in.title is not None:
         doc.title = doc_in.title
+        changes["title"] = doc_in.title
 
     await db.commit()
     await db.refresh(doc)
-    
+
+    await log_action(db, actor_id, tenant_id, "document.update", resource_type="document", resource_id=doc.id, details=changes)
+
     curr_v = next((v for v in doc.versions if v.id == doc.current_version_id), doc.versions[-1] if doc.versions else None)
     size = curr_v.file_size_bytes if curr_v else 0
     s3_path = curr_v.s3_path if curr_v else None
@@ -295,7 +345,7 @@ async def update_document(
     )
 
 
-async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> DocumentListItem:
+async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: UUID, actor_id: UUID) -> DocumentListItem:
     stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
     res = await db.execute(stmt)
     doc = res.scalar_one_or_none()
@@ -306,6 +356,8 @@ async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: U
     await db.commit()
     await db.refresh(doc)
 
+    await log_action(db, actor_id, tenant_id, "document.star_toggle", resource_type="document", resource_id=doc.id, details={"is_starred": doc.is_starred})
+
     curr_v = next((v for v in doc.versions if v.id == doc.current_version_id), doc.versions[-1] if doc.versions else None)
     size = curr_v.file_size_bytes if curr_v else 0
     s3_path = curr_v.s3_path if curr_v else None
@@ -328,7 +380,7 @@ async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: U
     )
 
 
-async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> DocumentListItem:
+async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: UUID, actor_id: UUID) -> DocumentListItem:
     stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
     res = await db.execute(stmt)
     doc = res.scalar_one_or_none()
@@ -337,8 +389,23 @@ async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: 
 
     doc.is_trashed = not doc.is_trashed
     doc.trashed_at = datetime.utcnow() if doc.is_trashed else None
+
+    # T66/D-7 — this was the missing half of the retention engine: nothing
+    # ever assigned 'operational_trash', so cleanup_expired_trashed_items'
+    # class lookup treated every trashed document as the permanent default
+    # class and refused to purge it, ever — the 30-day trash-purge has been
+    # silently inert for every document since D-7 shipped. Only touches the
+    # two states this toggle itself owns; never overwrites a class assigned
+    # by something else (e.g. a future 'statutory_record' reclassification).
+    if doc.is_trashed and doc.retention_class == "unclassified_permanent":
+        doc.retention_class = "operational_trash"
+    elif not doc.is_trashed and doc.retention_class == "operational_trash":
+        doc.retention_class = "unclassified_permanent"
+
     await db.commit()
     await db.refresh(doc)
+
+    await log_action(db, actor_id, tenant_id, "document.trash_toggle", resource_type="document", resource_id=doc.id, details={"is_trashed": doc.is_trashed})
 
     curr_v = next((v for v in doc.versions if v.id == doc.current_version_id), doc.versions[-1] if doc.versions else None)
     size = curr_v.file_size_bytes if curr_v else 0
@@ -362,12 +429,52 @@ async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: 
     )
 
 
-async def delete_document_permanently(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> None:
+WORM_PERMANENT_RETENTION_DAYS = 36500  # T64 — S3 Object Lock has no infinite
+# option; 100 years is the standard real-world proxy for "permanent" in WORM
+# archival systems. This is a storage-layer lock duration only — it does not
+# affect the DB-level retention_class engine, where 'statutory_record'
+# already means NULL/never-engine-purged regardless of this number.
+
+
+async def archive_document_as_statutory_record(db: AsyncSession, tenant_id: UUID, document_id: UUID) -> None:
+    """T64/T66 — the other missing half: a document that becomes evidence
+    for a Record (T60, i.e. records_service.create_record was called with
+    base_evidence_fact_id) graduates from an ordinary upload to something
+    that needs WORM tamper-evident storage and permanent retention — this
+    is the D-7 'statutory_record' class's own stated purpose ("explicitly
+    for anything tied to a property/entity record"), but nothing ever
+    actually assigned it or archived the file. Best-effort: never raises —
+    called from inside create_record, and a record's own creation must
+    never fail because archival storage had a problem.
+    """
+    try:
+        stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
+        res = await db.execute(stmt)
+        doc = res.scalar_one_or_none()
+        if not doc:
+            return
+        doc.retention_class = "statutory_record"
+
+        curr_v = next((v for v in doc.versions if v.id == doc.current_version_id), None)
+        if curr_v and curr_v.s3_path:
+            file_bytes = await download_file(curr_v.s3_path)
+            await archive_file_with_retention(file_bytes, curr_v.s3_path, "application/octet-stream", WORM_PERMANENT_RETENTION_DAYS)
+            logger.info(f"T64 WORM-archived document {document_id} (now a statutory record)")
+    except Exception as e:
+        logger.warning(f"T64/T66 statutory-record archival skipped for document {document_id}: {e}")
+
+
+async def delete_document_permanently(
+    db: AsyncSession, document_id: UUID, tenant_id: UUID,
+    actor_id: UUID, policy_version: Optional[str] = None,
+) -> None:
     stmt = select(Document).where(Document.id == document_id, Document.tenant_id == tenant_id).options(selectinload(Document.versions))
     res = await db.execute(stmt)
     doc = res.scalar_one_or_none()
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
+
+    doc_title = doc.title
 
     for v in doc.versions:
         if v.s3_path:
@@ -390,6 +497,13 @@ async def delete_document_permanently(db: AsyncSession, document_id: UUID, tenan
     await db.execute(delete(DocumentVersion).where(DocumentVersion.document_id == document_id))
 
     await db.delete(doc)
+    # T08/T66 — log_action before commit, not after: a permanent delete is
+    # irreversible, so the audit write must land in the same transaction
+    # as the delete, not a separate one that can fail after the data is
+    # already gone (discovered as a real gap during T66's live testing —
+    # the old commit-then-log ordering let a failed audit write leave a
+    # deleted document with no audit trail at all).
+    await log_action(db, actor_id, tenant_id, "document.delete", resource_type="document", resource_id=document_id, details={"title": doc_title}, policy_version=policy_version)
     await db.commit()
 
 
@@ -425,50 +539,116 @@ async def get_drive_stats(db: AsyncSession, tenant_id: UUID) -> DriveStatsRespon
         total_folders=total_folders,
         total_starred=total_starred,
         total_trashed=total_trashed,
+        total_size_bytes=total_bytes,
         total_bytes=total_bytes
     )
 
 
-async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 30) -> dict:
+async def _resolve_policy_actor(db: AsyncSession, tenant_id: UUID, cache: dict) -> Optional[UUID]:
+    """T66 — audit_dg_logs.actor_id is NOT NULL + FK'd to a real user row at
+    the DB level, so a scheduled/policy-driven purge still needs a real
+    actor to attribute the deletion to, per tenant. Prefers that tenant's
+    it_admin (the tenant-wide administrative role, T50) since a
+    policy-driven system action is closest in kind to what that role
+    already covers; falls back to any user in the tenant if no it_admin
+    exists, so a tenant that hasn't been migrated onto personas yet still
+    gets its trash purged rather than silently skipped forever."""
+    if tenant_id in cache:
+        return cache[tenant_id]
+
+    from app.models.user import User
+    res = await db.execute(
+        select(User.id).where(User.tenant_id == tenant_id, User.role == "it_admin").limit(1)
+    )
+    actor_id = res.scalar_one_or_none()
+    if actor_id is None:
+        res = await db.execute(select(User.id).where(User.tenant_id == tenant_id).limit(1))
+        actor_id = res.scalar_one_or_none()
+
+    cache[tenant_id] = actor_id
+    return actor_id
+
+
+async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 30, tenant_id: Optional[UUID] = None) -> dict:
+    """tenant_id=None sweeps every tenant — that's what the scheduled
+    worker task wants (a system-wide retention janitor). A real caller
+    acting on behalf of one tenant (the "Empty Bin" API) MUST pass its
+    own tenant_id, or this silently purges every other tenant's expired
+    trash too — confirmed live: a single-tenant Empty Bin click deleted
+    an unrelated tenant's folder alongside the caller's own, because
+    neither query here was ever scoped by tenant."""
     from datetime import datetime, timedelta
     from app.models.folder import Folder
+    from app.models.retention_class import RetentionClass
     from app.services.folder_service import delete_folder_permanently
 
     cutoff = datetime.utcnow() - timedelta(days=retention_days)
+    actor_cache: dict = {}
 
-    # 1. Fetch expired trashed documents (trashed_at <= cutoff)
-    doc_stmt = select(Document.id, Document.tenant_id).where(
-        Document.is_trashed == True,
-        Document.trashed_at.is_not(None),
-        Document.trashed_at <= cutoff
+    # T66/D-7 — a document's own retention_class governs whether/when it's
+    # eligible, not the flat `retention_days` arg (that still applies to
+    # folders below, which stay on the pre-D-7 flat rule). A class with
+    # retention_days=NULL (the default) is never engine-purged, however
+    # long it's sat trashed — only 'operational_trash' has a finite period.
+    class_res = await db.execute(select(RetentionClass.class_name, RetentionClass.retention_days))
+    class_periods = dict(class_res.all())
+
+    doc_conditions = [Document.is_trashed == True, Document.trashed_at.is_not(None)]
+    if tenant_id is not None:
+        doc_conditions.append(Document.tenant_id == tenant_id)
+    doc_stmt = select(Document.id, Document.tenant_id, Document.retention_class, Document.trashed_at, Document.title).where(
+        *doc_conditions,
     )
     doc_res = await db.execute(doc_stmt)
-    expired_docs = doc_res.all()
+    candidate_docs = doc_res.all()
 
+    now = datetime.utcnow()
     deleted_doc_count = 0
-    for d_id, t_id in expired_docs:
+    protected_documents = []  # (title, retention_class) — never auto-purged, no matter the caller's retention_days
+    pending_documents = []  # (title, retention_class, days_remaining) — has a finite period, just not up yet
+    for d_id, t_id, retention_class, trashed_at, title in candidate_docs:
+        class_days = class_periods.get(retention_class)
+        if class_days is None:
+            protected_documents.append({"title": title, "retention_class": retention_class})
+            continue  # permanent class, or an unrecognized one — fail safe, never purge
+        if now - trashed_at < timedelta(days=class_days):
+            days_remaining = class_days - (now - trashed_at).days
+            pending_documents.append({"title": title, "retention_class": retention_class, "days_remaining": max(days_remaining, 0)})
+            continue
+        actor_id = await _resolve_policy_actor(db, t_id, actor_cache)
+        if actor_id is None:
+            logger.warning(f"Skipping purge of document {d_id}: tenant {t_id} has no user to attribute the deletion to")
+            continue
         try:
-            await delete_document_permanently(db, d_id, t_id)
+            await delete_document_permanently(db, d_id, t_id, actor_id, policy_version="T66_retention_purge_v1")
             deleted_doc_count += 1
         except Exception as e:
             logger.warning(f"Error purging expired trashed document {d_id}: {e}")
 
     # 2. Fetch expired trashed folders (trashed_at <= cutoff)
-    folder_stmt = select(Folder.id, Folder.tenant_id).where(
-        Folder.is_trashed == True,
-        Folder.trashed_at.is_not(None),
-        Folder.trashed_at <= cutoff
-    )
+    folder_conditions = [Folder.is_trashed == True, Folder.trashed_at.is_not(None), Folder.trashed_at <= cutoff]
+    if tenant_id is not None:
+        folder_conditions.append(Folder.tenant_id == tenant_id)
+    folder_stmt = select(Folder.id, Folder.tenant_id).where(*folder_conditions)
     folder_res = await db.execute(folder_stmt)
     expired_folders = folder_res.all()
 
     deleted_folder_count = 0
     for f_id, t_id in expired_folders:
+        actor_id = await _resolve_policy_actor(db, t_id, actor_cache)
+        if actor_id is None:
+            logger.warning(f"Skipping purge of folder {f_id}: tenant {t_id} has no user to attribute the deletion to")
+            continue
         try:
-            await delete_folder_permanently(db, f_id, t_id)
+            await delete_folder_permanently(db, f_id, t_id, actor_id, policy_version="T66_retention_purge_v1")
             deleted_folder_count += 1
         except Exception as e:
             logger.warning(f"Error purging expired trashed folder {f_id}: {e}")
 
     logger.info(f"Purged {deleted_doc_count} expired documents and {deleted_folder_count} expired folders older than {retention_days} days in Bin.")
-    return {"deleted_documents": deleted_doc_count, "deleted_folders": deleted_folder_count}
+    return {
+        "deleted_documents": deleted_doc_count,
+        "deleted_folders": deleted_folder_count,
+        "protected_documents": protected_documents,
+        "pending_documents": pending_documents,
+    }

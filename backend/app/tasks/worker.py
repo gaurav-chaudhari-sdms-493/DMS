@@ -1,4 +1,5 @@
 import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -6,16 +7,20 @@ from uuid import UUID
 
 from celery import Celery
 from sqlalchemy import select, delete, text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from ..ai.base import Message
 from ..ai.factory import get_embed_provider, get_llm_provider
-from ..database import AsyncSessionLocal
 from ..models.chunk import Chunk as DBChunk
 from ..models.document import Document
+from ..models.document_version import DocumentVersion
 from ..models.metadata_item import MetadataItem
 from ..ocr.factory import get_ocr_provider
 from ..pipeline.chunker import TextChunker
-from ..services.storage_service import download_file
+from ..services.storage_service import download_file, upload_file, convert_to_pdfa
+from ..services.config_service import get_int, get_float
+from ..services.extraction_archive_service import get_cached_ocr, record_ocr
+from ..services import duplicate_service
 from ..config import settings
 
 celery_app = Celery(
@@ -26,6 +31,28 @@ celery_app = Celery(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _new_task_db_session_factory():
+    """A fresh, dedicated engine + session factory for one Celery task
+    invocation. Each task runs via asyncio.run() (a brand-new event loop
+    every time), but app.database's AsyncSessionLocal is bound to one
+    shared, pooled engine created once at process start — a connection
+    checked out during one task's event loop can be handed to a LATER
+    task's different (by-then-closed) loop, raising 'RuntimeError: Event
+    loop is closed'. A dedicated per-task engine, disposed at the end of
+    the task, avoids that entirely.
+
+    Real bug: fixed once (2026-07-22, commit fb6eecf) via exactly this
+    pattern, then silently reverted 5 days later (2026-07-27, commit
+    57b8029's "atomic ingestion pipeline" refactor) back to the shared
+    AsyncSessionLocal — the refactor's author wasn't aware they were
+    undoing the earlier fix. Confirmed live in worker logs: 36 real
+    'Event loop is closed' tracebacks during real document ingestion.
+    """
+    task_engine = create_async_engine(settings.postgres_url)
+    TaskSession = async_sessionmaker(task_engine, class_=AsyncSession, expire_on_commit=False)
+    return task_engine, TaskSession
 
 
 async def extract_metadata(text: str) -> dict:
@@ -55,7 +82,7 @@ Text snippet:
 
 async def _ingest_document_task_async(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
     """Celery task for full ingestion pipeline with ACID Atomicity: OCR → chunk → embed → store."""
-    from app.database import engine
+    task_engine, TaskSession = _new_task_db_session_factory()
     try:
         document_id = UUID(document_id_str)
         version_id = UUID(version_id_str)
@@ -64,13 +91,53 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         # 1. Download file
         file_bytes = await download_file(s3_path)
         filename = os.path.basename(s3_path)
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
 
-        # 2. OCR
-        ocr = get_ocr_provider()
-        pages = await ocr.extract_pages(file_bytes, filename)
+        # 1b. T41 — PDF/A-2b rendition, mandatory-on-ingest, original kept
+        # unchanged (only the pdf source format is convertible; other
+        # formats — docx/xlsx/images — aren't in T41's PDF/A scope).
+        # Best-effort: a failed rendition never blocks ingestion of the
+        # original, which is what's actually indexed either way.
+        pdfa_s3_path = None
+        if filename.lower().endswith(".pdf"):
+            try:
+                pdfa_bytes = await convert_to_pdfa(file_bytes)
+                if pdfa_bytes:
+                    pdfa_key = f"{os.path.dirname(s3_path)}/pdfa_{os.path.basename(s3_path)}"
+                    await upload_file(pdfa_bytes, pdfa_key, "application/pdf")
+                    pdfa_s3_path = pdfa_key
+                    logger.info(f"T41 PDF/A-2b rendition created for document {document_id_str}: {pdfa_key}")
+                else:
+                    logger.warning(f"T41 PDF/A-2b conversion returned nothing for document {document_id_str}")
+            except Exception as pdfa_err:
+                logger.warning(f"T41 PDF/A-2b conversion skipped for document {document_id_str}: {pdfa_err}")
+
+        # 2. OCR — TS3: an unchanged file (by content hash) under the same
+        # OCR engine is never re-OCR'd; reprocessing the same upload after a
+        # chunking/parsing fix replays the archived response for free.
+        pages = None
+        try:
+            async with TaskSession() as cache_db:
+                pages = await get_cached_ocr(cache_db, file_hash, settings.ai_ocr_provider)
+        except Exception as cache_err:
+            logger.warning(f"TS3 OCR cache lookup failed for {document_id_str}: {cache_err}")
+
+        if pages is not None:
+            logger.info(f"TS3 OCR cache hit for document {document_id_str} (hash {file_hash[:12]}...)")
+        else:
+            ocr = get_ocr_provider()
+            pages = await ocr.extract_pages(file_bytes, filename)
+            try:
+                async with TaskSession() as cache_db:
+                    await record_ocr(cache_db, file_hash, settings.ai_ocr_provider, pages)
+                    await cache_db.commit()
+            except Exception as cache_err:
+                logger.warning(f"TS3 OCR cache write failed for {document_id_str}: {cache_err}")
 
         # 3. Chunk
-        chunker = TextChunker()
+        chunk_size = await get_int("chunk_size_tokens", 512)
+        chunk_overlap = await get_int("chunk_overlap_tokens", 64)
+        chunker = TextChunker(chunk_size=chunk_size, chunk_overlap=chunk_overlap)
         chunks = chunker.chunk_pages(pages)
 
         if not chunks or all(p.get("extraction_failed") for p in pages):
@@ -79,6 +146,35 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 "It may be a scanned image requiring an OCR provider "
                 "(set AI_OCR_PROVIDER=gcv or llamaparse)."
             )
+
+        # TS2 — data-loss audit: does every word OCR read survive into the
+        # chunks about to be stored (the search/chat/viewer-facing surface)?
+        # Best-effort, same as every other optional pipeline stage here —
+        # a failure here must never block ingestion.
+        data_loss_result = None
+        try:
+            from app.services.data_loss_audit import audit_pages_vs_chunks
+            data_loss_result = audit_pages_vs_chunks(pages, [c.content for c in chunks])
+            if not data_loss_result.passed:
+                logger.warning(
+                    f"TS2 data-loss audit: document {document_id_str} lost "
+                    f"{data_loss_result.missing_count}/{data_loss_result.total_words} words "
+                    f"({data_loss_result.loss_ratio:.2%}) between OCR and stored chunks"
+                )
+        except Exception as audit_err:
+            logger.warning(f"TS2 data-loss audit skipped for document {document_id_str}: {audit_err}")
+
+        # TS6 — page-furniture detection: flags (never removes) running
+        # headers/footers by position stability. Purely informational,
+        # same best-effort contract as every other optional stage here.
+        furniture_candidates = None
+        try:
+            from app.services.page_furniture_service import detect_page_furniture
+            furniture_candidates = detect_page_furniture(pages)
+            if furniture_candidates:
+                logger.info(f"TS6 page-furniture: document {document_id_str} has {len(furniture_candidates)} candidate(s)")
+        except Exception as furniture_err:
+            logger.warning(f"TS6 page-furniture detection skipped for document {document_id_str}: {furniture_err}")
 
         # 4. Embed chunks (batched for local BGE-M3 model / API providers)
         embed_provider = get_embed_provider()
@@ -117,7 +213,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
 
         # 6. ATOMIC DATABASE TRANSACTION (All-or-Nothing Commit)
         # All database writes (chunks, metadata, document status) occur inside a single atomic transaction.
-        async with AsyncSessionLocal() as db:
+        async with TaskSession() as db:
             async with db.begin():
                 await db.execute(text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": tenant_id_str})
                 # Purge any pre-existing partial chunks or metadata for this version/document
@@ -134,20 +230,21 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                         page_number=chunk.page_number,
                         chunk_index=chunk.chunk_index,
                         embedding=embeddings[idx],
-                        chunk_metadata={"token_count": chunk.token_count, "bbox": chunk.bbox},
+                        chunk_metadata={"token_count": chunk.token_count, "bbox": chunk.bbox, "word_regions": chunk.word_regions},
                         s3_path=s3_path
                     )
                     db.add(db_chunk)
 
                 # Insert metadata items
                 if meta_dict:
+                    extraction_confidence = await get_float("default_extraction_confidence", 0.9)
                     for key, value in meta_dict.items():
                         db_meta = MetadataItem(
                             document_id=document_id,
                             key=key,
                             value=value if isinstance(value, (dict, list)) else {"v": value},
                             source="llm",
-                            confidence_score=0.9,
+                            confidence_score=extraction_confidence,
                         )
                         db.add(db_meta)
 
@@ -159,12 +256,84 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                             doc.title = meta_dict["title"]
                             doc.doc_type = meta_dict.get("document_type")
 
+                # 5b. T23 — classification stage, unconditional (runs regardless of
+                # whether VLM extraction is even enabled). Persists the result on
+                # the document instead of the ad-hoc unpersisted match T22 used to
+                # do inline. A savepoint isolates it, same reasoning as T22 below.
+                template = None
+                try:
+                    from app.services.classification_service import classify_document
+                    sample_text = pages[0].get("text", "") if pages else ""
+                    async with db.begin_nested():
+                        classified_doc = await classify_document(db, tenant_id, document_id, sample_text)
+                    if classified_doc.matched_template_id:
+                        from app.models.template import Template as TemplateModel
+                        template = await db.get(TemplateModel, classified_doc.matched_template_id)
+                except Exception as classify_err:
+                    logger.warning(f"T23 classification skipped for document {document_id}: {classify_err}")
+
+                # 5c. T22 — VLM extraction against the matched template, if any.
+                # Best-effort and non-blocking: a savepoint isolates it so a failure
+                # here never aborts the chunk/metadata commit above (search must
+                # never wait on this, Section 3.5).
+                if template:
+                    try:
+                        from app.pipeline.vlm_extraction import extract_facts_for_document
+                        async with db.begin_nested():
+                            facts_count = await extract_facts_for_document(
+                                db, tenant_id, document_id, version_id,
+                                file_bytes, filename, pages, template,
+                            )
+                        if facts_count:
+                            logger.info(
+                                f"T22 VLM extraction wrote {facts_count} facts for "
+                                f"document {document_id} against template "
+                                f"{template.form_type}/{template.era_label}"
+                            )
+                    except Exception as vlm_err:
+                        logger.warning(f"T22 VLM extraction skipped for document {document_id}: {vlm_err}")
+
+                # T79 — fuzzy-duplicate check, now at ingest instead of only
+                # on-demand. Needs this document's own chunk-0 embedding,
+                # which is only available once the chunk inserts above have
+                # flushed — that's why this runs here, not earlier. Best-effort
+                # in its own savepoint: never blocks or fails ingestion.
+                duplicate_candidates = None
+                try:
+                    async with db.begin_nested():
+                        found = await duplicate_service.find_fuzzy_duplicates(db, tenant_id, document_id, limit=5)
+                    if found:
+                        duplicate_candidates = found
+                        logger.info(f"T79 fuzzy-duplicate check: document {document_id} resembles {len(found)} existing document(s)")
+                except Exception as dup_err:
+                    logger.warning(f"T79 fuzzy-duplicate check skipped for document {document_id}: {dup_err}")
+
                 # Update status to indexed
                 stmt = select(Document).where(Document.id == document_id)
                 res = await db.execute(stmt)
                 doc = res.scalar_one_or_none()
                 if doc:
                     doc.status = "indexed"
+                    # T76 — every document gets these, not just template
+                    # matches (unlike doc_dg_pages, which only T22 writes to).
+                    doc.pages_total_count = len(pages)
+                    doc.pages_failed_count = sum(1 for p in pages if p.get("extraction_failed"))
+                    if data_loss_result:
+                        doc.data_loss_words_missing = data_loss_result.missing_count
+                        doc.data_loss_details = (
+                            {"loss_ratio": data_loss_result.loss_ratio, "missing_sample": data_loss_result.missing_sample}
+                            if data_loss_result.missing_count > 0 else None
+                        )
+                    if furniture_candidates:
+                        doc.page_furniture_candidates = furniture_candidates
+                    if duplicate_candidates:
+                        doc.possible_duplicate_candidates = duplicate_candidates
+
+                if pdfa_s3_path:
+                    version_res = await db.execute(select(DocumentVersion).where(DocumentVersion.id == version_id))
+                    version_row = version_res.scalar_one_or_none()
+                    if version_row:
+                        version_row.pdfa_s3_path = pdfa_s3_path
 
         try:
             from app.services.cache_service import invalidate_tenant_cache
@@ -178,7 +347,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         logger.error(f"Ingestion failed for document {document_id_str}: {e}", exc_info=True)
         # ATOMIC CLEANUP & FAILURE RECORDING
         # If any operation fails, roll back all DB writes, purge orphaned rows, and mark document as failed.
-        async with AsyncSessionLocal() as db_fail:
+        async with TaskSession() as db_fail:
             async with db_fail.begin():
                 try:
                     await db_fail.execute(text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": tenant_id_str})
@@ -192,10 +361,27 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                     doc = res.scalar_one_or_none()
                     if doc:
                         doc.status = "failed"
+
+                    # T41 — real failure alerting instead of logger-only.
+                    # Best-effort, outside the doc/version writes above so a
+                    # notification problem never affects the failure record.
+                    try:
+                        from ..models.user import User
+                        uploader_res = await db_fail.execute(
+                            select(User.email)
+                            .join(DocumentVersion, DocumentVersion.uploaded_by == User.id)
+                            .where(DocumentVersion.id == version_id)
+                        )
+                        uploader_email = uploader_res.scalar_one_or_none()
+                        if uploader_email and doc:
+                            from ..services.email_service import send_ingestion_failure_alert
+                            await send_ingestion_failure_alert(uploader_email, doc.title, str(e)[:300])
+                    except Exception as alert_err:
+                        logger.warning(f"T41 failure alert skipped for document {document_id_str}: {alert_err}")
                 except Exception as inner_e:
                     logger.error(f"Failed to record ingestion failure status for {document_id_str}: {inner_e}")
     finally:
-        await engine.dispose()
+        await task_engine.dispose()
 
 
 celery_app.conf.beat_schedule = {
@@ -214,8 +400,13 @@ def ingest_document_task(document_id_str: str, version_id_str: str, s3_path: str
 
 async def _cleanup_trashed_items_async() -> None:
     from app.services.document_service import cleanup_expired_trashed_items
-    async with AsyncSessionLocal() as db:
-        await cleanup_expired_trashed_items(db, retention_days=30)
+    task_engine, TaskSession = _new_task_db_session_factory()
+    try:
+        retention_days = await get_int("trash_retention_days", 30)
+        async with TaskSession() as db:
+            await cleanup_expired_trashed_items(db, retention_days=retention_days)
+    finally:
+        await task_engine.dispose()
 
 
 @celery_app.task(name="app.tasks.cleanup_trashed_items_task")

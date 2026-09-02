@@ -26,6 +26,9 @@ class TokenResponse(BaseModel):
     token_type: str = 'bearer'
     expires_in: int
 
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
 class TokenPayload(BaseModel):
     sub: str  # user_id
     tenant_id: str
@@ -45,6 +48,14 @@ class ResetPasswordRequest(BaseModel):
     reset_token: str
     new_password: str = Field(..., min_length=8)
 
+class ChangePasswordRequest(BaseModel):
+    """An already-logged-in user changing their own password — distinct
+    from ForgotPassword/ResetPassword, which are for a user who can't log
+    in at all. Requires the current password so anyone who finds an
+    unlocked session can't silently lock the real owner out."""
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
 class FileTypeCount(BaseModel):
     extension: str
     count: int
@@ -55,6 +66,7 @@ class UserProfileResponse(BaseModel):
     full_name: str
     email: EmailStr
     role: str
+    locale: str
     tenant_id: UUID
     tenant_name: str
     created_at: str
@@ -63,3 +75,11 @@ class UserProfileResponse(BaseModel):
     total_size_bytes: int
     total_chunks: int
     file_types_breakdown: list[FileTypeCount]
+
+
+class UpdateLocaleRequest(BaseModel):
+    locale: str = Field(..., pattern="^(en|mr)$")
+
+
+class UpdateLocaleResponse(BaseModel):
+    locale: str

@@ -10,6 +10,13 @@ backend/data
 .git
 .idea
 
+# Ignore build output folders
+dist-desktop
+**/dist-desktop
+out
+**/out
+
 # Allow the frontend lib directory
 !frontend/lib
 
+frontend/dist-desktop/*c

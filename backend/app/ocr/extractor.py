@@ -6,16 +6,67 @@ from typing import List, Dict, Any
 
 logger = logging.getLogger(__name__)
 
-def extract_pages_from_file(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
+# Trilingual OCR per the product's English/Hindi/Marathi coverage — requires the
+# tesseract-ocr-hin and tesseract-ocr-mar language packs (see backend/Dockerfile).
+TESSERACT_LANG = "eng+hin+mar"
+
+# T90 — lazily-loaded singleton so the model loads once per process, not
+# once per page. lang='mr' selects PaddleOCR's Devanagari-family
+# recognition model (covers Marathi and Hindi both — see paddleocr's
+# DEVANAGARI_LANGS grouping), matching this product's stated priority
+# ("the product cannot currently read the script it is sold on").
+# Tradeoff versus Tesseract's eng+hin+mar single pass: PaddleOCR needs one
+# language pipeline per call, so pure-English pages may see lower
+# accuracy here than with Tesseract's combined pass — not a bug, a
+# genuine engine tradeoff, left for a caller to choose via ocr_engine.
+_paddle_ocr_instance = None
+
+
+def _get_paddle_ocr():
+    global _paddle_ocr_instance
+    if _paddle_ocr_instance is None:
+        from paddleocr import PaddleOCR
+        _paddle_ocr_instance = PaddleOCR(
+            lang="mr",
+            use_doc_orientation_classify=False,
+            use_doc_unwarping=False,
+            use_textline_orientation=False,
+            # Required on this platform — PaddlePaddle 3.3.1's default PIR
+            # executor errors on the oneDNN-fused instruction path for the
+            # text detection model:
+            # "NotImplementedError: ConvertPirAttribute2RuntimeAttribute
+            #  not support [pir::ArrayAttribute<pir::DoubleAttribute>]"
+            # Confirmed live: identical inputs succeed with this off,
+            # fail with it on. Revisit if a future paddlepaddle release
+            # fixes the oneDNN/PIR interaction.
+            enable_mkldnn=False,
+        )
+    return _paddle_ocr_instance
+
+
+def _paddle_ocr_image(pil_img) -> str:
+    import numpy as np
+    ocr = _get_paddle_ocr()
+    arr = np.array(pil_img.convert("RGB"))
+    lines = []
+    for res in ocr.predict(arr):
+        lines.extend(res.get("rec_texts", []))
+    return "\n".join(lines)
+
+
+def extract_pages_from_file(file_bytes: bytes, filename: str, ocr_engine: str = "tesseract") -> List[Dict[str, Any]]:
     """
     Extract structured pages and text content from various file formats:
     PDF, Word (.docx), Excel (.xlsx, .csv), PowerPoint (.pptx), Markdown (.md),
     RTF (.rtf), JSON (.json), Images (.jpg, .png, etc.), and Plain Text files.
+
+    ocr_engine ('tesseract' | 'paddle') only affects the PDF/image paths —
+    every other format here doesn't involve OCR at all.
     """
     ext = filename.lower().split(".")[-1] if "." in filename else ""
 
     if ext == "pdf":
-        return _extract_pdf(file_bytes, filename)
+        return _extract_pdf(file_bytes, filename, ocr_engine)
     elif ext in ["docx", "doc"]:
         return _extract_docx(file_bytes)
     elif ext in ["xlsx", "xls"]:
@@ -29,60 +80,86 @@ def extract_pages_from_file(file_bytes: bytes, filename: str) -> List[Dict[str, 
     elif ext == "json":
         return _extract_json(file_bytes)
     elif ext in ["jpg", "jpeg", "png", "bmp", "webp", "tiff"]:
-        return _extract_image(file_bytes, filename)
+        return _extract_image(file_bytes, filename, ocr_engine)
     else:
         return _extract_text(file_bytes)
 
 
-def _extract_image(file_bytes: bytes, filename: str) -> List[Dict[str, Any]]:
+def _extract_image(file_bytes: bytes, filename: str, ocr_engine: str = "tesseract") -> List[Dict[str, Any]]:
     text = ""
     try:
         from PIL import Image
-        import pytesseract
         img = Image.open(io.BytesIO(file_bytes))
-        text = pytesseract.image_to_string(img) or ""
-        logger.info(f"Image OCR extracted {len(text)} chars from {filename}")
+        if ocr_engine == "paddle":
+            text = _paddle_ocr_image(img) or ""
+        else:
+            import pytesseract
+            text = pytesseract.image_to_string(img, lang=TESSERACT_LANG) or ""
+        logger.info(f"Image OCR ({ocr_engine}) extracted {len(text)} chars from {filename}")
     except Exception as e:
-        logger.warning(f"Failed to perform Tesseract OCR on image file {filename}: {e}")
+        logger.warning(f"Failed to perform {ocr_engine} OCR on image file {filename}: {e}")
 
-    if not text.strip():
-        text = f"Scanned image document: {filename}"
-        return [{
-            "page_number": 1,
-            "text": text.strip(),
-            "words": [],
-            "bbox": {},
-            "extraction_failed": True
-        }]
+    failed = not text.strip()
+    if failed:
+        text = f"Image document: {filename}"
 
     return [{
         "page_number": 1,
         "text": text.strip(),
         "words": [],
-        "bbox": {}
+        "bbox": {},
+        "extraction_failed": failed
     }]
 
 
-def _extract_pdf(file_bytes: bytes, filename: str = "") -> List[Dict[str, Any]]:
+def _extract_pdf(file_bytes: bytes, filename: str = "", ocr_engine: str = "tesseract") -> List[Dict[str, Any]]:
     import pdfplumber
     pages = []
     try:
         with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
             for i, page in enumerate(pdf.pages):
                 text = page.extract_text() or ""
-                words = page.extract_words() or []
+                raw_words = page.extract_words() or []
+
+                # T05 — carry word-level regions from the extractor to the
+                # fact writer instead of discarding them here. Normalised
+                # to 0-1 page fractions, top-left origin, per T06's signed
+                # coordinate contract (pdfplumber's top/bottom are already
+                # top-down, so no y-flip needed). Page-level granularity
+                # (every word on the page, not sliced per-chunk) — chunking
+                # re-tokenizes page text and doesn't preserve a reliable
+                # char-offset mapping back to pdfplumber's word list, so a
+                # per-chunk slice would be a guess; the full per-page list
+                # is exact and still a real, usable region source (T04's
+                # own FactRegion works at page granularity too).
+                pw = float(page.width) or 1.0
+                ph = float(page.height) or 1.0
+                words = [
+                    {
+                        "text": w.get("text", ""),
+                        "x0": max(0.0, min(1.0, w["x0"] / pw)),
+                        "y0": max(0.0, min(1.0, w["top"] / ph)),
+                        "x1": max(0.0, min(1.0, w["x1"] / pw)),
+                        "y1": max(0.0, min(1.0, w["bottom"] / ph)),
+                    }
+                    for w in raw_words
+                    if "x0" in w and "top" in w and "x1" in w and "bottom" in w
+                ]
 
                 # OCR Fallback for scanned/image PDF pages
                 if not text.strip():
                     try:
-                        import pytesseract
                         pil_img = page.to_image(resolution=150).original
-                        ocr_text = pytesseract.image_to_string(pil_img) or ""
+                        if ocr_engine == "paddle":
+                            ocr_text = _paddle_ocr_image(pil_img) or ""
+                        else:
+                            import pytesseract
+                            ocr_text = pytesseract.image_to_string(pil_img, lang=TESSERACT_LANG) or ""
                         if ocr_text.strip():
                             text = ocr_text
-                            logger.info(f"Tesseract OCR extracted {len(text)} chars from page {i+1} of {filename}")
+                            logger.info(f"{ocr_engine} OCR extracted {len(text)} chars from page {i+1} of {filename}")
                     except Exception as ocr_err:
-                        logger.warning(f"OCR fallback failed for page {i+1} of {filename}: {ocr_err}")
+                        logger.warning(f"OCR fallback ({ocr_engine}) failed for page {i+1} of {filename}: {ocr_err}")
 
                 failed = False
                 if not text.strip():

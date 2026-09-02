@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy import func
@@ -6,7 +6,8 @@ import uuid
 from ...schemas.auth import (
     LoginRequest, TokenResponse, TokenPayload, SignUpRequest, SignUpResponse,
     ForgotPasswordRequest, ForgotPasswordResponse, ResetPasswordRequest,
-    UserProfileResponse, FileTypeCount
+    UserProfileResponse, FileTypeCount, RefreshTokenRequest,
+    UpdateLocaleRequest, UpdateLocaleResponse, ChangePasswordRequest
 )
 from ...models.user import User
 from ...models.tenant import Tenant
@@ -15,10 +16,10 @@ from ...models.document_version import DocumentVersion
 from ...models.chunk import Chunk
 from ...models.folder import Folder
 
-from ...deps import get_db, get_current_user, get_request_ip, require_tenant_access
+from ...deps import get_db, get_request_ip, require_tenant_access
 from ...services.auth_service import (
     verify_password, create_access_token, create_refresh_token, sign_up,
-    create_password_reset_token, reset_password_with_token
+    create_password_reset_token, reset_password_with_token, change_password
 )
 from ...services.audit_service import log_action
 
@@ -105,6 +106,7 @@ async def get_current_user_profile(
         full_name=user.full_name,
         email=user.email,
         role=user.role.value if hasattr(user.role, 'value') else str(user.role),
+        locale=user.locale,
         tenant_id=user.tenant_id,
         tenant_name=tenant_name,
         created_at=user.created_at.strftime("%B %d, %Y") if user.created_at else "N/A",
@@ -114,6 +116,39 @@ async def get_current_user_profile(
         total_chunks=total_chunks,
         file_types_breakdown=file_types
     )
+
+@router.patch('/me/locale', response_model=UpdateLocaleResponse)
+async def update_current_user_locale(
+    body: UpdateLocaleRequest,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db)
+):
+    """T95 — persists the user's language choice for their next login on
+    any device; the frontend also mirrors this to localStorage so the
+    choice applies immediately, before this call resolves."""
+    user_id = uuid.UUID(current_user.sub)
+    u_res = await db.execute(select(User).where(User.id == user_id))
+    user = u_res.scalar_one_or_none()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    user.locale = body.locale
+    await db.commit()
+    return UpdateLocaleResponse(locale=user.locale)
+
+@router.post('/me/password')
+async def change_current_user_password(
+    body: ChangePasswordRequest,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db)
+):
+    """In-place password change for an already-logged-in user — the
+    profile page's "Change Password" previously just linked to
+    /forgot-password, forcing an unnecessary email round-trip."""
+    user_id = uuid.UUID(current_user.sub)
+    await change_password(user_id, body.current_password, body.new_password, db)
+    await log_action(db, user_id, uuid.UUID(current_user.tenant_id), "auth.password_change")
+    return {"message": "Password changed successfully"}
 
 @router.post('/sign-up', response_model=SignUpResponse, status_code=201)
 async def sign_up_user(
@@ -161,9 +196,16 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
     )
 
 @router.post('/refresh', response_model=TokenResponse)
-async def refresh_token(refresh_token: str, db: AsyncSession = Depends(get_db)):
+async def refresh_token(
+    body: RefreshTokenRequest | None = None,
+    refresh_token: str | None = None,
+    db: AsyncSession = Depends(get_db)
+):
+    token = (body.refresh_token if body and body.refresh_token else None) or refresh_token
+    if not token:
+        raise HTTPException(status_code=400, detail="Missing refresh token")
     from ...services.auth_service import verify_token
-    payload = verify_token(refresh_token)
+    payload = verify_token(token)
     if payload.type != "refresh":
         raise HTTPException(status_code=401, detail="Not a refresh token")
     

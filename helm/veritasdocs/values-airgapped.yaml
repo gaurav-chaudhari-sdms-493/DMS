@@ -1,0 +1,39 @@
+# Air-gapped profile overrides. Layer on top of values.yaml:
+#   helm install veritasdocs ./helm/veritasdocs -f values-airgapped.yaml \
+#     --set image.registry=registry.airgapped.local:5000/ \
+#     --set secrets.jwtSecretKey=... --set secrets.postgresPassword=... --set secrets.redisPassword=...
+#
+# See the SCOPE NOTE at the top of values.yaml: this profile is honest
+# about what actually runs local-only today (embeddings, reranking, and
+# now real Devanagari-capable OCR via paddleocr — T90) versus what is
+# refused rather than faked (LLM, VLM field extraction — T90's VLM half
+# is unverified scaffolding pending GPU hardware, not wired in).
+
+airGapped:
+  enabled: true
+
+imagePullSecrets: []   # set if your local registry requires auth
+
+app:
+  ai:
+    llmProvider: openai        # left as-is for documentation; AIR_GAPPED=true
+                                # refuses this at startup regardless of value,
+                                # since no local LLM provider exists yet (T90)
+    embedProvider: bgem3       # local — actually works air-gapped today
+    embedFallbackProvider: none
+    rerankProvider: bgem3      # local — actually works air-gapped today
+    ocrProvider: paddleocr     # local — real Devanagari/Marathi support (T90),
+                                # live-verified through the real ingestion pipeline.
+                                # pdfplumber (with its Tesseract fallback) also
+                                # works air-gapped if you prefer it instead.
+    vlmProvider: gemini        # documentation only; refused at call time (T90 VLM half)
+
+secrets:
+  # No external AI keys needed for the local-only surfaces (embed/rerank/OCR).
+  # Leave the API-key fields blank — they are not read when airGapped.enabled.
+  openaiApiKey: ""
+  anthropicApiKey: ""
+  groqApiKey: ""
+  googleApiKey: ""
+  cohereApiKey: ""
+  llamaparseApiKey: ""

@@ -17,6 +17,7 @@ import {
   Eye,
 } from "lucide-react";
 import type { DocumentListItem } from "@/types";
+import { onKeyActivate } from "@/lib/a11y";
 
 interface SuggestedFilesTableProps {
   documents: DocumentListItem[];
@@ -31,6 +32,7 @@ interface SuggestedFilesTableProps {
   onRename: (doc: DocumentListItem) => void;
   onMove: (doc: DocumentListItem) => void;
   onTrash: (doc: DocumentListItem) => void;
+  emptyType?: "default" | "starred";
 }
 
 export function SuggestedFilesTable({
@@ -46,6 +48,7 @@ export function SuggestedFilesTable({
   onRename,
   onMove,
   onTrash,
+  emptyType = "default",
 }: SuggestedFilesTableProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
@@ -78,11 +81,7 @@ export function SuggestedFilesTable({
       );
     }
     if (["pdf"].includes(ext)) {
-      return (
-        <div className="w-5 h-5 bg-[#ea4335] rounded text-white flex items-center justify-center font-bold text-[9px]">
-          PDF
-        </div>
-      );
+      return <FileText className="w-5 h-5 text-red-500 flex-shrink-0" />;
     }
     if (["ipynb"].includes(ext)) {
       return (
@@ -97,79 +96,20 @@ export function SuggestedFilesTable({
     if (["png", "jpg", "jpeg", "svg"].includes(ext)) {
       return <ImageIcon className="w-5 h-5 text-[#a142f4]" />;
     }
-    return <FileText className="w-5 h-5 text-[#0b57d0]" />;
+    return <FileText className="w-5 h-5 text-[#0b57d0] flex-shrink-0" />;
   };
 
-  const renderGridThumbnail = (row: { title: string; downloadUrl?: string | null }) => {
-    const isImg = isImageFile(row.title);
+  const renderGridPreview = (row: { title: string; downloadUrl?: string | null }) => {
     const ext = row.title.split(".").pop()?.toLowerCase() || "";
 
-    if (isImg && row.downloadUrl) {
+    if (["png", "jpg", "jpeg", "webp", "gif", "svg"].includes(ext) && row.downloadUrl) {
       return (
-        <div className="relative w-full h-32 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] overflow-hidden flex items-center justify-center">
+        <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] overflow-hidden flex items-center justify-center p-2">
           <img
             src={row.downloadUrl}
             alt={row.title}
-            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-            onError={(e) => {
-              (e.target as HTMLElement).style.display = "none";
-            }}
+            className="max-h-full max-w-full object-contain rounded-md shadow-xs group-hover:scale-105 transition-transform"
           />
-        </div>
-      );
-    }
-
-    if (ext === "pdf" && row.downloadUrl) {
-      return (
-        <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] overflow-hidden flex items-center justify-center pointer-events-none">
-          <iframe
-            src={`${row.downloadUrl}#page=1&toolbar=0&navpanes=0&scrollbar=0`}
-            className="w-full h-[180%] border-0 bg-white scale-100 transform origin-top pointer-events-none select-none"
-            title={row.title}
-          />
-        </div>
-      );
-    }
-
-    if (["doc", "docx"].includes(ext)) {
-      return (
-        <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] flex items-center justify-center p-3 overflow-hidden">
-          <div className="w-20 h-28 bg-white rounded-md shadow-md border border-[#e1e3e1] flex flex-col p-2 overflow-hidden group-hover:scale-105 transition-transform">
-            <div className="flex items-center gap-1 border-b border-[#e1e3e1] pb-1 mb-1.5">
-              <div className="w-2.5 h-2.5 bg-[#0b57d0] rounded-xs flex-shrink-0" />
-              <span className="text-[7px] font-bold text-[#1f1f1f] truncate leading-none" title={row.title}>
-                {row.title.replace(/\.[^/.]+$/, "")}
-              </span>
-            </div>
-            <div className="space-y-1 text-[5px] text-[#444746] leading-tight flex-1 font-serif select-none overflow-hidden opacity-80">
-              <p className="font-bold text-[6px] text-[#1f1f1f]">{row.title.split(".")[0]}</p>
-              <p className="line-clamp-2">This document contains indexed text and metadata extracted for search & retrieval.</p>
-              <div className="h-0.5 bg-[#edf2fc] rounded w-full my-0.5" />
-              <div className="h-0.5 bg-[#edf2fc] rounded w-5/6" />
-              <div className="h-0.5 bg-[#edf2fc] rounded w-3/4" />
-            </div>
-          </div>
-        </div>
-      );
-    }
-
-    if (["xlsx", "xls", "csv"].includes(ext)) {
-      return (
-        <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] flex items-center justify-center p-3 overflow-hidden">
-          <div className="w-20 h-28 bg-white rounded-md shadow-md border border-[#e1e3e1] flex flex-col p-1.5 overflow-hidden group-hover:scale-105 transition-transform">
-            <div className="flex items-center gap-1 border-b border-emerald-200 pb-1 mb-1">
-              <div className="w-2.5 h-2.5 bg-[#107c41] rounded-xs text-white text-[5px] font-bold flex items-center justify-center">X</div>
-              <span className="text-[7px] font-bold text-emerald-800 truncate leading-none">Sheet 1</span>
-            </div>
-            <div className="grid grid-cols-3 gap-0.5 border border-[#e1e3e1] rounded-xs p-0.5 bg-[#f8fafd] flex-1">
-              <div className="bg-emerald-100 h-2 text-[5px] font-bold text-center">A</div>
-              <div className="bg-emerald-100 h-2 text-[5px] font-bold text-center">B</div>
-              <div className="bg-emerald-100 h-2 text-[5px] font-bold text-center">C</div>
-              {Array.from({ length: 9 }).map((_, i) => (
-                <div key={i} className="bg-white border border-[#e1e3e1]/60 h-2" />
-              ))}
-            </div>
-          </div>
         </div>
       );
     }
@@ -181,13 +121,56 @@ export function SuggestedFilesTable({
           <div className="text-gray-400 border-b border-gray-700 pb-1 mb-1 font-sans text-[6px]">code.py</div>
           <p><span className="text-blue-400">import</span> os, sys</p>
           <p><span className="text-purple-400">def</span> main():</p>
-          <p className="pl-1 text-gray-300">print(<span className="text-amber-300">"DMS AI"</span>)</p>
+          <p className="pl-1 text-gray-300">print(<span className="text-amber-300">&quot;DMS AI&quot;</span>)</p>
         </div>
       </div>
     );
   };
 
   if (documents.length === 0) {
+    if (emptyType === "starred") {
+      return (
+        <div className="flex flex-col items-center justify-center p-8 md:p-12 bg-[#f8fafd] rounded-3xl border border-[#e1e3e1] text-center my-6 select-none max-w-xl mx-auto shadow-2xs">
+          <div className="w-16 h-16 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-500 mb-4 shadow-sm">
+            <Star className="w-8 h-8 fill-amber-400 text-amber-500" />
+          </div>
+          <h3 className="text-base font-bold text-[#1f1f1f] mb-1">No Starred Files Yet</h3>
+          <p className="text-xs text-[#444746] max-w-md mb-6 leading-relaxed">
+            Star important files and folders to access them quickly here anytime.
+          </p>
+
+          <div className="w-full bg-white rounded-2xl p-5 border border-[#e1e3e1] shadow-xs space-y-3 text-left">
+            <div className="text-xs font-bold uppercase tracking-wider text-[#0b57d0] flex items-center gap-1.5">
+              <Star className="w-4 h-4 fill-[#0b57d0]" />
+              <span>How to star any file or folder</span>
+            </div>
+            
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[#444746]">
+              <div className="flex items-start gap-2.5 p-3 bg-[#f8f9fa] rounded-xl border border-[#e1e3e1]/70">
+                <div className="w-6 h-6 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] font-bold text-xs flex items-center justify-center shrink-0">1</div>
+                <div>
+                  <p className="font-semibold text-[#1f1f1f] mb-0.5">Click Star Icon</p>
+                  <p className="text-[11px] text-[#747775] leading-normal">
+                    Click the star icon next to any document or folder name.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-2.5 p-3 bg-[#f8f9fa] rounded-xl border border-[#e1e3e1]/70">
+                <div className="w-6 h-6 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] font-bold text-xs flex items-center justify-center shrink-0">2</div>
+                <div>
+                  <p className="font-semibold text-[#1f1f1f] mb-0.5">Context Menu</p>
+                  <p className="text-[11px] text-[#747775] leading-normal">
+                    Right-click any item and select <span className="font-semibold text-[#1f1f1f]">&quot;Add to Starred&quot;</span>.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-[#f0f4f9] rounded-3xl border border-dashed border-[#c4c7c5] text-center my-6 select-none">
         <div className="w-14 h-14 rounded-full bg-[#c2e7ff] flex items-center justify-center text-[#0b57d0] mb-3">
@@ -195,7 +178,7 @@ export function SuggestedFilesTable({
         </div>
         <h3 className="text-sm font-semibold text-[#1f1f1f] mb-1">A place for all your files</h3>
         <p className="text-xs text-[#444746] max-w-xs">
-          Use the "+ New" button to upload documents or create folders.
+          Use the &quot;+ New&quot; button to upload documents or create folders.
         </p>
       </div>
     );
@@ -253,6 +236,15 @@ export function SuggestedFilesTable({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[#e1e3e1] text-[#444746] font-medium">
+                    <th className="py-2.5 pl-3 pr-1 w-8">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={() => onToggleSelectAll && onToggleSelectAll()}
+                        aria-label={isAllSelected ? "Deselect all files" : "Select all files"}
+                        className="w-4 h-4 rounded accent-[#0b57d0] cursor-pointer"
+                      />
+                    </th>
                     <th className="py-2.5 px-3 font-medium">Name</th>
                     <th className="py-2.5 px-3 font-medium">Date added</th>
                     <th className="py-2.5 px-3 font-medium">Owner</th>
@@ -277,6 +269,15 @@ export function SuggestedFilesTable({
                           isSelected ? "bg-[#c2e7ff] text-[#001d35] font-semibold" : "hover:bg-[#edf2fc]"
                         }`}
                       >
+                        <td className="py-3 pl-3 pr-1" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => onSelectDoc(row.raw, true)}
+                            aria-label={`Select ${row.title}`}
+                            className="w-4 h-4 rounded accent-[#0b57d0] cursor-pointer"
+                          />
+                        </td>
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-3 min-w-[240px]">
                             {getFileIcon(row.title, row.downloadUrl)}
@@ -325,6 +326,7 @@ export function SuggestedFilesTable({
                           {activeMenuId === row.id && (
                             <>
                               <div
+                                role="presentation"
                                 className="fixed inset-0 z-10"
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -421,6 +423,8 @@ export function SuggestedFilesTable({
                 return (
                   <div
                     key={row.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={(e) => onSelectDoc(row.raw, e.ctrlKey || e.metaKey || e.shiftKey)}
                     onDoubleClick={() => {
                       if (onPreviewDoc) onPreviewDoc(row.raw);
@@ -428,6 +432,8 @@ export function SuggestedFilesTable({
                     onContextMenu={(e) => {
                       if (onContextMenu) onContextMenu(e, row.raw);
                     }}
+                    onKeyDown={onKeyActivate(() => onPreviewDoc && onPreviewDoc(row.raw))}
+                    aria-label={row.raw.title}
                     className={`group rounded-2xl border transition-all cursor-pointer flex flex-col overflow-hidden select-none ${
                       isSelected
                         ? "bg-[#c2e7ff]/40 border-[#0b57d0] shadow-md font-semibold ring-1 ring-[#0b57d0]"
@@ -435,7 +441,17 @@ export function SuggestedFilesTable({
                     }`}
                   >
                     <div className="relative">
-                      {renderGridThumbnail(row)}
+                      {renderGridPreview(row)}
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onSelectDoc(row.raw, true)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Select ${row.title}`}
+                        className={`absolute top-2 left-2 w-4 h-4 rounded accent-[#0b57d0] cursor-pointer bg-white/90 transition-opacity ${
+                          isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}
+                      />
                       <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-md rounded-full p-1 shadow-xs border border-[#e1e3e1]">
                         <button
                           onClick={(e) => {

@@ -178,9 +178,9 @@ async def _fetch_attached_documents_results(
 
         chunk_sql = text("""
             SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path
-            FROM chunks c
-            JOIN documents d ON c.document_id = d.id
-            LEFT JOIN document_versions v ON v.id = d.current_version_id
+            FROM doc_dg_chunks c
+            JOIN doc_dg_documents d ON c.document_id = d.id
+            LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id
             WHERE d.id = :doc_id AND d.tenant_id = :tenant_id AND d.is_trashed = false
             ORDER BY c.page_number ASC, c.chunk_index ASC
             LIMIT 10
@@ -342,7 +342,9 @@ async def send_chat_message(
                 "CRITICAL RULE: Answer the user's question accurately using ONLY the listed document excerpts below.\n"
                 "- Do NOT invent details outside these listed documents.\n"
                 "- Clearly reference document names, pages, scores, or metadata where relevant.\n"
-                "- Organize your answer with clear headers, bold text, or bullet points."
+                "- Organize your answer with clear headers, bold text, or bullet points.\n"
+                "- Respond in the language of the user's CURRENT message below, even if earlier turns in "
+                "this conversation were in a different language — do not carry a prior turn's language forward."
             )
 
             context_block = "\n\n---\n\n".join(excerpts)

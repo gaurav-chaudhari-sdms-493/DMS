@@ -7,9 +7,13 @@ import { api } from "@/lib/api";
 import { storeTokens } from "@/lib/auth";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
+import BackendUrlConfig from "@/components/BackendUrlConfig";
+import { useI18n } from "@/lib/i18n";
+import { LanguageSwitcher } from "@/components/common/LanguageSwitcher";
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -35,11 +39,14 @@ export default function LoginPage() {
   return (
     <div className="flex items-center justify-center min-h-[calc(100vh-8rem)]">
       <div className="w-full max-w-md animate-fadeIn">
+        <div className="flex justify-end mb-2">
+          <LanguageSwitcher />
+        </div>
         <div className="text-center mb-8">
-          <div className="bg-[#1e1e24] px-5 py-3 rounded-2xl mx-auto mb-4 shadow-[0_0_30px_rgba(253,82,0,0.3)] border border-primary/30 inline-flex items-center justify-center">
-            <img src="/stark-logo-white.avif" alt="Stark Logo" className="h-9 w-auto object-contain" />
+          <div className="flex justify-center mx-auto mb-6">
+            <img src="/stark-drive.svg" alt="Stark Drive Logo" className="h-20 md:h-24 lg:h-28 w-auto object-contain drop-shadow-md" />
           </div>
-          <h1 className="text-2xl font-bold text-textMain">Welcome Back</h1>
+          <h1 className="text-2xl font-bold text-textMain">{t("auth.login.title", "Sign in")}</h1>
           <p className="text-textMuted mt-2">Sign in to your DocSearch AI account</p>
         </div>
 
@@ -59,7 +66,8 @@ export default function LoginPage() {
               <input
                 type="email"
                 required
-                placeholder="Email Address"
+                aria-label={t("auth.login.email_label", "Email")}
+                placeholder={t("auth.login.email_label", "Email")}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full h-12 pl-10 pr-4 bg-surface/50 border border-borderDark rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all peer"
@@ -73,7 +81,8 @@ export default function LoginPage() {
               <input
                 type={showPassword ? "text" : "password"}
                 required
-                placeholder="Password"
+                aria-label={t("auth.login.password_label", "Password")}
+                placeholder={t("auth.login.password_label", "Password")}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full h-12 pl-10 pr-12 bg-surface/50 border border-borderDark rounded-lg text-textMain placeholder-textMuted focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-all peer"
@@ -95,23 +104,27 @@ export default function LoginPage() {
                 Remember me
               </label>
               <Link href="/forgot-password" className="text-sm font-medium text-primary hover:text-indigo-400 transition-colors">
-                Forgot password?
+                {t("auth.login.forgot_password", "Forgot password?")}
               </Link>
             </div>
 
             <Button type="submit" size="lg" className="w-full mt-4" loading={loading}>
-              Sign In
+              {t("auth.login.submit", "Sign in")}
             </Button>
 
             <div className="text-center mt-4 text-sm text-textMuted">
-              Don't have an account?{" "}
+              {t("auth.login.no_account", "Don't have an account?")}{" "}
               <Link href="/signup" className="font-semibold text-primary hover:underline transition-all">
-                Sign Up
+                {t("auth.login.signup_link", "Sign up")}
               </Link>
             </div>
 
           </form>
         </Card>
+
+        <div className="mt-6">
+          <BackendUrlConfig compact />
+        </div>
       </div>
     </div>
   );

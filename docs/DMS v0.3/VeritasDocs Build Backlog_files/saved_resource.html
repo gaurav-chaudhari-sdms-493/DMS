@@ -1,0 +1,845 @@
+<!DOCTYPE html>
+<!-- saved from url=(0133)https://7789e35f-bec7-46db-b1ee-23849ce5e8ef.frame.claudeusercontent.com/_f/1786966508-db4c/?__frame_v=manifest.7ad9d6101669efe9.json -->
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8"><!-- frame-runtime --><!--<base href="/_f/1786966508-db4c/">--><base href="."><script>window.__FRAME_PREAMBLE={"capabilities":{"artifact":"artifact.BWD0CGLd.js","assets":"assets.a_mJ8q_Q.js","comments":"comments.DGBrvfFR.js","db":"db.VpIrzqr_.js","downloads":"downloads.BXsoAvg9.js","mcp":"mcp.D3B2EyQu.js","permissions":"permissions.BNySkLV5.js","room":"room.BgXZkiYR.js","sample":"sample.kXGC3wc0.js","self":"artifact.BWD0CGLd.js","user":"user.CGub7vEP.js"},"transforms":"_transforms.BI3gXbbT.js","comments":"_comments.hMHmCz0l.js","translate":"_translate.3AdCy0Ua.js"}</script><script>(function(){"use strict";var ce=["light","dark","system"],ue=/^[A-Za-z0-9_-]{1,64}$/,V=/^[a-zA-Z_:][a-zA-Z0-9_:.-]{0,127}$/,fe=new Set(["class","hidden","value","checked"]);function de(e){const t=e.toLowerCase();return t.startsWith("data-")||t.startsWith("aria-")||fe.has(t)}var pe="http://www.w3.org/1999/xhtml",me="http://www.w3.org/2000/svg",ge=new Set(["script","style","iframe","noscript","noframes","noembed","xmp","plaintext","template","title","textarea","object","embed"]),_e=new Set(["script","style"]);function ve(e){const t=e.localName.toLowerCase();return e.namespaceURI===pe?!ge.has(t):e.namespaceURI===me?!_e.has(t):!1}function he(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_patch;if(t===null||typeof t!="object")return!1;const{seq:n,elements:a}=t;if(typeof n!="number"||!Number.isSafeInteger(n)||!Array.isArray(a)||a.length===0||a.length>64)return!1;for(const i of a){if(i===null||typeof i!="object")return!1;const r=i;if(typeof r.target!="string"||!ue.test(r.target)||r.text!==void 0&&typeof r.text!="string")return!1;if(r.attrsSet!==void 0){if(r.attrsSet===null||typeof r.attrsSet!="object")return!1;for(const[l,c]of Object.entries(r.attrsSet))if(!V.test(l)||typeof c!="string")return!1}if(r.attrsRemoved!==void 0){if(!Array.isArray(r.attrsRemoved))return!1;for(const l of r.attrsRemoved)if(typeof l!="string"||!V.test(l))return!1}}return!0}function ye(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_init;return t!==null&&typeof t=="object"}function be(e){return e!==null&&typeof e=="object"&&e.__frame_size_poke===!0}function Ee(e){if(e===null||typeof e!="object")return!1;const t=e.__frame_theme;if(t===null||typeof t!="object")return!1;const n=t.theme;return typeof n=="string"&&ce.includes(n)}function we(e){try{typeof reportError=="function"?reportError(e):setTimeout(()=>{throw e},0)}catch{}}var X=["#62744c","#b04e72","#5b7596","#a3651f","#7a6ba8","#3f7a75"],J=e=>{let t=0;for(let n=0;n<e.length;n++)t=t*31+e.charCodeAt(n)>>>0;return X[t%X.length]??"#788c5d"},Z="#c7c9d1",Ae=["data:image","/svg+xml,"].join(""),Q=e=>Ae+"%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 2 2'%3E%3Ccircle cx='1' cy='1' r='1' fill='"+encodeURIComponent(e)+"'/%3E%3C/svg%3E",Se=Object.freeze({id:null,name:"",avatarUrl:Q(Z),color:Z,email:null,isOwner:!1,canEdit:!1}),je=(...e)=>{const t=e[0],n=typeof t=="string"?[t]:Array.isArray(t)?t.filter(i=>typeof i=="string"):[],a=Object.create(null);for(const i of n)a[i]={id:i,name:"",avatarUrl:Q(J(i)),color:J(i),email:null,isMe:!1};return a},ee=Object.freeze(Object.assign(Object.create(null),{user:Object.freeze(Object.assign(Object.create(null),{id:null,isOwner:!1,canEdit:!1,me:Se,profiles:je,name:"",avatarUrl:null,search:Object.freeze([]),email:null}))})),Re={sample:"sample"};function te(){const e=new Uint8Array(20);try{crypto.getRandomValues(e)}catch{for(let n=0;n<e.length;n++)e[n]=Math.floor(Math.random()*256)}let t="";for(const n of e)t+=(n%36).toString(36);return t}function Oe(e,t){const n=r=>{const l={path:r},c=r.split("/");return{id:c[c.length-1],path:r,get:()=>t("get",[l]),set:d=>t("set",[l,d]),update:d=>t("update",[l,d]),delete:()=>t("delete",[l]),acquire:d=>t("acquire",[l,d]),onSnapshot:(d,E)=>t("subscribe",[l,d,E]),collection:d=>i(r+"/"+String(d))}},a=r=>({where:(l,c,d)=>a({...r,where:[...r.where??[],{f:String(l),op:String(c),v:d}]}),orderBy:(l,c)=>a({...r,orderBy:{f:String(l),dir:c===void 0?"asc":String(c)}}),limit:l=>a({...r,limit:Number(l)}),get:()=>t("query",[r]),onSnapshot:(l,c)=>t("subscribe",[r,l,c])}),i=r=>({...a({collection:r}),path:r,doc:l=>n(r+"/"+(l===void 0?te():String(l))),add:l=>{const c=n(r+"/"+te());return Promise.resolve(c.set(l)).then(()=>c)}});e.doc=r=>n(String(r)),e.collection=r=>i(String(r))}var Pe=Object.freeze([]);function Te(e,t){let n=null,a=null;const i=()=>e.__settled;e.peers=()=>Pe,e.connected=()=>!1,e.emit=()=>i()?.()??Promise.resolve(),e.presence=r=>{const l=i();if(l)return l();let c=null;if(r!==null&&typeof r=="object")try{Array.isArray(r)||(c={...r})}catch{}return c===null?Promise.reject({code:"invalid_argument",message:"presence takes an object"}):(n===null&&(n=Object.create(null),a=Promise.resolve(t("presence",[n]))),Object.assign(n,c),a)}}var B="__frame_scroll",Me=150,Le=310,ke=160,Ce=3e4;function Ne(){let e=0,t=!1,n=!1,a=!1,i=0,r=null;const l=u=>{try{sessionStorage.setItem(B,JSON.stringify({y:u}))}catch{}},c=()=>{if(clearTimeout(e),r===null)return;const u=r;r=null,l(u)},d=()=>{if(t){t=!1;return}n=!0,r=scrollY,clearTimeout(e),e=setTimeout(c,Me)};try{addEventListener("scroll",d,{passive:!0}),addEventListener("pagehide",c)}catch{}const E=()=>{let u;try{u=sessionStorage.getItem(B)}catch{return null}if(u===null)return null;let g;try{g=JSON.parse(u)}catch{g=null}const f=g?.y;if(!(typeof f=="number"&&Number.isFinite(f)&&f>=0)){try{sessionStorage.removeItem(B)}catch{}return null}return f};let T=!1;const h=u=>{try{const g=scrollY;scrollTo({top:u,left:0,behavior:"instant"}),i=u,a=!0,clearTimeout(e),r=null,l(u);const f=scrollY;f!==g&&(t=!0),f!==u&&!T&&(T=!0,addEventListener("load",()=>{try{if(scrollY===f){const p=E();h(p!==null?p:i)}}catch{}},{once:!0}))}catch{}},R=()=>{try{return!!location.hash}catch{return!0}};let A=!1;const O=()=>{try{if(A||innerWidth>Le||innerHeight>ke)return;A=!0;const u=Date.now(),g=()=>{try{removeEventListener("resize",g)}catch{}if(Date.now()-u>Ce||n||R())return;const f=E();h(f!==null?f:i)};addEventListener("resize",g)}catch{}};let M=!1,o=!1;return{restore(){if(M||(M=!0,R()))return;const u=E();u!==null&&(h(u),O())},promoted(){if(o||(o=!0,R()))return;const u=E();u!==null?(h(u),O()):a&&h(i)}}}var Ye="modulepreload",We=function(e){return"/"+e},Ke={},Ue=function(t,n,a){let i=Promise.resolve();function r(l){const c=new Event("vite:preloadError",{cancelable:!0});if(c.payload=l,window.dispatchEvent(c),!c.defaultPrevented)throw l}return i.then(l=>{for(const c of l||[])c.status==="rejected"&&r(c.reason);return t().catch(r)})};(function(){const e=Object.defineProperty,t=globalThis,n=["RTCPeerConnection","webkitRTCPeerConnection","RTCDataChannel","RTCIceCandidate","RTCSessionDescription","RTCRtpSender","RTCRtpReceiver"];let a=0;for(let i=0;i<n.length;i++){const r=n[i];try{e(t,r,{value:void 0,writable:!1,configurable:!1})}catch{try{delete t[r]}catch{}try{e(t,r,{value:void 0,writable:!1,configurable:!0})}catch{}}typeof t[r]=="function"&&a++}if(a&&window!==top)try{parent.postMessage({__frame_rtc_lockdown_failed:a},"*")}catch{}})();var qe=1e4,Ie=Object.freeze([...window.__FRAME_PREAMBLE?.origins??["https://claude.ai","https://preview.claude.ai"]]);function re(e){for(const t of Ie)if(t.endsWith(":*"))try{const n=new URL(e);if(`${n.protocol}//${n.hostname}:*`===t)return!0}catch{}else if(e===t)return!0;return!1}var k=Object.freeze({...window.__FRAME_PREAMBLE?.capabilities}),x=window.__FRAME_PREAMBLE?.transforms,$=window.__FRAME_PREAMBLE?.comments,z=window.__FRAME_PREAMBLE?.translate,q=/^[\w.-]+\.js$/,De=/^[a-z][a-z0-9_-]{0,63}$/,I=e=>Ue(()=>import("/_runtime/"+e),void 0);function Be(e,t){return{contract:e.contract,changes:new Set(e.changes??[]),flags:new Set(e.flags??[]),capabilities:e.capabilities??{},capBudgets:e.capBudgets??{},transforms:new Map,shellOrigin:t,mount:Y,pipe:()=>({wrap:(n,a)=>(...i)=>{try{return a(...i)}catch(r){return Promise.reject(r)}}})}}var ne=null,C=null;function F(e,t,n){try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!1,enumerable:!0})}catch{try{Object.defineProperty(e,t,{value:n,writable:!1,configurable:!0,enumerable:!0})}catch{}}}var H=!1;function xe(e,t){const n=[];for(const a of e.elements){const i=document.querySelector(`[data-id="${a.target}"]`);if(!i){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if([...Object.keys(a.attrsSet??{}),...a.attrsRemoved??[]].some(r=>!de(r))){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}if(a.text!==void 0&&!ve(i)){parent.postMessage({__frame_patch_miss:{seq:e.seq}},t);return}for(const[r,l]of Object.entries(a.attrsSet??{}))if(!oe(i,r)){try{i.setAttribute(r,l)}catch{}se(i,r,l)}for(const r of a.attrsRemoved??[])oe(i,r)||(i.removeAttribute(r),se(i,r,null));typeof a.text=="string"&&(i.textContent=a.text),n.push(a.target)}try{document.dispatchEvent(new CustomEvent("claude:edit",{detail:{seq:e.seq,targets:n}}))}catch{}}function se(e,t,n){if(!(e instanceof HTMLInputElement))return;const a=t.toLowerCase();a==="checked"?e.checked=n!==null:a==="value"&&e.type!=="file"&&(e.value=n??"")}function oe(e,t){const n=t.toLowerCase(),a=e;return n==="data-id"||(n==="value"||n==="checked")&&(a.__artifactSecret===!0||/^(password|hidden|file)$/.test(a.type??"")||/(^|\s)(cc-|one-time-code|current-password|new-password)/i.test(`${e.getAttribute("autocomplete")??""} ${a.autocomplete??""}`))}function ae(e){const t=document.documentElement;e==="light"||e==="dark"?(t.dataset.theme=e,t.style.colorScheme=e,H=!0):H&&(delete t.dataset.theme,t.style.colorScheme="",H=!1)}var ie=256,N=Object.assign(Object.create(null),{mcp:Object.assign(Object.create(null),{watchTool:{handlerArg:3}}),db:Object.assign(Object.create(null),{subscribe:{handlerArg:1,errArg:2}}),room:Object.assign(Object.create(null),{on:{handlerArg:1,errArg:2},onPeers:{handlerArg:0,errArg:1},onConnection:{handlerArg:0,errArg:1}})}),$e=Object.assign(Object.create(null),{db:(e,t)=>Oe(e,t),room:(e,t,n)=>Te(e,n)}),j=new Map;function Y(e,t){const n=j.get(e);if(!n)return;const a=Object.assign(Object.create(null),t);Object.assign(n.impl,a),n.r(n.ns),n.impl.__settled=()=>Promise.reject({code:"capability_removed",message:`${e}: method not in this runtime`});const i=n.queue;n.queue=[];for(const r of i){const l=a[r.method];if(l)if(N[e]?.[r.method])try{r.resolve(l(...r.args))}catch{U(r,N[e][r.method],{code:"transform_error",message:`${e}.${r.method} rejected its arguments`})}else l(...r.args).then(r.resolve,r.reject);else{const c={code:"capability_removed",message:`${e}.${r.method} is not in this runtime`},d=N[e]?.[r.method];if(d){U(r,d,c);continue}r.reject(c)}}}function ze(e,t){const n=j.get(e);if(!n)return;n.impl.__settled=()=>Promise.reject(t),n.r(null);const a=n.queue;n.queue=[];for(const i of a){const r=N[e]?.[i.method];if(r){U(i,r,t);continue}i.reject(t)}}function le(e,t){if(typeof e=="function")try{return e(...t)}catch{return Object.create(null)}return Array.isArray(e)?[...e]:e!==null&&typeof e=="object"?{...e}:e}function D(e,t){const n=ee[e];if(!n){ze(e,t);return}j.get(e)?.r(null),Y(e,Object.fromEntries(Object.entries(n).map(([a,i])=>[a,(...r)=>Promise.resolve(le(i,r))])))}function U(e,t,n){if(e.syncState?.dead)return;const a=t.errArg===void 0?void 0:e.args[t.errArg],i=t.errArg===void 0?e.args[t.handlerArg]:a;typeof i=="function"&&queueMicrotask(()=>{if(!e.syncState?.dead)try{i(t.errArg===void 0?{type:"error",error:n}:n)}catch(r){we(r)}})}var W=Object.getOwnPropertyDescriptor(window,"claude");if(window!==top&&!(W&&W.writable===!1)){const e=x&&q.test(x)?I(x).catch(()=>{}):Promise.resolve(void 0),t=o=>{if(o.type==="auxclick"&&o.button!==1)return;const u=o.target,g=u&&u.closest?u.closest("a[href],area[href]"):null;if(!g)return;const f=g.getAttribute("href");if(!f)return;let p,P;try{p=new URL(f,document.baseURI),P=new URL(document.baseURI).origin}catch{return}if((p.protocol==="http:"||p.protocol==="https:")&&p.origin!==P){o.preventDefault();const w=(g.getAttribute("target")??"").toLowerCase(),y=o.type==="auxclick"||o.metaKey||o.ctrlKey||o.shiftKey||o.altKey||!["","_self","_top","_parent"].includes(w);parent.postMessage({__frame_nav:!0,url:p.href,newTab:y},"*")}};addEventListener("click",t,!0),addEventListener("auxclick",t,!0);const n={},a=o=>{o.isTrusted&&(n.pointer=!0)},i=o=>{o.isTrusted&&(n.click=!0)};addEventListener("pointermove",a,{capture:!0,passive:!0}),addEventListener("click",i,{capture:!0,passive:!0}),e.then(o=>{o?.wireNav&&(o.wireNav(),removeEventListener("click",t,!0),removeEventListener("auxclick",t,!0),removeEventListener("pointermove",a,!0),removeEventListener("click",i,!0),o.wireEngagement?.(n))});let r=null;try{r=Ne()}catch{}const l=W?.value??{};F(window,"claude",l);const c=o=>{let u;const g=new Promise(v=>{u=v}),f={impl:Object.create(null),queue:[],u:g,r:u,ns:null};j.set(o,f);const p=f.impl,P=v=>({code:"queue_overflow",message:`${o}.${v}: pre-init call queue is full`}),w=(v,s)=>{if(f.queue.length>=ie){const m=ee[o];return m&&v in m?Promise.resolve(le(m[v],s)):Promise.reject(P(v))}return new Promise((m,_)=>{f.queue.push({method:v,args:s,resolve:m,reject:_})})},y=Re[o],L=new Proxy(y===void 0?p:(()=>{}),{apply:(v,s,m)=>{const _=y,b=p[_]??p.__settled;return b?b(...m):w(_,m)},get:(v,s)=>{if(typeof s!="string"||s==="then"||s==="toJSON"||s==="valueOf")return;if(s==="toString")return Object.prototype.toString;if(y!==void 0&&(s==="call"||s==="apply"||s==="bind"))return Function.prototype[s];const m=N[o]?.[s];return m?(..._)=>{if(typeof _[m.handlerArg]!="function")throw new TypeError(`${o}.${s} requires a handler function`);const b=p[s];if(b)return b(..._);if(p.__settled){const S={dead:!1},Fe={args:[..._],syncState:S};return p.__settled().catch(He=>U(Fe,m,He)),()=>{S.dead=!0}}if(f.queue.length>=ie){const S={dead:!1};return U({args:[..._],syncState:S},m,P(s)),()=>{S.dead=!0}}let K=null;const G={dead:!1};return f.queue.push({method:s,args:_,resolve:S=>{K=typeof S=="function"?S:null,G.dead&&K?.()},reject:()=>{},syncState:G}),()=>{G.dead=!0,K?.()}}:(..._)=>{const b=p[s]??p.__settled;return b?b(..._):w(s,_)}},set:()=>!1});$e[o]?.(p,(v,s)=>L[v](...s),w),f.ns=L,F(l,o,L)};for(const o of Object.keys(k)){if(l[o]!==void 0){F(l,o,l[o]);continue}c(o)}if(l.use===void 0){const o=u=>{if(typeof u!="string"||!Object.hasOwn(k,u))return Promise.resolve(null);const g=j.get(u);return g?g.u:Promise.resolve(l[u]??null)};try{Object.defineProperty(l,"use",{value:o,writable:!0,configurable:!0,enumerable:!1})}catch{}}let d=null,E=null,T=0;const h=o=>{o.source!==parent||!re(o.origin)||ye(o.data)&&(d=o.data.__frame_init,C=o.origin,removeEventListener("message",h),clearTimeout(T),E?.())};addEventListener("message",h),parent.postMessage({__frame_connect:!0},"*");const R=new Promise(o=>{E=o,T=setTimeout(()=>{removeEventListener("message",h),o()},qe)}),A=document.readyState==="loading"?new Promise(o=>document.addEventListener("DOMContentLoaded",()=>o(),{once:!0})):Promise.resolve();A.then(()=>{try{r?.restore()}catch{}});const O={cb:null},M=o=>{if(!(o.source!==parent||!re(o.origin))&&be(o.data)){try{r?.promoted()}catch{}O.cb?.()}};addEventListener("message",M),R.then(async()=>{if(!d||!C){for(const s of j.keys())D(s,{code:"not_granted",message:"frame initialization did not arrive - capability unavailable"});return}ae(d.theme);const o=C;let u=!1,g=!1;addEventListener("message",s=>{if(s.source!==parent||s.origin!==o)return;Ee(s.data)&&ae(s.data.__frame_theme.theme),he(s.data)&&xe(s.data.__frame_patch,o);const m=s.data?.__fc_mode;m&&typeof m=="object"&&!u&&$&&q.test($)&&(u=!0,I($).then(b=>b.install?.(o,m.on===!0)).catch(()=>{}));const _=s.data?.__ft_cmd;_&&typeof _=="object"&&!g&&z&&q.test(z)&&(g=!0,I(z).then(b=>b.install?.(o,_)).catch(()=>{}))});const f=Object.keys(d.capabilities??{});for(const s of f)Object.hasOwn(k,s)||De.test(s)&&l[s]===void 0&&(c(s),D(s,{code:"capability_disabled",message:"capability not in this runtime generation"}));const p=f.filter(s=>Object.hasOwn(k,s)).map(s=>[s,k[s]]).filter(s=>typeof s[1]=="string"&&q.test(s[1])),P=await Promise.allSettled(p.map(([,s])=>I(s))),w=await e,y=C;w?.buildBoot||parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:"_transforms"}},y),ne=w?.buildBoot?w.buildBoot(d,w.TRANSFORMS??{},{shellOrigin:y,mount:Y},s=>parent.postMessage({__frame_cap_telemetry:s},y)):Be(d,y);const L=s=>parent.postMessage({__frame_cap_telemetry:{kind:"cap-load-error",cap:s}},y),v=ne;P.forEach((s,m)=>{const _=p[m][0];if(s.status!=="fulfilled"){L(_);return}try{s.value?.install?.(v)}catch{L(_)}});for(const[s,m]of j)if(m.impl.__settled===void 0){if(f.includes(s)){D(s,{code:"capability_disabled",message:"capability not available in this session"});continue}D(s,{code:"not_granted",message:"capability not available in this session"})}await A,parent.postMessage({__frame_ready:!0},C),e.then(s=>s?.installSizeReporter?.(y,O))})}})();</script><!-- /frame-runtime --><meta name="viewport" content="width=device-width,initial-scale=1"><style>:root{color-scheme:light}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}</style></head><body>
+<title>VeritasDocs Build Backlog</title>
+<style>
+  :root {
+    --ground: #fbfbfc;
+    --surface: #ffffff;
+    --surface-2: #f3f4f7;
+    --ink: #16181f;
+    --muted: #5c6273;
+    --hairline: #dde0e8;
+    --accent: #2a4b8d;
+    --accent-soft: #eaeff8;
+    --crit: #a02a30;
+    --crit-soft: #f8ecec;
+    --warn: #8a6412;
+    --warn-soft: #f9f2e4;
+    --ok: #2c6a4a;
+    --ok-soft: #eaf3ee;
+
+    --display: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+    --body: ui-sans-serif, system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+
+    --measure: 74ch;
+    --page: 66rem;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1116;
+      --surface: #161922;
+      --surface-2: #1c2029;
+      --ink: #e6e8ee;
+      --muted: #99a0b2;
+      --hairline: #272c39;
+      --accent: #8fb2ea;
+      --accent-soft: #1a2434;
+      --crit: #e58a91;
+      --crit-soft: #2c1a1d;
+      --warn: #d9a848;
+      --warn-soft: #2a2317;
+      --ok: #74c298;
+      --ok-soft: #16261f;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --ground: #0f1116;
+    --surface: #161922;
+    --surface-2: #1c2029;
+    --ink: #e6e8ee;
+    --muted: #99a0b2;
+    --hairline: #272c39;
+    --accent: #8fb2ea;
+    --accent-soft: #1a2434;
+    --crit: #e58a91;
+    --crit-soft: #2c1a1d;
+    --warn: #d9a848;
+    --warn-soft: #2a2317;
+    --ok: #74c298;
+    --ok-soft: #16261f;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--ground);
+    color: var(--ink);
+    font-family: var(--body);
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: var(--page); margin: 0 auto; padding: 0 1.5rem 6rem; }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    border-bottom: 2px solid var(--ink);
+    padding: 3.5rem 0 1.25rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin: 0;
+  }
+
+  h1 {
+    font-family: var(--display);
+    font-weight: 600;
+    font-size: clamp(2.1rem, 5.5vw, 3rem);
+    line-height: 1.08;
+    letter-spacing: -0.015em;
+    text-wrap: balance;
+    margin: 0;
+  }
+
+  .standfirst {
+    font-family: var(--display);
+    font-size: clamp(1.02rem, 2.2vw, 1.2rem);
+    line-height: 1.5;
+    color: var(--muted);
+    max-width: var(--measure);
+    margin: 0;
+  }
+
+  .filing {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    gap: 0.75rem 1.5rem;
+    border-top: 1px solid var(--hairline);
+    padding-top: 1rem;
+  }
+
+  .filing div { display: flex; flex-direction: column; gap: 0.15rem; }
+  .filing .k {
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .filing .v { font-size: 0.85rem; font-variant-numeric: tabular-nums; }
+
+  /* ---------- generic section ---------- */
+
+  section { padding-top: 3rem; }
+
+  h2 {
+    font-family: var(--display);
+    font-size: 1.55rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
+    margin: 0 0 0.35rem;
+  }
+
+  .lede { max-width: var(--measure); color: var(--muted); margin: 0 0 1.4rem; }
+  p { max-width: var(--measure); }
+
+  /* ---------- key / how to read ---------- */
+
+  .key {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 1px;
+    background: var(--hairline);
+    border: 1px solid var(--hairline);
+    margin-top: 1.2rem;
+  }
+
+  .key div { background: var(--surface); padding: 0.95rem 1.1rem; }
+  .key .kh {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 0.25rem;
+  }
+  .key p { margin: 0; font-size: 0.86rem; color: var(--muted); max-width: none; }
+
+  /* ---------- module block ---------- */
+
+  .module {
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    margin-top: 2.25rem;
+  }
+
+  .module-head {
+    display: flex;
+    align-items: flex-start;
+    gap: 1rem;
+    padding: 1.15rem 1.25rem 1rem;
+    border-bottom: 1px solid var(--hairline);
+    border-left: 4px solid var(--hairline);
+    flex-wrap: wrap;
+  }
+
+  .module.lv-none .module-head { border-left-color: var(--crit); }
+  .module.lv-early .module-head { border-left-color: var(--warn); }
+  .module.lv-part .module-head { border-left-color: var(--ok); }
+  .module.lv-found .module-head { border-left-color: var(--accent); }
+
+  .module-head .chip {
+    font-family: var(--mono);
+    font-size: 1.05rem;
+    font-weight: 700;
+    color: var(--accent);
+    line-height: 1.3;
+    min-width: 2.2rem;
+  }
+
+  .module-head .titles { flex: 1 1 16rem; }
+
+  .module-head h3 {
+    font-family: var(--display);
+    font-size: 1.35rem;
+    font-weight: 600;
+    margin: 0 0 0.15rem;
+    text-wrap: balance;
+  }
+
+  .module-head .sub {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  .module-head .state {
+    font-family: var(--mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 0.25rem 0.55rem;
+    border-radius: 2px;
+    white-space: nowrap;
+    align-self: center;
+  }
+
+  .lv-none .state { background: var(--crit-soft); color: var(--crit); }
+  .lv-early .state { background: var(--warn-soft); color: var(--warn); }
+  .lv-part .state { background: var(--ok-soft); color: var(--ok); }
+  .lv-found .state { background: var(--accent-soft); color: var(--accent); }
+
+  .module-body { padding: 1rem 1.25rem 1.25rem; }
+  .module-body > p { margin: 0 0 0.9rem; font-size: 0.9rem; }
+  .module-body > p.built { color: var(--muted); }
+  .module-body > p:last-child { margin-bottom: 0; }
+
+  .callout {
+    border-left: 3px solid var(--accent);
+    background: var(--surface-2);
+    padding: 0.7rem 0.95rem;
+    font-size: 0.86rem;
+    margin-top: 1rem;
+  }
+
+  .callout.warn { border-left-color: var(--crit); }
+  .callout p { margin: 0; max-width: none; }
+  .callout strong { color: var(--ink); }
+
+  /* ---------- tables ---------- */
+
+  .scroll { overflow-x: auto; border: 1px solid var(--hairline); }
+
+  table {
+    border-collapse: collapse;
+    width: 100%;
+    min-width: 42rem;
+    background: var(--surface);
+    font-size: 0.86rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 0.58rem 0.8rem;
+    border-bottom: 1px solid var(--hairline);
+    vertical-align: top;
+  }
+
+  th {
+    font-size: 0.64rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 700;
+    background: var(--surface-2);
+    white-space: nowrap;
+  }
+
+  tbody tr:last-child td { border-bottom: 0; }
+
+  td.id {
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--accent);
+    white-space: nowrap;
+  }
+
+  td.dep {
+    font-family: var(--mono);
+    font-size: 0.74rem;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .size, .wave {
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 0.1rem 0.4rem;
+    border-radius: 2px;
+    white-space: nowrap;
+  }
+
+  .size.s { background: var(--ok-soft); color: var(--ok); }
+  .size.m { background: var(--warn-soft); color: var(--warn); }
+  .size.l { background: var(--crit-soft); color: var(--crit); }
+  .wave { background: var(--surface-2); color: var(--muted); }
+
+  code {
+    font-family: var(--mono);
+    font-size: 0.82em;
+    background: var(--surface-2);
+    padding: 0.06em 0.32em;
+    border-radius: 2px;
+    word-break: break-word;
+  }
+
+  .module-body code { background: var(--surface-2); }
+
+  /* ---------- start here ---------- */
+
+  .start {
+    border: 1px solid var(--hairline);
+    border-left: 3px solid var(--accent);
+    background: var(--surface);
+    margin-top: 1.3rem;
+  }
+
+  .start-item {
+    display: grid;
+    grid-template-columns: 2rem 1fr;
+    gap: 0.9rem;
+    padding: 0.9rem 1.15rem;
+    border-bottom: 1px solid var(--hairline);
+  }
+
+  .start-item:last-child { border-bottom: 0; }
+
+  .start-item .rank {
+    font-family: var(--display);
+    font-size: 1.45rem;
+    line-height: 1;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .start-item .what { font-weight: 600; font-size: 0.94rem; display: block; margin-bottom: 0.12rem; }
+  .start-item .why { font-size: 0.86rem; color: var(--muted); }
+
+  .note {
+    background: var(--surface-2);
+    border: 1px solid var(--hairline);
+    padding: 1rem 1.15rem;
+    font-size: 0.87rem;
+    color: var(--muted);
+  }
+
+  .note p { margin: 0 0 0.55rem; max-width: none; }
+  .note p:last-child { margin-bottom: 0; }
+  .note strong { color: var(--ink); }
+
+  footer {
+    margin-top: 4rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid var(--hairline);
+    font-family: var(--mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+  }
+
+  a { color: var(--accent); }
+  a:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+</style>
+
+<div class="wrap">
+
+  <header class="masthead">
+    <p class="eyebrow">Derived from SoW VeritasDocs v1 · v0.3 · CR-001</p>
+    <h1>VeritasDocs v1 build backlog</h1>
+    <p class="standfirst">Every task needed to close the gap between the Scope of Work and the code, grouped by module. Nine decisions gate the work and belong to people rather than to a sprint.</p>
+    <div class="filing">
+      <div><span class="k">Code baseline</span><span class="v">branch <code>dev</code> @ <code>5d8e1cb</code></span></div>
+      <div><span class="k">Tasks</span><span class="v">71 across 11 modules</span></div>
+      <div><span class="k">Decisions pending</span><span class="v">9</span></div>
+      <div><span class="k">Prepared</span><span class="v">17-Aug-2026</span></div>
+    </div>
+  </header>
+
+  <section>
+    <h2>How to read a row</h2>
+    <div class="key">
+      <div>
+        <span class="kh">Size</span>
+        <p>Rough judgement for one developer — <span class="size s">S</span> days, <span class="size m">M</span> one to two weeks, <span class="size l">L</span> three weeks or more. Not an estimate; the SoW sets dates after estimation against the FSDs.</p>
+      </div>
+      <div>
+        <span class="kh">Wave</span>
+        <p>When it can start, based on what it depends on — <span class="wave">W0</span> first through <span class="wave">W5</span> last. Modules run in parallel, so the wave is what keeps order straight across them.</p>
+      </div>
+      <div>
+        <span class="kh">Depends</span>
+        <p>Must land first. <code>A1</code>–<code>A8</code> are SoW assumptions, all externally owned and none resolved. <code>D-1</code>–<code>D-9</code> are the decisions listed at the end.</p>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Modules</h2>
+    <p class="lede">Eleven groups: the cross-cutting foundations, then the ten SoW modules (a) through (j).</p>
+
+    <!-- 0 Foundations -->
+    <div class="module lv-found">
+      <div class="module-head">
+        <span class="chip">0</span>
+        <span class="titles">
+          <h3>Foundations &amp; engineering standards</h3>
+          <span class="sub">§6 · D2 · 11 tasks</span>
+        </span>
+        <span class="state">Do first</span>
+      </div>
+      <div class="module-body">
+        <p>One migration today. After ingestion at volume, each of these becomes a migration plus a backfill plus a re-extraction of everything already processed.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T01</td><td>Rename all tables, FKs and indexes to the <code>{module}_dg_*</code> standard. Covers raw SQL in <code>search_service.py</code>, <code>chat_service.py</code> and the RLS policies</td><td><span class="size m">M</span></td><td><span class="wave">W0</span></td><td class="dep">T09</td></tr>
+              <tr><td class="id">T02</td><td>Create <code>sys_dg_config</code> plus a typed, cached accessor with documented defaults</td><td><span class="size s">S</span></td><td><span class="wave">W0</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T03</td><td>Move hardcoded thresholds into config — relevance 0.15, RRF k=60, chunk 512/64, embed batch, retention 30d, candidate limits</td><td><span class="size s">S</span></td><td><span class="wave">W0</span></td><td class="dep">T02</td></tr>
+              <tr><td class="id">T04</td><td><strong>Add provenance columns</strong> — page number and region coordinates on every extracted fact, non-null at write time</td><td><span class="size m">M</span></td><td><span class="wave">W0</span></td><td class="dep">T01</td></tr>
+              <tr><td class="id">T05</td><td>Stop discarding word boxes in the chunker; carry them from the extractor to the fact writer</td><td><span class="size m">M</span></td><td><span class="wave">W0</span></td><td class="dep">T04</td></tr>
+              <tr><td class="id">T06</td><td>Define the coordinate contract in D2 — origin, units, page-size normalisation, rotation</td><td><span class="size s">S</span></td><td><span class="wave">W0</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T07</td><td>Audit events on every mutating document and folder path, plus view and download</td><td><span class="size m">M</span></td><td><span class="wave">W0</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T08</td><td>Require actor identity at the service boundary; reject anonymous mutations</td><td><span class="size s">S</span></td><td><span class="wave">W0</span></td><td class="dep">T07</td></tr>
+              <tr><td class="id">T09</td><td><strong>D2 — Technical Architecture Document.</strong> Both deployment profiles, egress-zero approach, model abstraction, Apache AGE evaluation</td><td><span class="size l">L</span></td><td><span class="wave">W0</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T95</td><td>Localisation — EN + MR, translations table, Noto Sans Devanagari, Marathi digit conversion, language switcher</td><td><span class="size l">L</span></td><td><span class="wave">W5</span></td><td class="dep">T01</td></tr>
+              <tr><td class="id">T96</td><td>Accessibility — GIGW 3.0 / WCAG 2.1 AA baseline audit plus automated CI checks</td><td><span class="size m">M</span></td><td><span class="wave">W5</span></td><td class="dep">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout">
+          <p><strong>Why first:</strong> T04 and T05 block the entire Verification Workbench and every region click-through in the product. The pipeline extracts word boxes today and throws them away.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- a -->
+    <div class="module lv-early">
+      <div class="module-head">
+        <span class="chip">(a)</span>
+        <span class="titles">
+          <h3>Ingestion &amp; Connector Framework</h3>
+          <span class="sub">§3.1 · 8 tasks</span>
+        </span>
+        <span class="state">~20% built</span>
+      </div>
+      <div class="module-body">
+        <p class="built"><strong>Built:</strong> manual upload, REST upload endpoint, SHA-256 at capture, object-storage write, Celery hand-off.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T40</td><td>Connector abstraction layer — one ingestion contract; later connectors must not require pipeline changes. Port the existing upload onto it</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">T09</td></tr>
+              <tr><td class="id">T41</td><td>Mandatory-on-ingest set for every connector: PDF/A-2b with original preserved, provenance record, idempotent retry, failure alerting</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">T40</td></tr>
+              <tr><td class="id">T42</td><td>Watched folders and FTP/SFTP poller</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">T40</td></tr>
+              <tr><td class="id">T43</td><td>Email-in via a dedicated mailbox</td><td><span class="size s">S</span></td><td><span class="wave">W1</span></td><td class="dep">T40</td></tr>
+              <tr><td class="id">T44</td><td>Scanner integration — TWAIN or network-scan folder drop</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">T40</td></tr>
+              <tr><td class="id">T45</td><td>Google Drive — OAuth with refresh and revocation, incremental sync via Changes API, source permissions as provenance, backoff, health status</td><td><span class="size l">L</span></td><td><span class="wave">W4</span></td><td class="dep">T40, A8</td></tr>
+              <tr><td class="id">T46</td><td>SharePoint — same requirement set, incremental sync via delta queries</td><td><span class="size l">L</span></td><td><span class="wave">W4</span></td><td class="dep">T40, A8</td></tr>
+              <tr><td class="id">T47</td><td>NIC e-Office connector, built to the agreed spec. <strong>Gated at M4 exit</strong> — ships as fast-follow if access is not secured, never the sole release blocker</td><td><span class="size l">L</span></td><td><span class="wave">W4</span></td><td class="dep">A7</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- b -->
+    <div class="module lv-early">
+      <div class="module-head">
+        <span class="chip">(b)</span>
+        <span class="titles">
+          <h3>Document Processing Pipeline</h3>
+          <span class="sub">§3.2 · 14 tasks · the product's core IP</span>
+        </span>
+        <span class="state">~10% built</span>
+      </div>
+      <div class="module-body">
+        <p class="built"><strong>Built:</strong> multi-format text extraction, Tesseract fallback, token chunker, one generic LLM metadata pass.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T21</td><td><strong>Marathi and Devanagari OCR</strong> — pass <code>lang</code> to Tesseract (runs English-only today) and install the traineddata</td><td><span class="size s">S</span></td><td><span class="wave">W1</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T33</td><td>Fix silent OCR failure — failed image OCR no longer flags <code>extraction_failed</code>, so unreadable scans index as successes</td><td><span class="size s">S</span></td><td><span class="wave">W1</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T20</td><td>Real per-field confidence, replacing the hardcoded <code>0.9</code></td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">D-5</td></tr>
+              <tr><td class="id">T23</td><td>Document classification stage plus unclassified queue</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T24</td><td>Template registry — data-driven, keyed by statutory form and era, validation per template never global</td><td><span class="size l">L</span></td><td><span class="wave">W1</span></td><td class="dep">T01, T23</td></tr>
+              <tr><td class="id">T25</td><td>Seed templates — Basmath Form A (1974), Washim Form B (2004)</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">T24, A1</td></tr>
+              <tr><td class="id">T22</td><td>Add the VLM extraction path — none exists in the codebase today</td><td><span class="size l">L</span></td><td><span class="wave">W1</span></td><td class="dep">T09</td></tr>
+              <tr><td class="id">T26</td><td><strong>Handler 1 — multi-page spread join.</strong> Join halves by serial and row ordinality, parity check, mismatches flagged never auto-joined</td><td><span class="size l">L</span></td><td><span class="wave">W1</span></td><td class="dep">T24</td></tr>
+              <tr><td class="id">T27</td><td><strong>Handler 2 — ditto-chain expansion.</strong> Per-column expansion, chain-break rules, chains over 10 rows and across pages</td><td><span class="size l">L</span></td><td><span class="wave">W1</span></td><td class="dep">T24</td></tr>
+              <tr><td class="id">T28</td><td><strong>Handler 3 — continuation-row merge.</strong> Blank-serial rows at page top merge backward</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">T24</td></tr>
+              <tr><td class="id">T29</td><td><strong>Handler 4 — blob-cell parse.</strong> Survey/CTS numbers, area, open space from free-text cells; unit normalisation across sqm, sqft, hectares, gunthas, Akker</td><td><span class="size l">L</span></td><td><span class="wave">W1</span></td><td class="dep">T24</td></tr>
+              <tr><td class="id">T30</td><td>Handwritten and degraded policy — operator capture, marginalia to adjudication, never verified without a human</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">T20</td></tr>
+              <tr><td class="id">T31</td><td><strong>D5 — hostile-format regression corpus</strong> seeded from Waqf ground truth</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">A1</td></tr>
+              <tr><td class="id">T32</td><td><strong>D8 — accuracy baseline report.</strong> The numbers feed sales and tenders</td><td><span class="size m">M</span></td><td><span class="wave">W1</span></td><td class="dep">T26–T31</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn">
+          <p><strong>Exit criterion has a hole.</strong> M1 requires the handlers to reproduce ground truth “within agreed tolerance”, and open item 1 says those numbers do not exist yet — see decision D-4.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- c -->
+    <div class="module lv-none">
+      <div class="module-head">
+        <span class="chip">(c)</span>
+        <span class="titles">
+          <h3>Human Verification Workbench</h3>
+          <span class="sub">§3.3 · 5 tasks</span>
+        </span>
+        <span class="state">Not started</span>
+      </div>
+      <div class="module-body">
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T51</td><td>Two-lane model and the per-row <code>machine → in-review → human-verified</code> state machine</td><td><span class="size l">L</span></td><td><span class="wave">W2</span></td><td class="dep">T04, T20</td></tr>
+              <tr><td class="id">T52</td><td>Adjudication queues — marginalia, join mismatches, low-confidence fields, handwritten regions, with claim and release</td><td><span class="size m">M</span></td><td><span class="wave">W2</span></td><td class="dep">T51, T26, T30</td></tr>
+              <tr><td class="id">T53</td><td>Click-through from field to highlighted source region, reused by 360 views and Q&amp;A citations. Handles rotated and skewed scans</td><td><span class="size l">L</span></td><td><span class="wave">W2</span></td><td class="dep">T04–T06</td></tr>
+              <tr><td class="id">T54</td><td>Operator productivity — keyboard-first navigation, batch accept above a configurable threshold, audit event on every accept</td><td><span class="size m">M</span></td><td><span class="wave">W2</span></td><td class="dep">T51, T02</td></tr>
+              <tr><td class="id">T55</td><td><strong>Hard-rule tests</strong> — no promotion to verified without an actor event; no handwritten-source verified data without confirmation</td><td><span class="size m">M</span></td><td><span class="wave">W2</span></td><td class="dep">T51</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout">
+          <p><strong>Do not</strong> build a gate that blocks indexing. §3.5 guarantees search never waits on verification — verification gates the evidence layer, not usability.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- d -->
+    <div class="module lv-none">
+      <div class="module-head">
+        <span class="chip">(d)</span>
+        <span class="titles">
+          <h3>Entity &amp; Knowledge Layer</h3>
+          <span class="sub">§3.4 · 5 tasks</span>
+        </span>
+        <span class="state">Not started</span>
+      </div>
+      <div class="module-body">
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T10</td><td>Property-graph schema — <code>entity_dg_nodes</code> and <code>entity_dg_edges</code>. Every edge carries type, confidence, status, creating actor or policy version, timestamp, evidence pointer</td><td><span class="size m">M</span></td><td><span class="wave">W0</span></td><td class="dep">T01, T09</td></tr>
+              <tr><td class="id">T56</td><td>Tiered linking — tiers 1–2 auto-commit labelled machine, tier 3 escrowed identity links, tier 4 legal links human-only at any confidence</td><td><span class="size l">L</span></td><td><span class="wave">W3</span></td><td class="dep">T10</td></tr>
+              <tr><td class="id">T57</td><td>Bulk threshold confirmation, recording actor, threshold, corpus and policy version on the audit trail and every affected edge</td><td><span class="size m">M</span></td><td><span class="wave">W3</span></td><td class="dep">T56</td></tr>
+              <tr><td class="id">T58</td><td>Link reversibility with clean cascade; machine-accepted links stay permanently labelled</td><td><span class="size m">M</span></td><td><span class="wave">W3</span></td><td class="dep">T56</td></tr>
+              <tr><td class="id">T59</td><td>Per-corpus threshold calibration protocol, required before bulk acceptance is enabled on that corpus</td><td><span class="size m">M</span></td><td><span class="wave">W3</span></td><td class="dep">T57</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn">
+          <p><strong>Settle decision D-1 first.</strong> §3.10 fixes containers at two levels, Workspace then Project, and rules out nested folders. The code has arbitrarily deep recursive folders. Also: the storage decision is already recorded — Postgres edge tables, no graph database in v1. Do not re-litigate it.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- e -->
+    <div class="module lv-part">
+      <div class="module-head">
+        <span class="chip">(e)</span>
+        <span class="titles">
+          <h3>Search &amp; Q&amp;A</h3>
+          <span class="sub">§3.5 · 6 tasks</span>
+        </span>
+        <span class="state">~60% built</span>
+      </div>
+      <div class="module-body">
+        <p class="built"><strong>Built:</strong> full-text search plus pgvector HNSW, RRF fusion, Cohere rerank, trilingual query expansion, HyDE fallback, grounded answers with result cards, injection screening, PII scrubbing, Redis caching.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T72</td><td>Add the pg_trgm leg — the extension is created but no trigram index exists and no query uses it</td><td><span class="size s">S</span></td><td><span class="wave">W4</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T74</td><td>Immediate metadata-level findability on ingest. Search filters on <code>status = 'indexed'</code>, so a document is invisible until Celery finishes</td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T75</td><td>Devanagari indexing correctness — the tsvector uses the <code>english</code> configuration while Marathi queries use <code>simple</code></td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">T21</td></tr>
+              <tr><td class="id">T73</td><td>Search over extracted structured records, not only chunk text</td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">T24, T04</td></tr>
+              <tr><td class="id">T70</td><td><strong>Uncited-answer refusal</strong> — bind each claim to a source passage and refuse when grounding is weak. §11 acceptance rule, not a tuning preference</td><td><span class="size l">L</span></td><td><span class="wave">W4</span></td><td class="dep">T04</td></tr>
+              <tr><td class="id">T71</td><td>Citation click-through to the highlighted page region, not just a page number</td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">T53</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- f -->
+    <div class="module lv-none">
+      <div class="module-head">
+        <span class="chip">(f)</span>
+        <span class="titles">
+          <h3>Records &amp; Versioning</h3>
+          <span class="sub">§3.6 · 3 tasks</span>
+        </span>
+        <span class="state">Not started</span>
+      </div>
+      <div class="module-body">
+        <p class="built"><code>document_versions</code> tracks file revisions and is always written as version 1. This module is record-level amendment history, which is a different thing.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T60</td><td>Amendment chains — base record to amendments to a <strong>deterministically re-derivable</strong> current state, each amendment citing its source page. No mutable “current” that can drift</td><td><span class="size l">L</span></td><td><span class="wave">W3</span></td><td class="dep">T10, T56</td></tr>
+              <tr><td class="id">T61</td><td>Legal-status layer — in force, set aside, under stay, superseded. Filterable everywhere, inherited from a source under litigation</td><td><span class="size m">M</span></td><td><span class="wave">W3</span></td><td class="dep">T60</td></tr>
+              <tr><td class="id">T62</td><td>Entity and Property 360 view — versions, status, linked documents and entities, source click-through on every fact</td><td><span class="size l">L</span></td><td><span class="wave">W3</span></td><td class="dep">T60, T53</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout">
+          <p><strong>Test worth writing early:</strong> apply a corrigendum decades after a base entry that changes a valuation by three orders of magnitude, then assert base view, current view and history are each retrievable, each cite their source page, and re-deriving from the chain reproduces the current view exactly.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- g -->
+    <div class="module lv-none">
+      <div class="module-head">
+        <span class="chip">(g)</span>
+        <span class="titles">
+          <h3>Reports &amp; Analytics</h3>
+          <span class="sub">§3.7 · 2 tasks</span>
+        </span>
+        <span class="state">Not started</span>
+      </div>
+      <div class="module-body">
+        <p class="built">The admin panel reports <em>platform usage</em> — user, document, storage and API counts. This module is about the <em>corpus</em>, which is a different report.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T76</td><td>Completeness and reconciliation dashboard with gap scoring per corpus — missing fields, failed pages, unverified rows, machine-versus-verified split, confidence distribution, drill-through</td><td><span class="size l">L</span></td><td><span class="wave">W4</span></td><td class="dep">T20, T51</td></tr>
+              <tr><td class="id">T77</td><td>On-demand summary report generation, exportable, with unverified data flagged</td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">T78</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- h -->
+    <div class="module lv-early">
+      <div class="module-head">
+        <span class="chip">(h)</span>
+        <span class="titles">
+          <h3>Governance &amp; Audit</h3>
+          <span class="sub">§3.8 · 7 tasks · carries the “evidence-grade” claim</span>
+        </span>
+        <span class="state">~15% built</span>
+      </div>
+      <div class="module-body">
+        <p class="built"><strong>Built:</strong> tenant row-level security, an audit log table, API request logging, SHA-256 per version.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T34</td><td>The <code>permissions</code> table has <strong>zero code references</strong> — wire it into T50 or drop it, so it is not mistaken for working access control</td><td><span class="size s">S</span></td><td><span class="wave">W1</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T50</td><td>RBAC for six personas — records officer, operator/adjudicator, department head, legal counsel, IT admin, external auditor. Department scope is an RBAC group over projects, not a container level</td><td><span class="size l">L</span></td><td><span class="wave">W2</span></td><td class="dep">T34, D-1</td></tr>
+              <tr><td class="id">T63</td><td>Tamper-evident audit — append-only enforcement, hash <em>chains</em> anchored at capture, integrity verification tooling</td><td><span class="size l">L</span></td><td><span class="wave">W3</span></td><td class="dep">T07</td></tr>
+              <tr><td class="id">T64</td><td>WORM archival storage with retention lock per deployment profile</td><td><span class="size m">M</span></td><td><span class="wave">W3</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T65</td><td>Section 63 certificate generation — hash value, algorithm name, dual signature blocks. Blocking dependency for this module's release</td><td><span class="size m">M</span></td><td><span class="wave">W3</span></td><td class="dep">A3, D-8</td></tr>
+              <tr><td class="id">T66</td><td>Retention policy engine per record class, replacing the 30-day trash purge as the only retention behaviour</td><td><span class="size m">M</span></td><td><span class="wave">W3</span></td><td class="dep">D-7</td></tr>
+              <tr><td class="id">T67</td><td>Verified-layer boundary — exports, certificates and legal derivation consume only human-verified edges. Enforce at the query layer, not per call site</td><td><span class="size m">M</span></td><td><span class="wave">W3</span></td><td class="dep">T56, D-8</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout">
+          <p><strong>T67 is what makes tier-3 escrow safe.</strong> §11 requires it demonstrated on an evidence export that actually contains escrowed links.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- i -->
+    <div class="module lv-none">
+      <div class="module-head">
+        <span class="chip">(i)</span>
+        <span class="titles">
+          <h3>Data Operations</h3>
+          <span class="sub">§3.9 · 3 tasks</span>
+        </span>
+        <span class="state">Not started</span>
+      </div>
+      <div class="module-body">
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T78</td><td>Export — CSV, JSON, XLSX, PDF, PDF/A, as an audited action recording actor, scope, format and contents</td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">T67</td></tr>
+              <tr><td class="id">T79</td><td>Duplicate detection — hash-based (the SHA-256 is stored but never compared) plus fuzzy matching for rescans. Surface for operator resolution, do not silently discard</td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T80</td><td>Bulk edit with per-row audit capture, preview before apply, bounded undo. Cannot promote machine values to verified</td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">T07</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- j -->
+    <div class="module lv-early">
+      <div class="module-head">
+        <span class="chip">(j)</span>
+        <span class="titles">
+          <h3>Admin &amp; Deployment</h3>
+          <span class="sub">§3.10 · 7 tasks</span>
+        </span>
+        <span class="state">~25% built</span>
+      </div>
+      <div class="module-body">
+        <p class="built"><strong>Built:</strong> SaaS multi-tenancy with row-level security, a provider abstraction over LLM, embedding, rerank and OCR back-ends, Docker Compose stack.</p>
+        <div class="scroll">
+          <table>
+            <thead><tr><th>ID</th><th>Subtask</th><th>Size</th><th>Wave</th><th>Depends</th></tr></thead>
+            <tbody>
+              <tr><td class="id">T81</td><td>Licensing enforcement — subscription metering for SaaS, node and GPU capacity licence on-prem</td><td><span class="size m">M</span></td><td><span class="wave">W4</span></td><td class="dep">A5</td></tr>
+              <tr><td class="id">T90</td><td><strong>Local model provider</strong> — Qwen2.5-VL-7B-Instruct on a 24 GB+ GPU, with PaddleOCR / Surya / Docling. Every LLM call currently goes to an external API</td><td><span class="size l">L</span></td><td><span class="wave">W5</span></td><td class="dep">A2, D-6</td></tr>
+              <tr><td class="id">T91</td><td>API-versus-local toggle that <strong>fails closed</strong> — a missing local model errors, never silently falls back to an API provider</td><td><span class="size m">M</span></td><td><span class="wave">W5</span></td><td class="dep">T90</td></tr>
+              <tr><td class="id">T92</td><td>Egress-zero verification script and CI coverage</td><td><span class="size m">M</span></td><td><span class="wave">W5</span></td><td class="dep">T90, T91</td></tr>
+              <tr><td class="id">T93</td><td>Helm charts and the air-gapped install runbook. Exit criterion: someone who did not build it installs from the runbook</td><td><span class="size l">L</span></td><td><span class="wave">W5</span></td><td class="dep">—</td></tr>
+              <tr><td class="id">T94</td><td>Project / Collection container level — does not exist today</td><td><span class="size m">M</span></td><td><span class="wave">W5</span></td><td class="dep">D-1</td></tr>
+              <tr><td class="id">T97</td><td>Performance pass on real corpus volumes, including recursive-CTE measurement</td><td><span class="size m">M</span></td><td><span class="wave">W5</span></td><td class="dep">—</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="callout warn">
+          <p><strong>Air-gapped acceptance is binary:</strong> zero outbound calls, verifiable by egress monitoring. Cloud connectors are excluded by definition; any <em>other</em> feature needing internet is a release blocker.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Decisions that gate the build</h2>
+    <p class="lede">Not development work. Each blocks tasks that cannot sensibly start until it is answered.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>ID</th><th>Decision</th><th>Owner</th><th>Blocks</th></tr></thead>
+        <tbody>
+          <tr><td class="id">D-1</td><td><strong>Container model</strong> — collapse recursive folders to Workspace → Project (two levels, §3.10), or raise a change request under §10</td><td>Product owner</td><td class="dep">T10, T50, T94</td></tr>
+          <tr><td class="id">D-2</td><td>Ratify or change SaaS tenant isolation, row-level versus schema-per-tenant. The code already committed to row-level; open item 3 asks for a security review that has not happened</td><td>Tech Lead + security</td><td class="dep">module (j)</td></tr>
+          <tr><td class="id">D-3</td><td>JWT access-token lifetime — currently 30 days, refresh 60 days</td><td>Tech Lead</td><td class="dep">—</td></tr>
+          <tr><td class="id">D-4</td><td>M1 accuracy tolerance numbers — “within agreed tolerance” has none today</td><td>Product owner + QA</td><td class="dep">M1 exit</td></tr>
+          <tr><td class="id">D-5</td><td>Confidence calibration policy — per-template or global bands</td><td>BA + Tech Lead</td><td class="dep">T20, T51</td></tr>
+          <tr><td class="id">D-6</td><td>Surya GPL inclusion in the on-prem distribution</td><td>Legal</td><td class="dep">T90</td></tr>
+          <tr><td class="id">D-7</td><td>Retention classes and defaults</td><td>BA</td><td class="dep">T66</td></tr>
+          <tr><td class="id">D-8</td><td>Escrowed links in evidence exports — exclude entirely, or include with a flag</td><td>Legal counsel</td><td class="dep">T65, T67</td></tr>
+          <tr><td class="id">D-9</td><td>Scope status of the built drive product — folder tree, star, trash, chat, offline and PWA. Accepted change request, or recorded out-of-scope</td><td>Product owner</td><td class="dep">estimates</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>Assumptions blocking tasks</h2>
+    <p class="lede">All six are externally owned and none is resolved.</p>
+    <div class="scroll">
+      <table>
+        <thead><tr><th>Ref</th><th>Assumption</th><th>Blocks</th></tr></thead>
+        <tbody>
+          <tr><td class="id">A1</td><td>Waqf reference corpus with human-verified ground truth available to engineering and QA</td><td class="dep">T25, T31, T32</td></tr>
+          <tr><td class="id">A2</td><td>GPU availability for the local VLM, at least one 24 GB card for development</td><td class="dep">T90</td></tr>
+          <tr><td class="id">A3</td><td>Legal counsel review of the Section 63 certificate template</td><td class="dep">T65</td></tr>
+          <tr><td class="id">A5</td><td>Licensing model decision finalised before M4</td><td class="dep">T81</td></tr>
+          <tr><td class="id">A7</td><td>NIC e-Office integration access — API, database view or file handoff</td><td class="dep">T47</td></tr>
+          <tr><td class="id">A8</td><td>Google restricted-scope verification and Microsoft Entra admin consent</td><td class="dep">T45, T46</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section>
+    <h2>If you only start five things this week</h2>
+    <div class="start">
+      <div class="start-item">
+        <span class="rank">1</span>
+        <span>
+          <span class="what">T04 · T05 · T06 — provenance coordinates</span>
+          <span class="why">Block the whole Verification Workbench and every region click-through, and get more expensive with every document ingested.</span>
+        </span>
+      </div>
+      <div class="start-item">
+        <span class="rank">2</span>
+        <span>
+          <span class="what">T01 · T02 — naming standard and <code>sys_dg_config</code></span>
+          <span class="why">One migration now; a migration plus a backfill later.</span>
+        </span>
+      </div>
+      <div class="start-item">
+        <span class="rank">3</span>
+        <span>
+          <span class="what">T21 — Marathi and Devanagari OCR</span>
+          <span class="why">One missing argument. The product cannot currently read the script it is sold on.</span>
+        </span>
+      </div>
+      <div class="start-item">
+        <span class="rank">4</span>
+        <span>
+          <span class="what">T33 and D-3 — silent OCR failure, and the 30-day JWT</span>
+          <span class="why">An unreadable scan currently indexes as though it succeeded, and access tokens live for a month. Both small, both wrong to ship on an evidence system.</span>
+        </span>
+      </div>
+      <div class="start-item">
+        <span class="rank">5</span>
+        <span>
+          <span class="what">D-1 — the container model conflict</span>
+          <span class="why">Decides whether the folder tree survives. The answer changes the data model and the drive UI, so it should not surface halfway through the entity work.</span>
+        </span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Out of scope for v1 — do not build, do not stub</h2>
+    <p>Automated handwritten Urdu/Modi transcription as trusted data · silent promotion of links into the verified layer · GIS and geo-mapping · enterprise search over chat and email bodies · citizen-facing portals · OneDrive and S3/GCS connectors · graph-explorer UI · graph analytics · schema designer · a separate graph database · DPDP consent and erasure workflows · cleaning rules engine · clustering UI · scheduled reports · custom report builder · cross-document synthesis · saved queries · additional Indic scripts · template auto-suggestion · active learning.</p>
+    <p>Anything marked P1 or P2 in the PRD enters v1 only through a signed change request under §10. The SoW singles out “small” connector additions as the historically likeliest scope-creep vector.</p>
+    <div class="note" style="margin-top:1.4rem">
+      <p><strong>Sizes are judgement, not estimates.</strong> They come from reading the code, and express relative weight only. The SoW sets dates after estimation against the FSDs.</p>
+      <p><strong>Authority.</strong> The SoW names the PRD v1.0 as the requirements authority. Where this backlog and the PRD disagree, §1 says escalate to the product owner rather than resolve it silently.</p>
+    </div>
+  </section>
+
+  <footer>Prepared 17-Aug-2026 · from SoW VeritasDocs v1 v0.3 · code at dev/5d8e1cb · 71 tasks, 9 decisions</footer>
+
+</div>
+
+</body></html>

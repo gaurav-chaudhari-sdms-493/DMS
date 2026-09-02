@@ -1,0 +1,636 @@
+VeritasDocs v1 Build Design
+What we are building · with pictures
+VeritasDocs v1 — what we are building
+A picture of every part of v1 before we build it. What each part does, how the pieces fit together, and how we test it. The code we already have appears only where we build on top of it. Section 0 explains the words used.
+Scope baseline
+SoW VeritasDocs v1, v0.3 · CR-001
+Task ids
+match the build backlog
+Written
+18-Aug-2026
+Against code at
+branch
+dev
+@
+3e78636
+Companion documents
+Scope gap
+Build backlog
+Build design — you are here
+What is in here
+Fifteen short sections. Each answers three questions: what are we building, what does it look like, and how do we know it works? The T-numbers are task ids from the build backlog.
+0
+Words you will see
+1
+What the finished system looks like
+2
+Where each fact came from
+3
+How a fact goes from machine-read to checked
+4
+Four page layouts that break normal reading
+5
+The checking screen
+6
+Linking records to people and property
+7
+Records that change over the years
+8
+Search, sources, and saying “no answer”
+9
+Proving nothing was changed later
+10
+Export, duplicates and bulk edits
+11
+Two ways we install it
+12
+New tables and columns
+13
+What to build first
+14
+How we know each part is finished
+15
+What already exists in the code
+Words you will see
+read once, then skip
+Terms from the Scope of Work that appear throughout. Nothing here is jargon for its own sake — each one names something the product has to do.
+Word
+What it means here
+fact
+One value pulled out of a document — a name, an area, a date. Facts are what we check, cite and export.
+region
+The rectangle on the scanned page that a fact came from. Lets us highlight the source.
+provenance
+Where something came from: which file, which page, which spot on the page, from which office, and when. We say “source location” in this document.
+machine / human-verified
+Two states for a fact. Machine means the software read it. Human-verified means a person accepted it. Only the second counts as evidence.
+adjudication
+The Scope of Work’s word for the review queue: anything the software could not decide, waiting for a person.
+corpus / collection
+One set of documents, usually from one office or one register series.
+held link
+A link between two records that is probably right but not confirmed. Usable in the product, shown with a badge, kept out of exports.
+7/12 extract (satbara)
+The Maharashtra land record showing survey number, holder, area and crop. One of the document types we will be reading.
+ferfar
+A mutation entry — the record of a change of holder, usually after a sale, succession or court order.
+shuddhipatrak
+A correction issued later against an earlier entry. Corrections are why records need an amendment chain.
+sanad
+A grant or title deed issued by government. Links from a sanad are legal links, so a person must confirm them.
+khatedar
+The holder named in a land record.
+shera
+The remarks column in a register.
+survey no. / CTS no.
+How a plot is identified — survey number in rural areas, City Survey (CTS) number in towns.
+guntha · are · hectare
+Area units used side by side in these records. 1 hectare = 100 are; 1 guntha ≈ 101 sq m.
+register
+The old bound books these documents come from. Their layout is why the four handlers exist.
+spread
+One entry printed across two facing pages.
+ditto mark
+A mark meaning "same as the row above" instead of repeating the value.
+air-gapped
+Installed on a network with no internet at all.
+PDF/A
+A version of PDF meant for long-term archives. Required on ingest, with the original file kept too.
+1 · What the finished system looks like
+Scope of Work 3.1 – 3.10
+A scanned Waqf register or 7/12 extract arrives. We record where it came from, read it, and pull out the facts. Then the path splits. The document becomes searchable straight away. The facts only count as evidence after a person has checked them.
+upload
+watched folder
+FTP / SFTP
+email-in
+scanner
+Google Drive
+SharePoint
+NIC e-Office
+connector layer — one ingestion contract
+a new source must never require a pipeline change
+mandatory on ingest
+PDF/A-2b with original kept · hash · record of where it came from · safe retry — running it twice changes nothing · failure alert
+processing
+OCR + chunk
+classify
++ unclassified queue
+template registry
+form × era
+VLM extraction
++ four handlers
+confidence
+per field + region
+verification workbench
+two lanes · review queues · batch accept
+search index
+chunks, vectors, records
+verified layer
+entity graph
+nodes · tiered edges
+records
+amendment chains · status
+governance · export · reports
+audit chain · Section 63 certificate · completeness
+search & Q&A
+citation binding + refusal gate
+no passage, no answer
+facts needing a human
+indexed at once — search never waits
+records are searchable too
+Exists — the starting point
+To build
+The split under processing is the important part. Searching and checking happen side by side, not one after the other. A document can be found as soon as it is processed. Checked facts build up behind it at human speed. Only checked facts may be exported, certified or used in legal work.
+2 · Where each fact came from — agree this first
+T04 · T05 · T06
+Every fact we store has to point at the exact spot on the page it came from. Three parts of the product draw that spot on screen: the checking screen, the 360 view, and the citations under an answer. None of them can be started until we agree how a spot is described.
+x →
+y ↓
+(0,0)
+(1,1)
+region
+fact
+area = 1 ha 25 are · confidence 0.82
+region
+x0 y0 x1 y1, normalised · rotation
+page
+number · width · height · skew
+7/12 extract · Washim
+file hash · source office · date
+resolves to
+Four links, and none may be empty. If a fact has no region, we refuse to save it. A fact we cannot show on the page is a fact nobody can check.
+What has to be decided, in writing, before code
+Where (0,0) sits
+The top-left corner is (0,0) and y grows downward, the way the scan looks. Agree it once, so the extractor, the API and the viewer cannot disagree.
+What the numbers mean
+Store values from 0 to 1, as a fraction of the page width and height. Not pixels. The box then stays correct at any zoom and any screen size.
+Crooked scans
+Store the rotation and skew per page and let the viewer apply it. Old registers were photographed crooked. Ignore skew and the highlight lands on the wrong row.
+Facts from more than one place
+One value can come from two pages. Store a list of regions, not a single one. Build the column as a list from day one.
+How we test it
+Load a crooked scan. Every fact has a region, every region sits inside its page, and clicking a fact highlights the right part of the image. Then try to save a fact with no region: it must fail.
+3 · How a fact goes from machine-read to checked
+T23 · T51 · T55
+One flow with fixed steps, enforced by the database rather than by the screen. Two of the three product rules are steps in this flow.
+ingested
+classified
+machine-extracted
+confidence per field
+in review
+human-verified
+evidence grade
+unclassified queue
+a human names the form
+indexed for search
+badged as machine
+review queue
+marginalia · join mismatch
+·
+·
+no template match
+at once
+dispute
+resolved
+requires actor event
+The blue step is a rule, not a habit. A row becomes human-verified only when a real person accepts it, and the system records who. If the value was handwritten, that person has to confirm it as well. Enforce this where data is saved. Hiding the button in the screen is not enough.
+How we test it
+Call the API directly, with no user attached, and try to mark a row verified. It must fail. Try again on a handwritten row with no confirmation. It must fail too. Both are tests, not something checked by hand.
+4 · Four page layouts that break normal reading
+SoW 3.2 · T26 – T29
+These four page layouts break normal table reading. The Scope of Work calls them the most important engineering work in the product. Each one turns a messy page into clean records. Each one also has a case where it must stop and ask a person instead of guessing.
+Handler 1 — multi-page spread join
+T26
+no.
+khatedar
+area
+12
+13
+14
+15
+no.
+shera
+value
+12
+13
+14
+15
+no.
+khatedar · area · shera · value
+12
+13
+14
+15
+left page
+right page — same entries continue
+one record per entry
+join on serial
+A Form A register entry runs across two facing pages. Match the two halves by serial number, and check the row order as well. If the halves disagree on how many rows they have, do not join them — send them to a person. A wrong join puts one family's valuation on another family's land.
+Handler 2 — ditto-chain expansion
+T27
+no.
+khatedar
+village
+21
+Ramrao Patil
+Basmath
+22
+,,
+,,
+23
+,,
+Kalamnuri
+24
+Sitabai Deshmukh
+,,
+no.
+khatedar
+village
+21
+Ramrao Patil
+Basmath
+22
+Ramrao Patil
+Basmath
+23
+Ramrao Patil
+Kalamnuri
+24
+Sitabai Deshmukh
+Kalamnuri
+as written in the register
+as stored, each value labelled inherited
+expand per column
+Each column has its own chain. Row 23 keeps the same khatedar but starts a new village, and row 24 then copies that new village. Chains can run past ten rows and carry on to the next page. Store every copied value with a label saying it was copied, so the person checking knows it was never written on the page.
+Handler 3 — continuation-row merge
+T28
+no.
+description of the property
+47
+kabrastan, survey no. 47, north —
+road, south — well, east —
+no.
+description of the property
+—
+school, west — road
+no.
+description
+47
+…north road, south well, east school,
+west road — one record
+page 4, last row
+page 5, first row — serial blank
+merge backwards
+A blank serial number in the first row of a page means the entry above is still running. Read it as its own row and you get a half record. Merge it and the real record is complete. The merged record points at two pages, which is why a fact stores a list of regions.
+Handler 4 — blob-cell parse
+T29
+मौजे वाशिम — S.No. 121/2A & 121/2B,
+area 1 हे 25 आर, construction 4500 sqft,
+open space 300 चौ.मी., CTS 88, Akker 2.5
+one cell, as scanned
+survey_numbers = [121/2A, 121/2B], cts = 88
+area_sqm = 12500  · from 1 ha 25 are
+built_sqm = 418.06  · from 4500 sqft
+open_space_sqm = 300 · akker 2.5 flagged
+parse + normalise
+One cell of a Washim register, mixing Marathi and English. Convert every area into one unit and keep the original text beside it. These registers use square metres, square feet, hectares, ares, gunthas and “Akker”. Akker means different things in different districts, so flag it for a person instead of guessing a number.
+How we test it — the regression corpus
+T31 · T32
+Keep one sample document per handler, each with the correct answer written out by a person, and run them in CI. Check that the records come out exactly right. Also check the safety path: a spread with mismatched rows goes to a person, and an unknown unit never quietly becomes a number. The accuracy figures from this run are a deliverable in their own right. Note that nobody has agreed yet how accurate is accurate enough (decision D-4).
+5 · The checking screen
+SoW 3.3 · T51 – T55
+The screen an operator uses all day. It is the whole verification module, and the largest front-end job in v1.
+Waqf register, Form A · Basmath · 1974 · page 4 of 12
+queue: 128 rows · claimed by you
+operator
+active field
+scanned page, rotation applied
+FIELD
+VALUE
+CONF · STATE
+survey no.
+121/2A
+0.99 · verified
+holder
+Ramrao Patil
+0.71 · in review
+village
+Basmath
+0.94 · inherited
+area
+1 ha 25 are
+0.88 · machine
+chatai sima
+handwritten
+— · review queue
+valuation
+Rs. 1,240
+0.62 · machine
+[A] accept   [C] correct   [D] send to the review queue   [Tab] next field   [Shift+A] accept all above 0.90
+The operator sees the scanned Form A page on the left and its fields on the right. Click a field and its area lights up on the scan. Click an area and the field is selected. Both work as soon as the source-location rules exists, and neither works before it. The state column shows the flow from the previous section, one state per row rather than per document.
+Two lanes of work
+T51
+One lane for clean rows accepted in batches, one lane for anything flagged. A row can move between lanes, and every move is logged.
+One person per row
+T52
+Separate queues for notes in the margin, join mismatches, low-confidence fields and handwritten areas. When someone opens an item it is hidden from everyone else, so two people never check the same row.
+Keyboard first
+T54
+An operator should never need the mouse for a clean row. Allow accepting everything above a chosen confidence in one go, and keep that number in config rather than in code.
+Checking never blocks search
+SoW 3.5
+Checking decides what counts as evidence, not what can be found. An unchecked document still appears in search, marked as unchecked.
+How we test it
+One operator checks fifty rows using the keyboard only. Every accept writes a log entry with the user, the row, the previous state and the confidence. A handwritten row cannot be accepted without confirming it. A second operator never sees a row someone else has open.
+6 · Linking records to people and property
+SoW 3.4 · T10 · T56 – T59
+People, properties and offices become nodes. Links between them become edges. The safety comes from tiers: the tier decides what a link is allowed to be used for.
+Tier 1 — structural
+Form A page 4 contains this row
+Tier 2 — mention
+this row names “Ramrao Patil”
+Tier 3 — identity
+Ramrao Patil = R. B. Patil, 1998 ferfar
+Tier 4 — legal
+this sanad transfers survey no. 121/2A
+machine layer
+auto-commit, labelled machine
+human confirmation
+actor · threshold · corpus · policy version
+verified layer
+the only source for
+exports · certificates
+legal derivation
+held edges are
+usable and badged
+everywhere else
+never crosses
+crosses
+always, at any confidence
+Bulk confirm is the same gate at scale. A person accepts every held link above a chosen score for one collection, in one action. Record the user, the score, the collection and the rule version — on the log and on every link it touched. Undoing it must remove those links cleanly. A link the machine created keeps that label for good, even after a person has looked at it.
+How we test it
+T67
+Export data from a collection that contains held links. They are left out, or clearly marked — decision D-8 says which. Enforce it in the query layer, so an export format added next year gets the rule without anyone remembering to add it.
+7 · Records that change over the years
+SoW 3.6 · T60 – T62
+A land record is not a document. It is a first entry plus every change made to it since, sometimes over fifty years. Work out the current state from those changes. Never store a current value and edit it in place.
+Form A entry · Basmath · 1974
+holder Ramrao Patil
+1 ha 25 are · Rs. 1,240 · p. 4
+ferfar no. 1123 · 1998
+holder → Sitabai Deshmukh
+succession order · p. 17
+shuddhipatrak · 2021
+value → Rs. 12,40,000
+gazette correction · p. 3
+current state · derived
+Sitabai Deshmukh
+Rs. 12,40,000 · in force
+re-derivable from the chain at any time — never a stored mutable "current"
+·
+A 1974 Form A entry, a 1998 ferfar transferring it on succession, and a 2021 shuddhipatrak fixing the valuation. Every change points at the page that authorised it, so “why does this record say this?” can be answered with a page image. Legal status sits alongside: in force, set aside, under stay, superseded. A record takes the status of a source that is in court, which is what makes it possible to filter on.
+How we test it
+Add a shuddhipatrak decades after the first entry, one that changes a valuation from Rs. 1,240 to Rs. 12,40,000. Then check three things: the original view, the current view and the full history are all readable; each one cites its source page; and rebuilding from the chain gives exactly the current view. Write this test first in the records module — it is the one that catches a stored, editable current value sneaking in.
+8 · Search, sources, and saying “no answer”
+SoW 3.5 · hard rule 1 · T70 · T71 · T73
+Search already works. What v1 adds is the rule around the answer: every statement is tied to a passage, and there is no answer at all when the passages do not support one.
+retrieval
+hybrid + rerank, built
+draft claims
+model reads passages
+bind each claim
+to a passage + region
+cited answer
+every claim clicks to a region
+refusal
+“the corpus does not say”
+also searched: extracted records
+structured fields, not only chunk text — a query can filter on area, village or status
+bound
+unbound or weak
+This gate is a product rule, not a setting to tune. A confident, well-written answer with no source is exactly the failure this product exists to prevent. Clicking a citation opens the page at the highlighted area, using the same viewer as the checking screen. Build that viewer once.
+How we test it
+Ask something the documents cannot answer — “which Waqf plots in Washim are under stay?” when no such record was scanned. The system says it cannot answer. Ask something they can: every sentence carries a citation, and each citation opens the page at the right spot. This has to work whichever model provider is configured.
+9 · Proving nothing was changed later
+SoW 3.8 · T63 – T67
+This is what lets us call the records evidence. A log table on its own is not enough. The record has to be able to show it was not changed afterwards.
+capture
+file hash anchors the chain
+h₀ = sha256(file)
+event
+actor · action · target
+h₁ = sha256(h₀ ‖ payload)
+event
+verification accepted
+h₂ = sha256(h₁ ‖ payload)
+Section 63 certificate
+hash · algorithm name
+dual signature blocks
+integrity checker
+walks the chain, reports the first break
+WORM archive
+cannot be deleted early
+Make the log append-only in the database itself: the application user gets no permission to update or delete rows. The chain turns “our logs say so” into something an auditor can check for themselves. The certificate cannot ship until legal has reviewed the template (assumption A3).
+Log everything
+T07
+Log every change, plus views and downloads. Today only sign-in, search and chat are logged, so widening coverage comes first, before any chaining.
+Always know who did it
+T08
+Refuse any change that has no user attached. A chain full of empty user fields proves nothing.
+Six user roles
+T50
+Six roles: records officer, operator, department head, legal counsel, IT admin, and auditor with read-only access. Department scope is a group over projects, not another folder level.
+How long we keep things
+T66
+How long to keep each class of record, replacing today's single rule of emptying trash after 30 days. The classes and defaults are decision D-7.
+10 · Export, duplicates and bulk edits
+SoW 3.9 · T78 – T80
+Export
+T78
+CSV, JSON, XLSX, PDF and PDF/A. Every export is logged with the user, what was exported and in which format. It reads only checked data.
+Duplicate detection
+T79
+Compare hashes first. The SHA-256 is already stored but never compared, so the same file is processed again in full today. Then add fuzzy matching for pages scanned twice. Show both to an operator to decide — never drop a file quietly.
+Bulk edit
+T80
+Show a preview before applying, log every row changed, and allow a limited undo. It cannot mark machine values as checked; that only happens on the checking screen.
+11 · Two ways we install it
+SoW 3.10 · T90 – T93
+The same product ships two ways: as a hosted service, and inside a government network with no internet. The second one is pass or fail: a single outbound call fails it.
+provider interfaces
+LLM
+VLM / OCR
+embeddings
+reranker
+one abstraction,
+two resolutions
+SaaS profile
+external APIs · metered subscription
+Groq / OpenAI / Anthropic · Cohere
+embeddings already local
+air-gapped profile
+Qwen2.5-VL-7B on a 24 GB GPU
+PaddleOCR / Surya / Docling
+node or GPU capacity licence
+fails closed
+a missing local model
+raises an error
+never silently calls an API
+egress monitor
+CI job asserts zero
+outbound connections
+cloud connectors excluded
+Both setups use the same four interfaces, so no feature depends on which one is running. Failing closed matters because the alternative is worse: quietly calling a cloud API when the local model is missing would send government records outside, and still look like a working install.
+How we test it
+T92 · T93
+Start everything with outbound network blocked. Loading documents, checking them and searching all still work on local models. Then remove a local model and confirm the call fails instead of falling back to an API. Finally, have someone who did not build it install the whole thing from the runbook.
+12 · New tables and columns
+engineering standards · T01 – T05 · T10
+All of this is a single migration today. Once real documents are loaded, each item becomes a migration plus a data backfill plus re-processing everything already loaded.
+Add
+Holds
+Why now
+sys_dg_config
+T02
+Every threshold and limit in one place, with documented defaults
+The Scope of Work says settings belong in config. Nine values are written into the code today, including the search relevance threshold and the accept-all level the checking screen needs
+Source-location columns
+T04
+Page number and list of spots on the page for every fact. Never allowed to be empty
+Blocks the checking screen, the 360 views and every citation. The pipeline already works out word positions and then throws them away
+Verification state
+T51
+Per-row state, lane, claiming operator, confidence, actor event reference
+The fact lifecycle lives here, not in the UI
+entity_dg_nodes
+·
+entity_dg_edges
+T10
+Typed nodes; edges with type, confidence, status, creating actor or policy version, timestamp, evidence pointer
+Use Postgres tables for the graph. That decision is already recorded — do not re-open it
+Record and amendment tables
+T60
+Base entries, ordered amendments, legal status, each citing a source page
+document_versions
+tracks uploaded files, which is a different thing
+Template registry
+T24
+Statutory form × era, field definitions, per-template validation rules
+Driven by data, not code. Validation rules are written per template, never once for everything
+Audit chain columns
+T63
+Previous-hash and event-hash on the audit table, append-only grants
+Adding a chain later proves nothing about rows written before it
+Renaming pass
+T01
+{module}_dg_*
+tables,
+fk_*
+,
+idx_*
+Touches hand-written SQL in the search and chat services, and the security policies. Cheapest to do before more tables exist
+13 · What to build first
+waves W0 – W5
+Modules run at the same time. The waves keep the order right between them. One path runs through nearly everything.
+W0 foundations
+T01–T09 · source location
+config · audit · D2
+W1 pipeline
+T20–T33 · templates
+handlers · Marathi OCR
+W2 workbench
+T50–T55 · lanes
+queues · click-through
+W3 evidence
+T56–T67 · graph
+records · audit chain
+W1 connectors
+T40–T44 · abstraction
+folder · FTP · email
+W4 surfaces
+T70–T80 · citations
+reports · export · cloud
+W5 shipping
+T90–T97 · local models
+Helm · i18n · a11y
+critical path — T06 signed, then T04 and T05, or the workbench cannot start
+Decisions D-1, D-3, D-4, D-5, D-8 and assumptions A1, A2, A3 gate work inside these waves and belong to people, not sprints.
+One thing blocks everything else: agreeing how coordinates are written down. It is a short document and one meeting. Until it is signed, nobody can start the checking screen, the 360 views or citation click-through.
+14 · How we know each part is finished
+what "done" means
+Written as tests, because these are what should be running in CI when a module is finished. Several need sample documents with answers written out by a person, which we do not have yet (assumption A1, owned outside the team).
+Module
+The test that proves it
+Needs
+Foundations
+Every extracted fact has a page and a region inside the page box; a write with a null region raises; every threshold in use is read from
+sys_dg_config
+, none from a literal
+T02, T04, T06
+(a) Ingestion
+The same file arriving through two different connectors produces one document, one record of where it came from naming each source, and a PDF/A rendition with the original preserved. A failing connector alerts rather than dropping
+T40, T41
+(b) Processing
+The four sample documents come out matching the answers a person wrote; a spread with mismatched rows and an unknown unit both go to the review queue instead of into the data; a Marathi 7/12 extract gives Devanagari text, not empty strings
+T21, T26–T32, A1, D-4
+(c) Workbench
+Promotion with no actor is rejected at the write layer; a handwritten row needs explicit confirmation; fifty rows verified with the keyboard alone, each producing an audit event; a claimed row is invisible to a second operator
+T51, T55
+(d) Entity
+Tier 3 links are usable in search and badged, and absent from an export; bulk accept records the user, the score, the collection and the rule version on every link; undo removes them cleanly and the machine label stays
+T56–T59, T67
+(e) Search
+An unanswerable question is refused; every claim in an answer carries a citation that opens the highlighted region; a document is findable by metadata before its indexing finishes; a query typed in Marathi finds a Marathi 7/12 extract
+T70, T71, T74, T75
+(f) Records
+The correction test — base, current and history all retrievable, all cited, and the current view exactly re-derivable from the chain
+T60
+(g) Reports
+A corpus with known gaps produces the expected completeness score, and every number drills through to the affected records
+T76
+(h) Governance
+Altering one audit row is detected by the integrity checker at exactly that row; the application role cannot update or delete audit rows; a certificate carries hash, algorithm and both signature blocks
+T63, T65, A3
+(i) Data ops
+Re-uploading an identical file is detected rather than re-ingested; a bulk edit previews, audits per row, and cannot mark anything verified
+T79, T80
+(j) Deployment
+The egress test, and a clean install from the runbook by someone who did not build it
+T90–T93, A2
+Where the suite stands today.
+Nine files, 540 lines, covering authentication, tenant isolation, document and folder services, chat and search edges. Nothing covers the ingestion pipeline, the OCR path, the chunker or the migrations, and CI has no coverage threshold, so a thin suite cannot fail. Task T98 sets the threshold at today's number and raises it as these tests land.
+15 · What already exists in the code
+branch
+dev
+@
+3e78636
+Only the parts that matter for the work above. The full reading of the code, with evidence, is in the scope gap document.
+What exists
+How it helps
+What has to change
+Upload, MinIO storage, Celery hand-off, atomic ingest transaction
+The upload path is solid. A document either finishes completely or fails cleanly
+Becomes one implementation behind the connector interface
+Text extraction per format with a Tesseract fallback
+Where templates, the vision model and the handlers will hook in
+Tesseract runs English-only; the image path marks failed OCR as success; word boxes are computed and discarded
+Hybrid search — pgvector, full text, rank fusion, rerank, trilingual expansion, HyDE
+The best-built part of the code, and close to what the Scope of Work asks for
+Add citations, the refusal gate, record search, the trigram leg, and validate Devanagari indexing
+Tenant isolation through row-level security
+The hosted, multi-customer setup already works
+Confirm the isolation approach (D-2); add the six user roles on top
+Provider abstraction over LLM, embeddings, rerank and OCR
+Exactly where local models will plug in
+Add local implementations and make the toggle fail closed
+An audit table, request logging, a hash per version
+The columns we need for the chain already exist
+Widen coverage, chain the hashes, make the table append-only
+A drive product — folder tree, star, trash, chat, offline shell
+Finished front-end code and components we can reuse
+Appears nowhere in the Scope of Work. Record it as an accepted change or as out of scope (decision D-9), and settle whether nested folders survive (decision D-1)
+Two defects to fix on the way past, not later.
+Failed image OCR no longer sets
+extraction_failed
+, so an unreadable scan indexes with placeholder text as if it had succeeded — the software says it succeeded when it did not, which is the failure this product exists to prevent. And the JWT access token lives 30 days with a 60-day refresh, on a system meant to hold evidence. Tasks T33 and T99.
+Build design · 18-Aug-2026 · SoW VeritasDocs v1 v0.3 · task ids match the build backlog

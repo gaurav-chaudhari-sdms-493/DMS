@@ -12,8 +12,9 @@ import {
   FolderPlus,
   Upload,
   Sparkles,
+  Server,
 } from "lucide-react";
-import type { DriveStats, FolderTreeNode } from "@/types";
+import type { DriveStats, FolderTreeNode, DocumentListItem } from "@/types";
 import { FolderTreeSidebar } from "./FolderTreeSidebar";
 
 interface DriveSidebarProps {
@@ -21,10 +22,13 @@ interface DriveSidebarProps {
   onSelectView: (view: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat") => void;
   onOpenNewFolderModal: () => void;
   onTriggerFileUpload: () => void;
+  onOpenConnectorModal: () => void;
   stats: DriveStats | null;
   folderTree?: FolderTreeNode[];
   activeFolderId?: string | null;
   onSelectFolder?: (folderId: string) => void;
+  onSelectDoc?: (doc: DocumentListItem) => void;
+  onPreviewDoc?: (doc: DocumentListItem) => void;
 }
 
 export function DriveSidebar({
@@ -32,10 +36,13 @@ export function DriveSidebar({
   onSelectView,
   onOpenNewFolderModal,
   onTriggerFileUpload,
+  onOpenConnectorModal,
   stats,
   folderTree = [],
   activeFolderId = null,
   onSelectFolder,
+  onSelectDoc,
+  onPreviewDoc,
 }: DriveSidebarProps) {
   const [showNewMenu, setShowNewMenu] = useState(false);
   const [expandDriveTree, setExpandDriveTree] = useState(true);
@@ -48,7 +55,7 @@ export function DriveSidebar({
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
   };
 
-  const usedBytes = stats?.total_size_bytes || 0;
+  const usedBytes = stats?.total_bytes ?? stats?.total_size_bytes ?? 0;
 
   return (
     <aside className="w-60 flex-shrink-0 flex flex-col justify-between py-2 pr-2 select-none bg-gdriveBg overflow-y-auto">
@@ -65,7 +72,7 @@ export function DriveSidebar({
 
           {showNewMenu && (
             <>
-              <div className="fixed inset-0 z-40" onClick={() => setShowNewMenu(false)} />
+              <div role="presentation" className="fixed inset-0 z-40" onClick={() => setShowNewMenu(false)} />
               <div className="absolute left-3 top-14 z-50 w-56 bg-white rounded-2xl shadow-xl border border-[#e1e3e1] p-2 animate-fadeIn text-sm text-[#1f1f1f]">
                 <button
                   onClick={() => {
@@ -89,6 +96,19 @@ export function DriveSidebar({
                 >
                   <Upload className="w-4 h-4 text-[#00639b]" />
                   <span>File upload</span>
+                </button>
+
+                <div className="h-px bg-[#e1e3e1] my-1" />
+
+                <button
+                  onClick={() => {
+                    setShowNewMenu(false);
+                    onOpenConnectorModal();
+                  }}
+                  className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[#f0f4f9] font-medium text-left"
+                >
+                  <Server className="w-4 h-4 text-[#34a853]" />
+                  <span>Connect a device</span>
                 </button>
               </div>
             </>
@@ -125,17 +145,23 @@ export function DriveSidebar({
 
           {/* My Drive Node */}
           <div>
+            {/* Two sibling controls, not nested — a <button> inside a
+                role="button" row fails WCAG 4.1.2 (nested interactive
+                controls have ambiguous focus/activation semantics). */}
             <div
-              onClick={() => onSelectView("my-drive")}
-              className={`flex items-center justify-between w-full px-4 py-2 rounded-r-full text-sm font-medium cursor-pointer transition-all ${currentView === "my-drive" && !activeFolderId
+              className={`flex items-center justify-between w-full pr-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "my-drive" && !activeFolderId
                 ? "bg-[#c2e7ff] text-[#001d35] font-bold"
                 : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
                 }`}
             >
-              <div className="flex items-center gap-4">
+              <button
+                type="button"
+                onClick={() => onSelectView("my-drive")}
+                className="flex items-center gap-4 flex-1 pl-4 py-0 text-left cursor-pointer"
+              >
                 <HardDrive className="w-4 h-4" />
                 <span>My Drive</span>
-              </div>
+              </button>
               {folderTree.length > 0 && (
                 <button
                   onClick={(e) => {
@@ -143,6 +169,8 @@ export function DriveSidebar({
                     setExpandDriveTree(!expandDriveTree);
                   }}
                   className="p-1 rounded-full hover:bg-black/10 transition-transform"
+                  aria-label={expandDriveTree ? "Collapse My Drive folder tree" : "Expand My Drive folder tree"}
+                  aria-expanded={expandDriveTree}
                 >
                   <ChevronRight
                     className={`w-3.5 h-3.5 transition-transform ${expandDriveTree ? "rotate-90" : ""}`}
@@ -157,6 +185,8 @@ export function DriveSidebar({
                 tree={folderTree}
                 activeFolderId={activeFolderId}
                 onSelectFolder={onSelectFolder}
+                onSelectDoc={onSelectDoc}
+                onPreviewDoc={onPreviewDoc}
               />
             )}
           </div>
