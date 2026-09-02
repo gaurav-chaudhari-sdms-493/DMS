@@ -336,7 +336,7 @@ export function DocumentPreviewModal({
             onClick={() => setShowChat(!showChat)}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-xs ${
               showChat
-                ? "bg-[#0b57d0] text-white shadow-blue-500/20"
+                ? "bg-[#0d2e5c] text-white shadow-blue-500/20"
                 : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
             }`}
           >
@@ -348,7 +348,7 @@ export function DocumentPreviewModal({
             <a
               href={doc.download_url}
               download={doc.title}
-              className="flex items-center gap-2 px-4 py-2 bg-[#0b57d0] hover:bg-[#0945a5] text-white rounded-full text-xs font-semibold shadow-sm transition-all"
+              className="flex items-center gap-2 px-4 py-2 bg-[#0d2e5c] hover:bg-[#0945a5] text-white rounded-full text-xs font-semibold shadow-sm transition-all"
             >
               <Download className="w-4 h-4" />
               <span>Download</span>
@@ -473,7 +473,7 @@ export function DocumentPreviewModal({
               `}</style>
               {loadingText ? (
                 <div className="text-[#444746] text-center py-32 flex flex-col items-center gap-3">
-                  <div className="w-8 h-8 border-4 border-[#0b57d0] border-t-transparent rounded-full animate-spin" />
+                  <div className="w-8 h-8 border-4 border-[#0d2e5c] border-t-transparent rounded-full animate-spin" />
                   <span>Converting Word Document preview...</span>
                 </div>
               ) : docxHtml ? (
@@ -627,7 +627,7 @@ export function DocumentPreviewModal({
                 <span className="font-mono font-semibold text-[#1f1f1f]">{doc.title}</span>
                 <button
                   onClick={handleCopyText}
-                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#edf2fc] hover:bg-[#e1e5ea] text-[#0b57d0] font-semibold transition-colors border border-[#d3d7dc]"
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#edf2fc] hover:bg-[#e1e5ea] text-[#0d2e5c] font-semibold transition-colors border border-[#d3d7dc]"
                 >
                   {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                   <span>{copied ? "Copied" : "Copy content"}</span>
@@ -646,7 +646,7 @@ export function DocumentPreviewModal({
           {/* Fallback download card */}
           {!isPdf && !isDocx && !isExcel && !isCsv && !isPptx && !isImage && !isAudio && !isVideo && !isTextCode && (
             <div className="w-full max-w-md p-8 rounded-3xl bg-white border border-[#e1e3e1] flex flex-col items-center text-center shadow-xl">
-              <div className="w-20 h-20 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0b57d0] mb-4">
+              <div className="w-20 h-20 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center text-[#0d2e5c] mb-4">
                 <FileText className="w-10 h-10" />
               </div>
               <h3 className="text-lg font-bold text-[#1f1f1f] mb-2 truncate max-w-xs" title={doc.title}>
@@ -659,7 +659,7 @@ export function DocumentPreviewModal({
                 <a
                   href={doc.download_url}
                   download={doc.title}
-                  className="flex items-center gap-2 px-6 py-3 bg-[#0b57d0] hover:bg-[#0945a5] text-white rounded-full text-sm font-semibold shadow-md transition-all"
+                  className="flex items-center gap-2 px-6 py-3 bg-[#0d2e5c] hover:bg-[#0945a5] text-white rounded-full text-sm font-semibold shadow-md transition-all"
                 >
                   <Download className="w-4 h-4" />
                   <span>Download File</span>
@@ -705,19 +705,19 @@ export function DocumentPreviewModal({
                   setChatWidth(maxWidth);
                 }
               }}
-              className={`absolute left-0 top-0 bottom-0 w-2.5 -ml-1.5 cursor-col-resize z-50 flex items-center justify-center group hover:bg-[#0b57d0]/20 transition-colors ${
-                isResizingChat ? "bg-[#0b57d0]/30" : ""
+              className={`absolute left-0 top-0 bottom-0 w-2.5 -ml-1.5 cursor-col-resize z-50 flex items-center justify-center group hover:bg-[#0d2e5c]/20 transition-colors ${
+                isResizingChat ? "bg-[#0d2e5c]/30" : ""
               }`}
               title="Click and drag, or use arrow keys, to resize the chat panel"
             >
-              <div className="w-1 h-10 bg-[#c4c7c5] group-hover:bg-[#0b57d0] rounded-full transition-colors" />
+              <div className="w-1 h-10 bg-[#c4c7c5] group-hover:bg-[#0d2e5c] rounded-full transition-colors" />
             </div>
             {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
 
             {/* Header */}
             <div className="p-4 border-b border-[#e1e3e1] flex items-center justify-between bg-[#f8fafd] shadow-2xs">
               <div className="flex items-center gap-3">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0b57d0] to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[#0d2e5c] to-indigo-600 flex items-center justify-center text-white shadow-md shadow-blue-500/20">
                   <Sparkles className="w-4.5 h-4.5 text-white" />
                 </div>
                 <div>
@@ -745,7 +745,7 @@ export function DocumentPreviewModal({
             <div className="p-3 border-b border-[#e1e3e1] flex items-center gap-2 overflow-x-auto bg-[#f8fafd] text-xs">
               <button
                 onClick={() => handleSendChatMessage(`Summarize the main contents of ${doc.title}`)}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[#0b57d0] hover:bg-[#0b57d0] hover:text-white border border-[#d3d7dc] hover:border-[#0b57d0] whitespace-nowrap transition-all font-semibold shadow-2xs cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white text-[#0d2e5c] hover:bg-[#0d2e5c] hover:text-white border border-[#d3d7dc] hover:border-[#0d2e5c] whitespace-nowrap transition-all font-semibold shadow-2xs cursor-pointer"
               >
                 <Zap className="w-3.5 h-3.5" />
                 <span>Summarize</span>
@@ -775,7 +775,7 @@ export function DocumentPreviewModal({
                 >
                   <div
                     className={`w-7 h-7 rounded-full flex items-center justify-center text-white flex-shrink-0 shadow-xs ${
-                      msg.sender === "user" ? "bg-[#0b57d0]" : "bg-gradient-to-br from-indigo-600 to-[#0b57d0]"
+                      msg.sender === "user" ? "bg-[#0d2e5c]" : "bg-gradient-to-br from-indigo-600 to-[#0d2e5c]"
                     }`}
                   >
                     {msg.sender === "user" ? <User className="w-3.5 h-3.5" /> : <Bot className="w-3.5 h-3.5" />}
@@ -784,7 +784,7 @@ export function DocumentPreviewModal({
                   <div
                     className={`max-w-[85%] rounded-2xl p-3.5 space-y-1 overflow-hidden break-words [word-break:break-word] min-w-0 ${
                       msg.sender === "user"
-                        ? "bg-[#0b57d0] text-white font-medium rounded-tr-xs shadow-sm"
+                        ? "bg-[#0d2e5c] text-white font-medium rounded-tr-xs shadow-sm"
                         : "bg-white border border-[#e1e3e1] text-[#1f1f1f] rounded-tl-xs shadow-2xs"
                     }`}
                   >
@@ -804,7 +804,7 @@ export function DocumentPreviewModal({
 
               {aiThinking && (
                 <div className="flex gap-2.5 items-center text-[#747775] text-xs bg-white p-3 rounded-2xl border border-[#e1e3e1] w-fit shadow-2xs animate-pulse">
-                  <Sparkles className="w-4 h-4 text-[#0b57d0] animate-spin" />
+                  <Sparkles className="w-4 h-4 text-[#0d2e5c] animate-spin" />
                   <span>Analyzing {doc.title}...</span>
                 </div>
               )}
@@ -826,12 +826,12 @@ export function DocumentPreviewModal({
                   value={chatInput}
                   onChange={(e) => setChatInput(e.target.value)}
                   placeholder={`Ask AI about ${doc.title}...`}
-                  className="w-full pl-4 pr-10 py-2.5 rounded-full bg-[#edf2fc] border border-[#d3d7dc] text-xs text-[#1f1f1f] placeholder-[#747775] focus:outline-none focus:bg-white focus:border-[#0b57d0] focus:ring-2 focus:ring-[#0b57d0]/30 transition-all shadow-inner"
+                  className="w-full pl-4 pr-10 py-2.5 rounded-full bg-[#edf2fc] border border-[#d3d7dc] text-xs text-[#1f1f1f] placeholder-[#747775] focus:outline-none focus:bg-white focus:border-[#0d2e5c] focus:ring-2 focus:ring-[#0d2e5c]/30 transition-all shadow-inner"
                 />
                 <button
                   type="submit"
                   disabled={!chatInput.trim() || aiThinking}
-                  className="absolute right-1.5 p-1.5 rounded-full bg-[#0b57d0] hover:bg-[#0945a5] text-white disabled:opacity-40 transition-all hover:scale-105 shadow-sm"
+                  className="absolute right-1.5 p-1.5 rounded-full bg-[#0d2e5c] hover:bg-[#0945a5] text-white disabled:opacity-40 transition-all hover:scale-105 shadow-sm"
                   title="Send message"
                 >
                   <Send className="w-3.5 h-3.5" />

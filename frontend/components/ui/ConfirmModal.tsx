@@ -48,7 +48,7 @@ export function ConfirmModal({
       case "warning":
         return "bg-amber-600 hover:bg-amber-700 text-white shadow-amber-600/20";
       default:
-        return "bg-[#0b57d0] hover:bg-[#0945a5] text-white shadow-blue-600/20";
+        return "bg-[#0d2e5c] hover:bg-[#0945a5] text-white shadow-blue-600/20";
     }
   };
 

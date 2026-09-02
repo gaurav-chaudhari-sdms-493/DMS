@@ -91,12 +91,12 @@ export function SuggestedFilesTable({
       );
     }
     if (["json", "js", "ts", "py"].includes(ext)) {
-      return <FileCode className="w-5 h-5 text-[#0b57d0]" />;
+      return <FileCode className="w-5 h-5 text-[#0d2e5c]" />;
     }
     if (["png", "jpg", "jpeg", "svg"].includes(ext)) {
       return <ImageIcon className="w-5 h-5 text-[#a142f4]" />;
     }
-    return <FileText className="w-5 h-5 text-[#0b57d0] flex-shrink-0" />;
+    return <FileText className="w-5 h-5 text-[#0d2e5c] flex-shrink-0" />;
   };
 
   const renderGridPreview = (row: { title: string; downloadUrl?: string | null }) => {
@@ -140,14 +140,14 @@ export function SuggestedFilesTable({
           </p>
 
           <div className="w-full bg-white rounded-2xl p-5 border border-[#e1e3e1] shadow-xs space-y-3 text-left">
-            <div className="text-xs font-bold uppercase tracking-wider text-[#0b57d0] flex items-center gap-1.5">
-              <Star className="w-4 h-4 fill-[#0b57d0]" />
+            <div className="text-xs font-bold uppercase tracking-wider text-[#0d2e5c] flex items-center gap-1.5">
+              <Star className="w-4 h-4 fill-[#0d2e5c]" />
               <span>How to star any file or folder</span>
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-[#444746]">
               <div className="flex items-start gap-2.5 p-3 bg-[#f8f9fa] rounded-xl border border-[#e1e3e1]/70">
-                <div className="w-6 h-6 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] font-bold text-xs flex items-center justify-center shrink-0">1</div>
+                <div className="w-6 h-6 rounded-full bg-[#0d2e5c]/10 text-[#0d2e5c] font-bold text-xs flex items-center justify-center shrink-0">1</div>
                 <div>
                   <p className="font-semibold text-[#1f1f1f] mb-0.5">Click Star Icon</p>
                   <p className="text-[11px] text-[#747775] leading-normal">
@@ -157,7 +157,7 @@ export function SuggestedFilesTable({
               </div>
 
               <div className="flex items-start gap-2.5 p-3 bg-[#f8f9fa] rounded-xl border border-[#e1e3e1]/70">
-                <div className="w-6 h-6 rounded-full bg-[#0b57d0]/10 text-[#0b57d0] font-bold text-xs flex items-center justify-center shrink-0">2</div>
+                <div className="w-6 h-6 rounded-full bg-[#0d2e5c]/10 text-[#0d2e5c] font-bold text-xs flex items-center justify-center shrink-0">2</div>
                 <div>
                   <p className="font-semibold text-[#1f1f1f] mb-0.5">Context Menu</p>
                   <p className="text-[11px] text-[#747775] leading-normal">
@@ -173,7 +173,7 @@ export function SuggestedFilesTable({
 
     return (
       <div className="flex flex-col items-center justify-center p-12 bg-[#f0f4f9] rounded-3xl border border-dashed border-[#c4c7c5] text-center my-6 select-none">
-        <div className="w-14 h-14 rounded-full bg-[#c2e7ff] flex items-center justify-center text-[#0b57d0] mb-3">
+        <div className="w-14 h-14 rounded-full bg-[#c2e7ff] flex items-center justify-center text-[#0d2e5c] mb-3">
           <UploadCloud className="w-7 h-7" />
         </div>
         <h3 className="text-sm font-semibold text-[#1f1f1f] mb-1">A place for all your files</h3>
@@ -201,7 +201,7 @@ export function SuggestedFilesTable({
       <div className="flex items-center justify-between mb-3">
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="flex items-center gap-2 text-sm font-medium text-[#1f1f1f] hover:text-[#0b57d0] transition-colors"
+          className="flex items-center gap-2 text-sm font-medium text-[#1f1f1f] hover:text-[#0d2e5c] transition-colors"
         >
           <ChevronDown className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
           <span>Files ({documents.length})</span>
@@ -211,7 +211,7 @@ export function SuggestedFilesTable({
           <button
             onClick={() => setViewMode("list")}
             className={`p-1.5 rounded-full transition-all ${
-              viewMode === "list" ? "bg-white text-[#0b57d0] shadow-sm font-bold" : "text-[#444746] hover:bg-white"
+              viewMode === "list" ? "bg-white text-[#0d2e5c] shadow-sm font-bold" : "text-[#444746] hover:bg-white"
             }`}
             title="List view"
           >
@@ -220,7 +220,7 @@ export function SuggestedFilesTable({
           <button
             onClick={() => setViewMode("grid")}
             className={`p-1.5 rounded-full transition-all ${
-              viewMode === "grid" ? "bg-white text-[#0b57d0] shadow-sm font-bold" : "text-[#444746] hover:bg-white"
+              viewMode === "grid" ? "bg-white text-[#0d2e5c] shadow-sm font-bold" : "text-[#444746] hover:bg-white"
             }`}
             title="Grid view"
           >
@@ -242,7 +242,7 @@ export function SuggestedFilesTable({
                         checked={isAllSelected}
                         onChange={() => onToggleSelectAll && onToggleSelectAll()}
                         aria-label={isAllSelected ? "Deselect all files" : "Select all files"}
-                        className="w-4 h-4 rounded accent-[#0b57d0] cursor-pointer"
+                        className="w-4 h-4 rounded accent-[#0d2e5c] cursor-pointer"
                       />
                     </th>
                     <th className="py-2.5 px-3 font-medium">Name</th>
@@ -275,7 +275,7 @@ export function SuggestedFilesTable({
                             checked={isSelected}
                             onChange={() => onSelectDoc(row.raw, true)}
                             aria-label={`Select ${row.title}`}
-                            className="w-4 h-4 rounded accent-[#0b57d0] cursor-pointer"
+                            className="w-4 h-4 rounded accent-[#0d2e5c] cursor-pointer"
                           />
                         </td>
                         <td className="py-3 px-3">
@@ -343,7 +343,7 @@ export function SuggestedFilesTable({
                                     }}
                                     className="w-full flex items-center gap-2.5 px-3 py-2 text-xs text-[#1f1f1f] hover:bg-[#f0f4f9] font-medium"
                                   >
-                                    <Eye className="w-3.5 h-3.5 text-[#0b57d0]" />
+                                    <Eye className="w-3.5 h-3.5 text-[#0d2e5c]" />
                                     <span>Preview</span>
                                   </button>
                                 )}
@@ -436,7 +436,7 @@ export function SuggestedFilesTable({
                     aria-label={row.raw.title}
                     className={`group rounded-2xl border transition-all cursor-pointer flex flex-col overflow-hidden select-none ${
                       isSelected
-                        ? "bg-[#c2e7ff]/40 border-[#0b57d0] shadow-md font-semibold ring-1 ring-[#0b57d0]"
+                        ? "bg-[#c2e7ff]/40 border-[#0d2e5c] shadow-md font-semibold ring-1 ring-[#0d2e5c]"
                         : "bg-white border-[#e1e3e1] hover:shadow-md"
                     }`}
                   >
@@ -448,7 +448,7 @@ export function SuggestedFilesTable({
                         onChange={() => onSelectDoc(row.raw, true)}
                         onClick={(e) => e.stopPropagation()}
                         aria-label={`Select ${row.title}`}
-                        className={`absolute top-2 left-2 w-4 h-4 rounded accent-[#0b57d0] cursor-pointer bg-white/90 transition-opacity ${
+                        className={`absolute top-2 left-2 w-4 h-4 rounded accent-[#0d2e5c] cursor-pointer bg-white/90 transition-opacity ${
                           isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
                         }`}
                       />
@@ -458,7 +458,7 @@ export function SuggestedFilesTable({
                             e.stopPropagation();
                             if (onPreviewDoc) onPreviewDoc(row.raw);
                           }}
-                          className="p-1 rounded-full text-[#444746] hover:text-[#0b57d0] hover:bg-[#edf2fc] transition-all"
+                          className="p-1 rounded-full text-[#444746] hover:text-[#0d2e5c] hover:bg-[#edf2fc] transition-all"
                           title="Preview"
                         >
                           <Eye className="w-3.5 h-3.5" />

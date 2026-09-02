@@ -3,12 +3,13 @@
 <svg version="1.1" id="Layer_1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" x="0px" y="0px"
 	 viewBox="0 0 114.42 63.8" style="enable-background:new 0 0 114.42 63.8;" xml:space="preserve">
 <style type="text/css">
-	.st0{fill-rule:evenodd;clip-rule:evenodd;fill:#F6986B;}
-	.st1{fill-rule:evenodd;clip-rule:evenodd;fill:#F05623;}
+	.st0{fill-rule:evenodd;clip-rule:evenodd;fill:#C9A227;}
+	.st1{fill-rule:evenodd;clip-rule:evenodd;fill:#0D2E5C;}
 	.st2{font-family:'Syne-Bold';}
 	.st3{font-size:17.846px;}
-	.st4{fill:#F05623;}
+	.st4{fill:#C9A227;}
 	.st5{font-size:18.8747px;}
+	.st6{fill:#0D2E5C;}
 </style>
 <g>
 	<g>
@@ -18,7 +19,7 @@
 			C28.93,56.88,8.65,55.36,2.42,37.03c-3.69-11.3,3.84-16.66,4.71-10.65c5.58,27.31,22.45,26.29,29.48,17.02
 			C43.13,34.71,40.74,19.71,15.75,18.2L15.75,18.2z"/>
 	</g>
-	<text transform="matrix(1 0 0 1 45.1251 27.8054)" class="st2 st3">STARK</text>
+	<text transform="matrix(1 0 0 1 45.1251 27.8054)" class="st2 st3 st6">STARK</text>
 	<text transform="matrix(1 0 0 1 45.1251 45.8298)" class="st4 st2 st5">DRIVE</text>
 </g>
 </svg>

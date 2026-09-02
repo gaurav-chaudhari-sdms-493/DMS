@@ -81,7 +81,7 @@ export function DriveSidebar({
                   }}
                   className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[#f0f4f9] font-medium text-left"
                 >
-                  <FolderPlus className="w-4 h-4 text-[#0b57d0]" />
+                  <FolderPlus className="w-4 h-4 text-[#0d2e5c]" />
                   <span>New folder</span>
                 </button>
 
@@ -137,7 +137,7 @@ export function DriveSidebar({
               : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
               }`}
           >
-            <Sparkles className="w-4 h-4 text-[#0b57d0]" />
+            <Sparkles className="w-4 h-4 text-[#0d2e5c]" />
             <span>AI Chat</span>
           </button>
 

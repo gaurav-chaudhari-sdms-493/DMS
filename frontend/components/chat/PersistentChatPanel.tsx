@@ -183,7 +183,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
       const found = existing.find((f) => f.name === "Chat Uploads");
       if (found) return found.id;
 
-      const created = await api.folders.create("Chat Uploads", null, "#0b57d0");
+      const created = await api.folders.create("Chat Uploads", null, "#0d2e5c");
       return created.id;
     } catch (err) {
       console.warn("Could not resolve Chat Uploads folder:", err);
@@ -458,7 +458,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
         <div className="p-4 border-b border-[#e1e3e1]">
           <button
             onClick={() => handleCreateNewSession()}
-            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[#0b57d0] hover:bg-[#0945a5] text-white font-semibold rounded-2xl shadow-sm transition-all text-sm"
+            className="w-full flex items-center justify-center gap-2 py-2.5 px-4 bg-[#0d2e5c] hover:bg-[#0945a5] text-white font-semibold rounded-2xl shadow-sm transition-all text-sm"
           >
             <Plus className="w-4 h-4 stroke-[2.5]" />
             <span>New Chat</span>
@@ -495,7 +495,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                 }`}
               >
                 <div className="flex items-center gap-2.5 truncate">
-                  <MessageSquare className="w-4 h-4 flex-shrink-0 text-[#0b57d0]" />
+                  <MessageSquare className="w-4 h-4 flex-shrink-0 text-[#0d2e5c]" />
                   <span className="truncate">{s.title}</span>
                 </div>
 
@@ -513,7 +513,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
 
         {/* Footer info */}
         <div className="p-3 border-t border-[#e1e3e1] bg-[#f8fafd] text-[11px] text-[#747775] flex items-center gap-2">
-          <Sparkles className="w-3.5 h-3.5 text-[#0b57d0]" />
+          <Sparkles className="w-3.5 h-3.5 text-[#0d2e5c]" />
           <span>Powered by Stark AI Engine</span>
         </div>
       </div>
@@ -531,11 +531,11 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
               {isSidebarOpen ? (
                 <PanelLeftClose className="w-5 h-5" />
               ) : (
-                <PanelLeft className="w-5 h-5 text-[#0b57d0]" />
+                <PanelLeft className="w-5 h-5 text-[#0d2e5c]" />
               )}
             </button>
 
-            <div className="w-9 h-9 rounded-xl bg-[#0b57d0] text-white flex items-center justify-center shadow-sm flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-[#0d2e5c] text-white flex items-center justify-center shadow-sm flex-shrink-0">
               <Bot className="w-5 h-5" />
             </div>
             <div>
@@ -543,7 +543,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                 {activeSession?.title === "New Persistent Chat" ? "Stark AI Assistant" : activeSession?.title || "Stark AI Assistant"}
               </h2>
               <div className="flex items-center gap-2 text-xs text-[#444746] mt-0.5">
-                <span className="flex items-center gap-1 font-medium text-[#0b57d0]">
+                <span className="flex items-center gap-1 font-medium text-[#0d2e5c]">
                   <CheckCircle2 className="w-3.5 h-3.5" />
                   Grounded in My Drive
                 </span>
@@ -566,12 +566,12 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
               className="w-full px-6 py-2 flex items-center justify-between hover:bg-[#e4e9f0] transition-colors text-left"
             >
               <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-[#0b57d0]" />
+                <FileText className="w-4 h-4 text-[#0d2e5c]" />
                 <span className="text-xs font-semibold text-[#1f1f1f]">
                   Loaded Context ({activeLoadedDocs.length} {activeLoadedDocs.length === 1 ? "document" : "documents"})
                 </span>
               </div>
-              <div className="flex items-center gap-1 text-xs text-[#0b57d0] font-semibold">
+              <div className="flex items-center gap-1 text-xs text-[#0d2e5c] font-semibold">
                 <span>{isDocsExpanded ? "Hide Details" : "Show Details"}</span>
                 {isDocsExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               </div>
@@ -586,11 +586,11 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                   return (
                     <div
                       key={`${res.document_id}-${idx}`}
-                      className="p-2.5 rounded-xl bg-[#f8fafd] border border-[#e1e3e1] hover:border-[#0b57d0]/40 transition-all space-y-1.5 shadow-2xs"
+                      className="p-2.5 rounded-xl bg-[#f8fafd] border border-[#e1e3e1] hover:border-[#0d2e5c]/40 transition-all space-y-1.5 shadow-2xs"
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-1.5 min-w-0">
-                          <FileText className="w-3.5 h-3.5 text-[#0b57d0] flex-shrink-0" />
+                          <FileText className="w-3.5 h-3.5 text-[#0d2e5c] flex-shrink-0" />
                           <span className="font-semibold text-xs text-[#1f1f1f] truncate">
                             {res.document_name}
                           </span>
@@ -614,7 +614,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                       <div className="flex items-center justify-between pt-0.5">
                         <button
                           onClick={() => handlePreviewCard(res)}
-                          className="flex items-center gap-1 text-xs font-semibold text-[#0b57d0] hover:underline"
+                          className="flex items-center gap-1 text-xs font-semibold text-[#0d2e5c] hover:underline"
                         >
                           <Eye className="w-3.5 h-3.5" />
                           <span>Preview</span>
@@ -625,7 +625,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                             href={res.download_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="p-1 text-[#747775] hover:text-[#0b57d0]"
+                            className="p-1 text-[#747775] hover:text-[#0d2e5c]"
                             title="Download document"
                           >
                             <Download className="w-3.5 h-3.5" />
@@ -640,9 +640,9 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                 {activeLoadedDocs.length > 1 && (
                   <div className="col-span-full p-2.5 bg-[#edf2fc]/60 border border-[#c4c7c5]/50 rounded-xl flex items-center justify-between text-[11px] text-[#444746] mt-1">
                     <div className="flex items-center gap-1.5 font-medium">
-                      <Sparkles className="w-3.5 h-3.5 text-[#0b57d0]" />
+                      <Sparkles className="w-3.5 h-3.5 text-[#0d2e5c]" />
                       <span>Search Technology:</span>
-                      <span className="font-bold text-[#0b57d0] px-1.5 py-0.5 rounded-md bg-white border border-[#0b57d0]/20 shadow-2xs">
+                      <span className="font-bold text-[#0d2e5c] px-1.5 py-0.5 rounded-md bg-white border border-[#0d2e5c]/20 shadow-2xs">
                         {activeSession?.messages?.find((m) => m.role === "assistant" && m.search_mode)?.search_mode === "HyDE"
                           ? "HyDE"
                           : activeSession?.messages?.find((m) => m.role === "assistant" && m.search_mode)?.search_mode || "vector+keyword"}
@@ -677,7 +677,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                   <div
                     className={`rounded-2xl shadow-2xs ${
                       m.role === "user"
-                        ? "bg-[#0b57d0] text-white p-4 max-w-[85%] rounded-tr-xs font-medium shadow-sm"
+                        ? "bg-[#0d2e5c] text-white p-4 max-w-[85%] rounded-tr-xs font-medium shadow-sm"
                         : "bg-white border border-[#e1e3e1] text-[#1f1f1f] p-5 w-full max-w-[92%] md:max-w-[88%] rounded-tl-xs shadow-xs"
                     }`}
                   >
@@ -777,7 +777,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
             ) : (
               /* ChatGPT Empty State with Dynamic Prompt Cards */
               <div className="h-full flex flex-col items-center justify-center text-center py-8 px-4 max-w-3xl mx-auto">
-                <div className="w-16 h-16 rounded-3xl bg-[#0b57d0] text-white flex items-center justify-center mb-4 shadow-xl shadow-[#0b57d0]/20">
+                <div className="w-16 h-16 rounded-3xl bg-[#0d2e5c] text-white flex items-center justify-center mb-4 shadow-xl shadow-[#0d2e5c]/20">
                   <Sparkles className="w-8 h-8" />
                 </div>
                 <h3 className="text-2xl font-bold text-[#1f1f1f] mb-1">Stark AI Assistant</h3>
@@ -811,7 +811,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
 
             {sending && (
               <div className="flex items-center gap-3 p-4 bg-white border border-[#e1e3e1] rounded-2xl max-w-md animate-pulse shadow-sm">
-                <Sparkles className="w-4.5 h-4.5 text-[#0b57d0] animate-spin flex-shrink-0" />
+                <Sparkles className="w-4.5 h-4.5 text-[#0d2e5c] animate-spin flex-shrink-0" />
                 <div className="flex flex-col min-w-0">
                   <span className="text-xs font-bold text-[#1f1f1f] truncate">
                     {processingStatus}
@@ -869,7 +869,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                       key={idx}
                       className="relative group flex items-center gap-2.5 px-3 py-2 bg-[#f0f4f9] border border-[#d3d7dc] rounded-2xl shadow-2xs max-w-[200px] flex-shrink-0"
                     >
-                      <div className="w-8 h-8 rounded-xl bg-blue-100 text-[#0b57d0] flex items-center justify-center flex-shrink-0">
+                      <div className="w-8 h-8 rounded-xl bg-blue-100 text-[#0d2e5c] flex items-center justify-center flex-shrink-0">
                         <FileText className="w-4 h-4" />
                       </div>
                       <div className="min-w-0 flex-1">
@@ -897,13 +897,13 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                 e.preventDefault();
                 handleSendMessage();
               }}
-              className="flex items-center gap-2 bg-[#f0f4f9] rounded-3xl p-2 pl-4 border border-[#d3d7dc] focus-within:border-[#0b57d0] focus-within:bg-white transition-all shadow-xs"
+              className="flex items-center gap-2 bg-[#f0f4f9] rounded-3xl p-2 pl-4 border border-[#d3d7dc] focus-within:border-[#0d2e5c] focus-within:bg-white transition-all shadow-xs"
             >
               {/* Paperclip Button for Chat File Attachments */}
               <button
                 type="button"
                 onClick={() => chatFileInputRef.current?.click()}
-                className="p-2 text-[#444746] hover:text-[#0b57d0] hover:bg-[#e1e5ea] rounded-full transition-all"
+                className="p-2 text-[#444746] hover:text-[#0d2e5c] hover:bg-[#e1e5ea] rounded-full transition-all"
                 title="Attach document(s) to chat"
               >
                 <Paperclip className="w-5 h-5" />
@@ -921,7 +921,7 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
               <button
                 type="submit"
                 disabled={(!query.trim() && attachedFiles.length === 0) || sending}
-                className="p-2.5 bg-[#0b57d0] hover:bg-[#0945a5] disabled:opacity-40 text-white rounded-full shadow-xs transition-all flex items-center justify-center"
+                className="p-2.5 bg-[#0d2e5c] hover:bg-[#0945a5] disabled:opacity-40 text-white rounded-full shadow-xs transition-all flex items-center justify-center"
               >
                 <Send className="w-4 h-4 stroke-[2.5]" />
               </button>

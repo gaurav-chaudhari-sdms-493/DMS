@@ -81,7 +81,7 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
           return (
             <code
               key={i}
-              className="px-1.5 py-0.5 bg-[#f0f4f9] text-[#0b57d0] rounded font-mono text-xs border border-[#d3d7dc]"
+              className="px-1.5 py-0.5 bg-[#f0f4f9] text-[#0d2e5c] rounded font-mono text-xs border border-[#d3d7dc]"
             >
               {part.slice(1, -1)}
             </code>
@@ -94,7 +94,7 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
               key={i}
               type="button"
               onClick={() => onCitationClick(n)}
-              className="inline-flex items-center justify-center align-super ml-0.5 w-4 h-4 text-[10px] font-bold rounded-full bg-[#e8f0fe] hover:bg-[#c2e7ff] text-[#0b57d0] border border-[#c2d5f5] cursor-pointer leading-none"
+              className="inline-flex items-center justify-center align-super ml-0.5 w-4 h-4 text-[10px] font-bold rounded-full bg-[#e8f0fe] hover:bg-[#c2e7ff] text-[#0d2e5c] border border-[#c2d5f5] cursor-pointer leading-none"
               title={`Open source ${n}`}
             >
               {n}
@@ -143,7 +143,7 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
         elements.push(
           <h2
             key={`h2-${lineIdx}`}
-            className="text-lg font-extrabold text-[#001d35] mt-5 mb-2.5 pb-1 border-b border-[#0b57d0]/20"
+            className="text-lg font-extrabold text-[#001d35] mt-5 mb-2.5 pb-1 border-b border-[#0d2e5c]/20"
           >
             {parseInline(trimmed.slice(3))}
           </h2>
@@ -155,7 +155,7 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
         elements.push(
           <h1
             key={`h1-${lineIdx}`}
-            className="text-xl font-black text-[#0b57d0] mt-5 mb-3 pb-1 border-b-2 border-[#0b57d0]"
+            className="text-xl font-black text-[#0d2e5c] mt-5 mb-3 pb-1 border-b-2 border-[#0d2e5c]"
           >
             {parseInline(trimmed.slice(2))}
           </h1>
@@ -194,7 +194,7 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
         elements.push(
           <blockquote
             key={`quote-${lineIdx}`}
-            className="my-3 p-3 border-l-4 border-[#0b57d0] bg-[#f0f4f9] rounded-r-xl text-sm text-[#444746] italic"
+            className="my-3 p-3 border-l-4 border-[#0d2e5c] bg-[#f0f4f9] rounded-r-xl text-sm text-[#444746] italic"
           >
             {parseInline(trimmed.slice(2))}
           </blockquote>

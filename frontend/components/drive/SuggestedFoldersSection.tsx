@@ -47,7 +47,7 @@ export function SuggestedFoldersSection({
       {/* Header */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="flex items-center gap-2 text-sm font-medium text-[#1f1f1f] hover:text-[#0b57d0] transition-colors mb-3"
+        className="flex items-center gap-2 text-sm font-medium text-[#1f1f1f] hover:text-[#0d2e5c] transition-colors mb-3"
       >
         <ChevronDown className={`w-4 h-4 transition-transform ${collapsed ? "-rotate-90" : ""}`} />
         <span>Folders ({folders.length})</span>
@@ -73,7 +73,7 @@ export function SuggestedFoldersSection({
                 aria-label={item.name}
                 className={`group relative flex items-center justify-between p-3 rounded-2xl transition-all cursor-pointer shadow-xs select-none border ${
                   isSelected
-                    ? "bg-[#c2e7ff] border-[#0b57d0] shadow-sm font-semibold"
+                    ? "bg-[#c2e7ff] border-[#0d2e5c] shadow-sm font-semibold"
                     : "bg-[#f0f4f9] hover:bg-[#e1e5ea] border-transparent hover:border-[#c4c7c5]"
                 }`}
               >
@@ -111,7 +111,7 @@ export function SuggestedFoldersSection({
                         }}
                         className="flex items-center gap-2 w-full px-3 py-2 rounded-lg hover:bg-[#f0f4f9]"
                       >
-                        <FolderIcon className="w-4 h-4 text-[#0b57d0]" />
+                        <FolderIcon className="w-4 h-4 text-[#0d2e5c]" />
                         <span>Open</span>
                       </button>
                       <button

@@ -988,8 +988,8 @@ export default function DrivePage() {
         >
           {/* Drag and Drop Overlay Indicator */}
           {isDragging && (
-            <div className="absolute inset-0 bg-[#0b57d0]/10 backdrop-blur-md rounded-3xl border-2 border-dashed border-[#0b57d0] z-40 flex flex-col items-center justify-center p-8 text-center animate-fadeIn pointer-events-none">
-              <div className="w-20 h-20 bg-[#0b57d0] text-white rounded-full flex items-center justify-center shadow-xl shadow-[#0b57d0]/30 mb-4 animate-bounce">
+            <div className="absolute inset-0 bg-[#0d2e5c]/10 backdrop-blur-md rounded-3xl border-2 border-dashed border-[#0d2e5c] z-40 flex flex-col items-center justify-center p-8 text-center animate-fadeIn pointer-events-none">
+              <div className="w-20 h-20 bg-[#0d2e5c] text-white rounded-full flex items-center justify-center shadow-xl shadow-[#0d2e5c]/30 mb-4 animate-bounce">
                 <UploadCloud className="w-10 h-10" />
               </div>
               <h3 className="text-xl font-bold text-[#001d35] mb-1">Drop files here to upload to DMS</h3>
@@ -1040,7 +1040,7 @@ export default function DrivePage() {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setShowRightChatDrawer(!showRightChatDrawer)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0b57d0] hover:bg-[#0945a5] text-white rounded-full text-xs font-semibold shadow-sm transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0d2e5c] hover:bg-[#0945a5] text-white rounded-full text-xs font-semibold shadow-sm transition-all"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>{showRightChatDrawer ? "Hide AI Assistant" : "AI Persistent Chatbot"}</span>
@@ -1068,9 +1068,9 @@ export default function DrivePage() {
                       {searchResponse.results.length > 1 && (
                         <div className="p-3 bg-[#edf2fc]/60 border border-[#c4c7c5]/50 rounded-2xl flex items-center justify-between text-xs text-[#444746] mt-2 shadow-2xs">
                           <div className="flex items-center gap-2 font-medium">
-                            <Sparkles className="w-4 h-4 text-[#0b57d0]" />
+                            <Sparkles className="w-4 h-4 text-[#0d2e5c]" />
                             <span>Search Technology Used:</span>
-                            <span className="font-bold text-[#0b57d0] px-2.5 py-0.5 rounded-full bg-white border border-[#0b57d0]/20 shadow-2xs">
+                            <span className="font-bold text-[#0d2e5c] px-2.5 py-0.5 rounded-full bg-white border border-[#0d2e5c]/20 shadow-2xs">
                               {searchResponse.search_mode === "HyDE"
                                 ? "HyDE"
                                 : searchResponse.search_mode || "vector+keyword"}
@@ -1165,7 +1165,7 @@ export default function DrivePage() {
                         onClick={(e) => handleSelectFolder(f, e.ctrlKey || e.metaKey || e.shiftKey)}
                         onKeyDown={onKeyActivate(() => handleSelectFolder(f, false))}
                         className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
-                          isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
+                          isSelected ? "bg-[#c2e7ff] border-[#0d2e5c]" : "bg-[#f8f9fa] border-[#e1e3e1]"
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-2">
@@ -1220,7 +1220,7 @@ export default function DrivePage() {
                         onKeyDown={onKeyActivate(() => setPreviewDoc(d))}
                         onDoubleClick={() => setPreviewDoc(d)}
                         className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
-                          isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
+                          isSelected ? "bg-[#c2e7ff] border-[#0d2e5c]" : "bg-[#f8f9fa] border-[#e1e3e1]"
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-2">
@@ -1511,7 +1511,7 @@ export default function DrivePage() {
                   }}
                   className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-[#f0f4f9] font-medium"
                 >
-                  <Eye className="w-4 h-4 text-[#0b57d0]" />
+                  <Eye className="w-4 h-4 text-[#0d2e5c]" />
                   <span>{itemContextMenu.type === "folder" ? "Open Folder" : "Preview"}</span>
                 </button>
               )}

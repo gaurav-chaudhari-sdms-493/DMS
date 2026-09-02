@@ -92,7 +92,7 @@ export function DriveDetailPanel({
           </div>
         ) : (
           <div className="w-24 h-32 bg-white rounded-xl shadow-md border border-[#e1e3e1] flex flex-col overflow-hidden mb-3">
-            <div className="h-7 bg-[#0b57d0] flex items-center px-2.5 text-xs font-bold text-white tracking-wider">
+            <div className="h-7 bg-[#0d2e5c] flex items-center px-2.5 text-xs font-bold text-white tracking-wider">
               DOC
             </div>
             <div className="p-2.5 space-y-2 flex-1 bg-white">
@@ -112,7 +112,7 @@ export function DriveDetailPanel({
           <a
             href={selectedDoc.download_url}
             download={selectedDoc.title}
-            className="mt-4 flex items-center gap-2 px-4 py-2 bg-[#0b57d0] text-white hover:bg-[#0945a5] rounded-full text-xs font-semibold shadow-md transition-all"
+            className="mt-4 flex items-center gap-2 px-4 py-2 bg-[#0d2e5c] text-white hover:bg-[#0945a5] rounded-full text-xs font-semibold shadow-md transition-all"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Download file</span>
@@ -126,7 +126,7 @@ export function DriveDetailPanel({
           <button
             onClick={() => setActiveTab("details")}
             className={`flex-1 py-2.5 text-center transition-colors border-b-2 ${
-              activeTab === "details" ? "border-[#0b57d0] text-[#0b57d0] font-bold" : "border-transparent hover:text-[#1f1f1f]"
+              activeTab === "details" ? "border-[#0d2e5c] text-[#0d2e5c] font-bold" : "border-transparent hover:text-[#1f1f1f]"
             }`}
           >
             Details
@@ -134,7 +134,7 @@ export function DriveDetailPanel({
           <button
             onClick={() => setActiveTab("metadata")}
             className={`flex-1 py-2.5 text-center transition-colors border-b-2 ${
-              activeTab === "metadata" ? "border-[#0b57d0] text-[#0b57d0] font-bold" : "border-transparent hover:text-[#1f1f1f]"
+              activeTab === "metadata" ? "border-[#0d2e5c] text-[#0d2e5c] font-bold" : "border-transparent hover:text-[#1f1f1f]"
             }`}
           >
             AI Metadata ({docDetail?.metadata?.length || 0})
@@ -142,7 +142,7 @@ export function DriveDetailPanel({
           <button
             onClick={() => setActiveTab("versions")}
             className={`flex-1 py-2.5 text-center transition-colors border-b-2 ${
-              activeTab === "versions" ? "border-[#0b57d0] text-[#0b57d0] font-bold" : "border-transparent hover:text-[#1f1f1f]"
+              activeTab === "versions" ? "border-[#0d2e5c] text-[#0d2e5c] font-bold" : "border-transparent hover:text-[#1f1f1f]"
             }`}
           >
             Versions ({docDetail?.versions?.length || 1})
@@ -207,8 +207,8 @@ export function DriveDetailPanel({
                   <div key={idx} className="p-3 bg-[#f8f9fa] rounded-xl border border-[#e1e3e1] space-y-1 select-text">
                     <div className="flex items-center justify-between text-[#444746]">
                       <span className="font-semibold text-[#1f1f1f] capitalize">{keyStr}</span>
-                      <span className="flex items-center gap-1 text-[10px] text-[#0b57d0] font-semibold">
-                        <Sparkles className="w-3 h-3 text-[#0b57d0]" />
+                      <span className="flex items-center gap-1 text-[10px] text-[#0d2e5c] font-semibold">
+                        <Sparkles className="w-3 h-3 text-[#0d2e5c]" />
                         {score}%
                       </span>
                     </div>
@@ -241,7 +241,7 @@ export function DriveDetailPanel({
                     <a
                       href={ver.download_url}
                       download
-                      className="p-1.5 rounded-lg bg-white text-[#444746] hover:text-[#0b57d0] border border-[#e1e3e1]"
+                      className="p-1.5 rounded-lg bg-white text-[#444746] hover:text-[#0d2e5c] border border-[#e1e3e1]"
                     >
                       <Download className="w-3.5 h-3.5" />
                     </a>
