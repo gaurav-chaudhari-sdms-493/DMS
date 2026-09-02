@@ -12,6 +12,7 @@ import hashlib
 import hmac
 import logging
 import mimetypes
+import uuid
 from typing import Any, Dict, List, Optional, Tuple
 from uuid import UUID
 
@@ -20,7 +21,6 @@ from fastapi import (
     Depends,
     File,
     Form,
-    Header,
     HTTPException,
     Request,
     UploadFile,
@@ -37,7 +37,6 @@ from app.models.user import User
 from app.schemas.auth import TokenPayload
 from app.models.metadata_item import MetadataItem
 from app.services.connector_ingest_service import (
-    DEFAULT_CONNECTOR_EMAIL,
     already_ingested,
     get_connector_actor,
     get_or_create_folder_path,
@@ -108,7 +107,6 @@ async def verify_scanner_auth(
     auth_header = request.headers.get("Authorization")
     if auth_header and auth_header.startswith("Bearer "):
         try:
-            token_str = auth_header.split(" ", 1)[1]
             credentials = await bearer_scheme(request)
             if credentials:
                 user_payload = await get_current_user(credentials)
