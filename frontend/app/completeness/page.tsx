@@ -29,16 +29,22 @@ function flattenFolders(nodes: FolderTreeNode[], depth = 0): { id: string; name:
 interface Completeness {
   corpus_folder_id: string;
   documents: { total: number; pages_total: number; pages_failed: number; documents_with_failed_pages: number };
+  data_loss: { documents_with_loss: number; total_missing_words: number };
+  page_furniture: { documents_with_candidates: number };
   facts: { machine: number; in_review: number; verified: number; confidence_histogram: { bucket: string; count: number }[] };
   entity_edges: { machine: number; held: number; verified: number };
   missing_fields: { count: number };
 }
+
+const ROOT_FOLDER_ID = "root";
 
 const DRILL_CATEGORIES: { key: string; label: string }[] = [
   { key: "missing_fields", label: "Missing required fields" },
   { key: "failed_pages", label: "Documents with failed pages" },
   { key: "unverified_facts", label: "Unverified facts (machine + in-review)" },
   { key: "machine_facts", label: "Auto-committed facts (machine only)" },
+  { key: "data_loss_documents", label: "Documents with OCR data loss" },
+  { key: "page_furniture_documents", label: "Documents with header/footer candidates" },
 ];
 
 function StatBar({ label, value, total, color }: { label: string; value: number; total: number; color: string }) {
@@ -164,7 +170,13 @@ export default function CompletenessDashboardPage() {
           </div>
           {showFolderPicker && folders && (
             <div className="mt-3 max-h-64 overflow-y-auto flex flex-col gap-1">
-              {folders.length === 0 && <p className="text-sm text-[#747775]">No folders found.</p>}
+              <button
+                onClick={() => loadDashboard(ROOT_FOLDER_ID)}
+                className="text-left text-sm py-1.5 px-3 rounded-lg hover:bg-[#f0f4f9] italic text-[#444746]"
+              >
+                Root — documents not in any folder
+              </button>
+              {folders.length === 0 && <p className="text-sm text-[#747775]">No sub-folders found.</p>}
               {folders.map((f) => (
                 <button
                   key={f.id}
@@ -233,6 +245,40 @@ export default function CompletenessDashboardPage() {
                 </button>
               ) : (
                 <div className="text-xs text-green-700 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> No gaps found</div>
+              )}
+            </Card>
+
+            <Card className="bg-white border border-[#e1e3e1]">
+              <h2 className="text-sm font-bold mb-3">OCR data loss</h2>
+              <div className={`text-3xl font-bold ${data.data_loss.documents_with_loss > 0 ? "text-amber-600" : "text-green-600"}`}>
+                {data.data_loss.documents_with_loss}
+              </div>
+              <div className="text-xs text-[#747775] mb-3">
+                documents where extracted text dropped words ({data.data_loss.total_missing_words} words missing total)
+              </div>
+              {data.data_loss.documents_with_loss > 0 ? (
+                <button
+                  onClick={() => openDrill("data_loss_documents")}
+                  className="text-xs font-bold text-[#0b57d0] hover:underline flex items-center gap-1"
+                >
+                  <FileWarning className="w-3.5 h-3.5" /> Drill into data loss
+                </button>
+              ) : (
+                <div className="text-xs text-green-700 flex items-center gap-1"><CheckCircle2 className="w-3.5 h-3.5" /> No data loss detected</div>
+              )}
+            </Card>
+
+            <Card className="bg-white border border-[#e1e3e1]">
+              <h2 className="text-sm font-bold mb-3">Page furniture</h2>
+              <div className="text-3xl font-bold">{data.page_furniture.documents_with_candidates}</div>
+              <div className="text-xs text-[#747775] mb-3">documents with detected running headers/footers (informational, not an error)</div>
+              {data.page_furniture.documents_with_candidates > 0 && (
+                <button
+                  onClick={() => openDrill("page_furniture_documents")}
+                  className="text-xs font-bold text-[#0b57d0] hover:underline flex items-center gap-1"
+                >
+                  <ListChecks className="w-3.5 h-3.5" /> Drill into page furniture
+                </button>
               )}
             </Card>
 

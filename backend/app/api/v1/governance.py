@@ -1,6 +1,6 @@
 import uuid
 from typing import Optional
-from fastapi import APIRouter, Depends, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -10,6 +10,17 @@ from ...services.audit_service import verify_chain_integrity
 from ...services import completeness_service, certificate_service, corpus_calibration_service
 
 router = APIRouter(prefix="/governance", tags=["Governance"])
+
+
+def _parse_corpus_folder_id(raw: str) -> Optional[uuid.UUID]:
+    """"root" selects the unfiled corpus (documents with no folder);
+    anything else must be a real folder UUID."""
+    if raw == "root":
+        return None
+    try:
+        return uuid.UUID(raw)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="corpus_folder_id must be a UUID or 'root'")
 
 
 class CorpusCalibrationRequest(BaseModel):
@@ -53,13 +64,16 @@ async def get_section63_certificate_api(
 
 @router.get("/completeness/{corpus_folder_id}")
 async def get_corpus_completeness_api(
-    corpus_folder_id: uuid.UUID,
+    corpus_folder_id: str,
     current_user: TokenPayload = Depends(require_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
-    """T76 — completeness/reconciliation dashboard, gap-scored per corpus."""
+    """T76 — completeness/reconciliation dashboard, gap-scored per corpus.
+    corpus_folder_id="root" reports on unfiled documents (folder_id IS NULL),
+    which previously had no way to be selected here."""
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await completeness_service.get_corpus_completeness(db, tenant_id, corpus_folder_id)
+    parsed_folder_id = _parse_corpus_folder_id(corpus_folder_id)
+    return await completeness_service.get_corpus_completeness(db, tenant_id, parsed_folder_id)
 
 
 @router.post("/calibrate-corpus/{corpus_folder_id}")
@@ -92,11 +106,12 @@ async def calibrate_corpus_api(
 
 @router.get("/completeness/{corpus_folder_id}/drill")
 async def get_completeness_drill_api(
-    corpus_folder_id: uuid.UUID,
+    corpus_folder_id: str,
     category: str,
     current_user: TokenPayload = Depends(require_tenant_access),
     db: AsyncSession = Depends(get_db),
 ):
     """T76 — drill-through: the actual rows behind one dashboard number."""
     tenant_id = uuid.UUID(current_user.tenant_id)
-    return await completeness_service.get_completeness_drill(db, tenant_id, corpus_folder_id, category)
+    parsed_folder_id = _parse_corpus_folder_id(corpus_folder_id)
+    return await completeness_service.get_completeness_drill(db, tenant_id, parsed_folder_id, category)

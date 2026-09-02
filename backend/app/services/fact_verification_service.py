@@ -302,6 +302,15 @@ async def get_adjudication_queue(
     )
     facts = list(res.scalars().all())
 
+    # Queue rows previously carried no document context at all — an
+    # operator had to open "View Source" per item just to find out which
+    # document a field even came from (found reviewing workbench UX).
+    doc_ids = {f.document_id for f in facts}
+    doc_titles: Dict[uuid_module.UUID, str] = {}
+    if doc_ids:
+        doc_res = await db.execute(select(Document.id, Document.title).where(Document.id.in_(doc_ids)))
+        doc_titles = {row[0]: row[1] for row in doc_res.all()}
+
     # TS4 — one trust-signal lookup per distinct field_name in this page,
     # not per fact, so a queue page of 50 low-confidence facts sharing a
     # handful of field names costs a handful of lookups, not fifty.
@@ -321,6 +330,7 @@ async def get_adjudication_queue(
             {
                 "fact_id": str(f.id),
                 "document_id": str(f.document_id),
+                "document_title": doc_titles.get(f.document_id),
                 "field_name": f.field_name,
                 "value": f.value,
                 "confidence": f.confidence,

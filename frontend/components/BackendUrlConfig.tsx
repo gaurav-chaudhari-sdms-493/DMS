@@ -77,7 +77,7 @@ export default function BackendUrlConfig({ className = "", compact = false }: Ba
         </div>
 
         {activeUrl && (
-          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-medium bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
+          <div className="flex items-center gap-1.5 text-xs text-emerald-700 font-medium bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
             <Radio className="w-3.5 h-3.5 animate-pulse" />
             <span className="truncate max-w-[200px]">{activeUrl}</span>
           </div>

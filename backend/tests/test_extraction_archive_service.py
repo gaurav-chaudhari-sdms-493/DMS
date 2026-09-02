@@ -5,7 +5,7 @@ import pytest
 from app.database import AsyncSessionLocal
 from app.services.extraction_archive_service import (
     get_cached_ocr, record_ocr, compute_vlm_cache_key,
-    get_cached_vlm_response, record_vlm_response,
+    get_cached_vlm_response, record_vlm_response, overwrite_vlm_response,
 )
 
 
@@ -106,5 +106,54 @@ async def test_vlm_cache_round_trip():
 
             cached = await get_cached_vlm_response(db, key)
             assert cached == '{"rows": [], "marginalia": []}'
+        finally:
+            await db.rollback()
+
+
+@pytest.mark.asyncio
+async def test_vlm_cache_write_once_ignores_a_second_record_call():
+    """record_vlm_response is intentionally write-once -- the first
+    response for a key wins, a second call is a silent no-op. This is
+    exactly why the VLM parse-retry path (vlm_extraction.py) needs
+    overwrite_vlm_response instead, tested below."""
+    async with AsyncSessionLocal() as db:
+        try:
+            key = compute_vlm_cache_key(f"test_vlm_writeonce_{uuid.uuid4().hex}", 1, "a prompt")
+            await record_vlm_response(db, key, "first response")
+            await record_vlm_response(db, key, "second response")
+            await db.commit()
+
+            assert await get_cached_vlm_response(db, key) == "first response"
+        finally:
+            await db.rollback()
+
+
+@pytest.mark.asyncio
+async def test_overwrite_vlm_response_replaces_an_existing_entry():
+    async with AsyncSessionLocal() as db:
+        try:
+            key = compute_vlm_cache_key(f"test_vlm_overwrite_{uuid.uuid4().hex}", 1, "a prompt")
+            await record_vlm_response(db, key, "bad malformed response")
+            await db.commit()
+
+            await overwrite_vlm_response(db, key, "corrected response")
+            await db.commit()
+
+            assert await get_cached_vlm_response(db, key) == "corrected response"
+        finally:
+            await db.rollback()
+
+
+@pytest.mark.asyncio
+async def test_overwrite_vlm_response_writes_fresh_key_like_record():
+    async with AsyncSessionLocal() as db:
+        try:
+            key = compute_vlm_cache_key(f"test_vlm_overwrite_fresh_{uuid.uuid4().hex}", 1, "a prompt")
+            assert await get_cached_vlm_response(db, key) is None
+
+            await overwrite_vlm_response(db, key, "first-ever response")
+            await db.commit()
+
+            assert await get_cached_vlm_response(db, key) == "first-ever response"
         finally:
             await db.rollback()

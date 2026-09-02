@@ -236,6 +236,15 @@ export function SuggestedFilesTable({
               <table className="w-full text-left text-xs border-collapse">
                 <thead>
                   <tr className="border-b border-[#e1e3e1] text-[#444746] font-medium">
+                    <th className="py-2.5 pl-3 pr-1 w-8">
+                      <input
+                        type="checkbox"
+                        checked={isAllSelected}
+                        onChange={() => onToggleSelectAll && onToggleSelectAll()}
+                        aria-label={isAllSelected ? "Deselect all files" : "Select all files"}
+                        className="w-4 h-4 rounded accent-[#0b57d0] cursor-pointer"
+                      />
+                    </th>
                     <th className="py-2.5 px-3 font-medium">Name</th>
                     <th className="py-2.5 px-3 font-medium">Date added</th>
                     <th className="py-2.5 px-3 font-medium">Owner</th>
@@ -260,6 +269,15 @@ export function SuggestedFilesTable({
                           isSelected ? "bg-[#c2e7ff] text-[#001d35] font-semibold" : "hover:bg-[#edf2fc]"
                         }`}
                       >
+                        <td className="py-3 pl-3 pr-1" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => onSelectDoc(row.raw, true)}
+                            aria-label={`Select ${row.title}`}
+                            className="w-4 h-4 rounded accent-[#0b57d0] cursor-pointer"
+                          />
+                        </td>
                         <td className="py-3 px-3">
                           <div className="flex items-center gap-3 min-w-[240px]">
                             {getFileIcon(row.title, row.downloadUrl)}
@@ -424,6 +442,16 @@ export function SuggestedFilesTable({
                   >
                     <div className="relative">
                       {renderGridPreview(row)}
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => onSelectDoc(row.raw, true)}
+                        onClick={(e) => e.stopPropagation()}
+                        aria-label={`Select ${row.title}`}
+                        className={`absolute top-2 left-2 w-4 h-4 rounded accent-[#0b57d0] cursor-pointer bg-white/90 transition-opacity ${
+                          isSelected ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+                        }`}
+                      />
                       <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity bg-white/90 backdrop-blur-md rounded-full p-1 shadow-xs border border-[#e1e3e1]">
                         <button
                           onClick={(e) => {

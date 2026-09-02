@@ -48,6 +48,14 @@ class ResetPasswordRequest(BaseModel):
     reset_token: str
     new_password: str = Field(..., min_length=8)
 
+class ChangePasswordRequest(BaseModel):
+    """An already-logged-in user changing their own password — distinct
+    from ForgotPassword/ResetPassword, which are for a user who can't log
+    in at all. Requires the current password so anyone who finds an
+    unlocked session can't silently lock the real owner out."""
+    current_password: str
+    new_password: str = Field(..., min_length=8)
+
 class FileTypeCount(BaseModel):
     extension: str
     count: int

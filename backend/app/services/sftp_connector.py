@@ -206,3 +206,15 @@ async def sftp_poll_loop():
         except Exception as e:
             logger.error("SFTP poll cycle failed: %s", e)
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
+
+
+class SFTPConnector:
+    """T40 — Connector-protocol wrapper around this module's functions."""
+
+    name = "sftp"
+
+    async def poll_once(self) -> int:
+        return await poll_sftp_once()
+
+    async def run_loop(self) -> None:
+        await sftp_poll_loop()

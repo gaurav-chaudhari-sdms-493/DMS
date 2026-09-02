@@ -434,3 +434,12 @@ async def scanner_poll_loop():
         except Exception as e:
             logger.error("Scanner poll cycle error: %s", e)
         await asyncio.sleep(settings.scanner_poll_interval_seconds)
+
+class ScannerConnector:
+    name = "scanner"
+
+    async def poll_once(self) -> int:
+        return await poll_scanner_inbox_once()
+
+    async def run_loop(self) -> None:
+        await scanner_poll_loop()

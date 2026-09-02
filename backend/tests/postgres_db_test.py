@@ -17,4 +17,11 @@ async def main():
     await conn.close()
 
 
-asyncio.run(main())
+if __name__ == "__main__":
+    # Manual connectivity check, not a pytest test -- but its filename
+    # matches pytest's default `*_test.py` discovery pattern, so without
+    # this guard `pytest -q` (no path args) tried to import this module
+    # and immediately attempted a real localhost:5432 connection at
+    # collection time, failing the whole run with a connection error
+    # before any real test executed.
+    asyncio.run(main())

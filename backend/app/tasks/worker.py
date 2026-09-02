@@ -8,10 +8,10 @@ from uuid import UUID
 
 from celery import Celery
 from sqlalchemy import select, delete, text
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
 from ..ai.base import Message
 from ..ai.factory import get_embed_provider, get_llm_provider
-from ..database import AsyncSessionLocal
 from ..models.chunk import Chunk as DBChunk
 from ..models.document import Document
 from ..models.document_version import DocumentVersion
@@ -32,6 +32,28 @@ celery_app = Celery(
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _new_task_db_session_factory():
+    """A fresh, dedicated engine + session factory for one Celery task
+    invocation. Each task runs via asyncio.run() (a brand-new event loop
+    every time), but app.database's AsyncSessionLocal is bound to one
+    shared, pooled engine created once at process start — a connection
+    checked out during one task's event loop can be handed to a LATER
+    task's different (by-then-closed) loop, raising 'RuntimeError: Event
+    loop is closed'. A dedicated per-task engine, disposed at the end of
+    the task, avoids that entirely.
+
+    Real bug: fixed once (2026-07-22, commit fb6eecf) via exactly this
+    pattern, then silently reverted 5 days later (2026-07-27, commit
+    57b8029's "atomic ingestion pipeline" refactor) back to the shared
+    AsyncSessionLocal — the refactor's author wasn't aware they were
+    undoing the earlier fix. Confirmed live in worker logs: 36 real
+    'Event loop is closed' tracebacks during real document ingestion.
+    """
+    task_engine = create_async_engine(settings.postgres_url)
+    TaskSession = async_sessionmaker(task_engine, class_=AsyncSession, expire_on_commit=False)
+    return task_engine, TaskSession
 
 
 async def extract_metadata(text: str) -> dict:
@@ -61,7 +83,7 @@ Text snippet:
 
 async def _ingest_document_task_async(document_id_str: str, version_id_str: str, s3_path: str, tenant_id_str: str) -> None:
     """Celery task for full ingestion pipeline with ACID Atomicity: OCR → chunk → embed → store."""
-    from app.database import engine
+    task_engine, TaskSession = _new_task_db_session_factory()
     try:
         document_id = UUID(document_id_str)
         version_id = UUID(version_id_str)
@@ -96,7 +118,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         # chunking/parsing fix replays the archived response for free.
         pages = None
         try:
-            async with AsyncSessionLocal() as cache_db:
+            async with TaskSession() as cache_db:
                 pages = await get_cached_ocr(cache_db, file_hash, settings.ai_ocr_provider)
         except Exception as cache_err:
             logger.warning(f"TS3 OCR cache lookup failed for {document_id_str}: {cache_err}")
@@ -107,7 +129,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
             ocr = get_ocr_provider()
             pages = await ocr.extract_pages(file_bytes, filename)
             try:
-                async with AsyncSessionLocal() as cache_db:
+                async with TaskSession() as cache_db:
                     await record_ocr(cache_db, file_hash, settings.ai_ocr_provider, pages)
                     await cache_db.commit()
             except Exception as cache_err:
@@ -201,7 +223,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
 
         # 6. ATOMIC DATABASE TRANSACTION (All-or-Nothing Commit)
         # All database writes (chunks, metadata, document status) occur inside a single atomic transaction.
-        async with AsyncSessionLocal() as db:
+        async with TaskSession() as db:
             async with db.begin():
                 await db.execute(text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": tenant_id_str})
                 # Purge pre-existing chunks and non-quality metadata for this version/document
@@ -367,7 +389,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
         logger.error(f"Ingestion failed for document {document_id_str}: {e}", exc_info=True)
         # ATOMIC CLEANUP & FAILURE RECORDING
         # If any operation fails, roll back all DB writes, purge orphaned rows, and mark document as failed.
-        async with AsyncSessionLocal() as db_fail:
+        async with TaskSession() as db_fail:
             async with db_fail.begin():
                 try:
                     await db_fail.execute(text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": tenant_id_str})
@@ -401,7 +423,7 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 except Exception as inner_e:
                     logger.error(f"Failed to record ingestion failure status for {document_id_str}: {inner_e}")
     finally:
-        await engine.dispose()
+        await task_engine.dispose()
 
 
 celery_app.conf.beat_schedule = {
@@ -420,9 +442,13 @@ def ingest_document_task(document_id_str: str, version_id_str: str, s3_path: str
 
 async def _cleanup_trashed_items_async() -> None:
     from app.services.document_service import cleanup_expired_trashed_items
-    retention_days = await get_int("trash_retention_days", 30)
-    async with AsyncSessionLocal() as db:
-        await cleanup_expired_trashed_items(db, retention_days=retention_days)
+    task_engine, TaskSession = _new_task_db_session_factory()
+    try:
+        retention_days = await get_int("trash_retention_days", 30)
+        async with TaskSession() as db:
+            await cleanup_expired_trashed_items(db, retention_days=retention_days)
+    finally:
+        await task_engine.dispose()
 
 
 @celery_app.task(name="app.tasks.cleanup_trashed_items_task")

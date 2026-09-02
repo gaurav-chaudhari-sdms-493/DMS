@@ -228,3 +228,15 @@ async def watch_folder_loop():
         except Exception as e:
             logger.error("Watched folder poll cycle failed: %s", e)
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
+
+
+class WatchedFolderConnector:
+    """T40 — Connector-protocol wrapper around this module's functions."""
+
+    name = "watched_folder"
+
+    async def poll_once(self) -> int:
+        return await poll_watched_folder_once()
+
+    async def run_loop(self) -> None:
+        await watch_folder_loop()

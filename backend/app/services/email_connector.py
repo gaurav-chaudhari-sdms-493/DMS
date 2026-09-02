@@ -130,3 +130,15 @@ async def email_poll_loop():
         except Exception as e:
             logger.error("Email poll cycle failed: %s", e)
         await asyncio.sleep(POLL_INTERVAL_SECONDS)
+
+
+class EmailConnector:
+    """T40 — Connector-protocol wrapper around this module's functions."""
+
+    name = "email"
+
+    async def poll_once(self) -> int:
+        return await poll_email_once()
+
+    async def run_loop(self) -> None:
+        await email_poll_loop()
