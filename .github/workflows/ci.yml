@@ -108,6 +108,13 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           APP_ENV: test
           JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
+          # test_cohere_reranker.py::test_cohere_reranker_execution makes a
+          # real, unmocked call to Cohere's rerank API -- inert (empty
+          # string, same failure as before) until a COHERE_API_KEY repo
+          # secret is actually added in GitHub settings; wiring it here so
+          # it works the moment that secret exists, without a further code
+          # change.
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
         run: |
           cd backend
           pytest tests/ --cov-report=json
