@@ -33,6 +33,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Start MinIO
+        # Not a `services:` entry: the minio/minio image needs `server
+        # /data` passed as its container command (bare `docker run
+        # minio/minio` just prints --help and exits), and GitHub Actions
+        # service containers have no way to override CMD. config.py's
+        # defaults (s3_endpoint_url=http://localhost:9000, aws creds
+        # minioadmin/minioadmin) already match this exactly, so no extra
+        # env vars are needed in the pytest step below. Any test that does
+        # a real upload (test_document_bulk_upload_partial_failures, etc.)
+        # was failing here with "Could not connect to the endpoint URL"
+        # since no S3-compatible service existed in this job at all.
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            echo "waiting for minio..."; sleep 2
+          done
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -56,6 +76,20 @@ jobs:
           # bugs only, no style/E-code linting) while making the existing
           # suppressions real.
           flake8 --select=F backend/app backend/migrations
+
+      - name: Run Alembic Migrations
+        # The postgres service container above starts genuinely empty --
+        # nothing in this workflow ever ran migrations against it, so
+        # every test touching a real table failed with UndefinedTableError
+        # ("relation ... does not exist"), not because of anything the
+        # test suite itself was verifying. Confirmed pre-existing: the
+        # PR #8 merge commit's CI run failed the identical way before any
+        # of this PR's changes existed.
+        env:
+          POSTGRES_URL: postgresql+asyncpg://postgres:password@localhost:5432/docsearch_db
+        run: |
+          cd backend
+          alembic upgrade head
 
       - name: Run Backend Pytest Suite
         env:
