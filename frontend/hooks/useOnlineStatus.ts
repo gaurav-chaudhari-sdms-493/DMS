@@ -1,10 +1,36 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode, createElement } from "react";
 import { offlineStore, syncOfflineData } from "@/lib/offlineStore";
 import { api, getBaseUrl } from "@/lib/api";
 
-export function useOnlineStatus() {
+interface OnlineStatusValue {
+  isOnline: boolean;
+  pendingCount: number;
+  isSyncing: boolean;
+  syncStatusMsg: string;
+  triggerSync: () => Promise<void>;
+  updatePendingCount: () => void;
+}
+
+// Real bug found live 2026-09-02: this used to be a plain hook, called
+// independently by both drive/page.tsx and OfflineBanner.tsx (each its
+// own separate useState/useEffect instance) -- and NOWHERE else. The
+// online/offline event listeners, the 10s polling loop, and triggerSync()
+// only existed on whichever page happened to mount one of those two
+// components, which in practice meant only /drive. A file queued offline
+// from /upload (or any other page) never synced until the user happened
+// to navigate to /drive -- confirmed live: went offline, uploaded a file
+// (queued correctly), came back online while still on /upload, and the
+// pending count stayed at 1 with no sync attempt.
+//
+// Fixed by making this a single Context instance mounted once in
+// app/layout.tsx (OnlineStatusProvider), so the listeners/polling/sync
+// logic run exactly once, application-wide, regardless of which page is
+// active. useOnlineStatus() now just reads that shared instance --
+// existing call sites (drive/page.tsx, OfflineBanner.tsx) needed no
+// changes.
+function useOnlineStatusInternal(): OnlineStatusValue {
   const [isOnline, setIsOnline] = useState<boolean>(true);
   const [pendingCount, setPendingCount] = useState<number>(0);
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
@@ -105,4 +131,19 @@ export function useOnlineStatus() {
     triggerSync,
     updatePendingCount,
   };
+}
+
+const OnlineStatusContext = createContext<OnlineStatusValue | null>(null);
+
+export function OnlineStatusProvider({ children }: { children: ReactNode }) {
+  const value = useOnlineStatusInternal();
+  return createElement(OnlineStatusContext.Provider, { value }, children);
+}
+
+export function useOnlineStatus(): OnlineStatusValue {
+  const ctx = useContext(OnlineStatusContext);
+  if (!ctx) {
+    throw new Error("useOnlineStatus() must be used within <OnlineStatusProvider> (mounted in app/layout.tsx)");
+  }
+  return ctx;
 }
