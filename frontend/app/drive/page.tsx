@@ -414,41 +414,74 @@ export default function DrivePage() {
   };
 
   const handleSelectFolder = (folder: Folder, isMulti?: boolean) => {
+    // Same bug and same fix as handleSelectDoc above -- see its comment.
+    if (isMulti) {
+      setSelectedDocIds(new Set());
+      setSelectedFolderIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(folder.id)) next.delete(folder.id);
+        else next.add(folder.id);
+        return next;
+      });
+      return;
+    }
+
+    const isSoleSelection = selectedFolderIds.size === 1 && selectedFolderIds.has(folder.id) && selectedFolder?.id === folder.id;
+    if (isSoleSelection) {
+      setSelectedFolderIds(new Set());
+      setSelectedFolder(null);
+      setShowDetailPanel(false);
+      return;
+    }
+
     setSelectedDoc(null);
+    setSelectedDocIds(new Set());
     setSelectedFolder(folder);
     setShowDetailPanel(true);
-
-    setSelectedFolderIds((prev) => {
-      const next = new Set(isMulti ? prev : []);
-      if (next.has(folder.id)) {
-        next.delete(folder.id);
-      } else {
-        next.add(folder.id);
-      }
-      return next;
-    });
-    if (!isMulti) {
-      setSelectedDocIds(new Set());
-    }
+    setSelectedFolderIds(new Set([folder.id]));
   };
 
   const handleSelectDoc = (doc: DocumentListItem, isMulti?: boolean) => {
+    // Real bug found live 2026-09-02: unchecking an already-selected row's
+    // checkbox (or clicking an already-sole-selected row again) never
+    // actually deselected it. The old logic always built `next` from a
+    // FRESH empty set whenever isMulti was false, so `next.has(doc.id)`
+    // was always false for a plain click -- it could only ever add, never
+    // remove, no matter what was already selected. It also unconditionally
+    // reopened the detail panel on every call, including checkbox clicks
+    // that are meant to be pure bulk-selection with no detail-panel side
+    // effect -- which is what looked like the row "shifting" (the panel
+    // popping open/refocusing) on an action that should have just cleared
+    // a checkbox.
+    if (isMulti) {
+      // Bulk multi-select (checkbox, ctrl/shift+click) -- toggles the
+      // selection set only, never touches the single-doc detail panel.
+      setSelectedFolderIds(new Set());
+      setSelectedDocIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(doc.id)) next.delete(doc.id);
+        else next.add(doc.id);
+        return next;
+      });
+      return;
+    }
+
+    // Plain click: single-select. Clicking the row that's already the
+    // sole selection deselects it and closes the detail panel, instead of
+    // silently re-adding it to an empty set (the actual bug).
+    const isSoleSelection = selectedDocIds.size === 1 && selectedDocIds.has(doc.id) && selectedDoc?.id === doc.id;
+    if (isSoleSelection) {
+      setSelectedDocIds(new Set());
+      setSelectedDoc(null);
+      setShowDetailPanel(false);
+      return;
+    }
+
     setSelectedFolder(null);
+    setSelectedFolderIds(new Set());
     setSelectedDoc(doc);
     setShowDetailPanel(true);
-
-    setSelectedDocIds((prev) => {
-      const next = new Set(isMulti ? prev : []);
-      if (next.has(doc.id)) {
-        next.delete(doc.id);
-      } else {
-        next.add(doc.id);
-      }
-      return next;
-    });
-    if (!isMulti) {
-      setSelectedFolderIds(new Set());
-    }
+    setSelectedDocIds(new Set([doc.id]));
   };
 
   const handleToggleSelectAll = () => {
