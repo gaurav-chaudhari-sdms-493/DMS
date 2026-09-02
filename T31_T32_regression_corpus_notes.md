@@ -142,15 +142,97 @@ template library seeded from an official, human-verified form catalogue,
 which needs A1 — but it closes the "works on this one dev DB only" gap for
 the two templates that do exist.
 
+## Update 2026-09-02 — a real, previously-unclassified corpus + a new Form A template
+
+User pointed at two real documents already sitting in the tenant
+(`Ambajogai (1).pdf`, 68 pages; `Aurangabad-Shia.pdf`, 12 pages) that had
+sat `unclassified` since 2026-08-28, never processed. Downloaded both from
+MinIO and rendered pages directly to understand why no template matched.
+
+**Real finding: same 1973/74 Marathwada Wakf Board gazette family as the
+existing spread template, but a different sub-form.** Both documents are
+almost entirely "Part A" — wakfs with no property, or property too small
+to need listing, per each document's own cover note ("A Means Wakfs
+having no property..."). Part A rows are fully self-contained on ONE
+page: 8 columns (serial+village, wakf name, sect, object, wakf name
+(col 5), creation date, deed details, mutawalli) — no facing/continuation
+page. That's exactly the existing template's *left*-half field set, just
+never needing a right half. The existing template is `layout='spread'`
+and assumes every row needs a right-half page (true for its Part B/C
+rows), which is why classification correctly found no match — not a bug,
+a genuinely different sub-form.
+
+Registered a new template (`scripts/register_waqf_gazette_form_a.py`,
+kept as a reusable tool): "Maharashtra State Wakf Gazette Register (Form
+A, no-property Wakfs)" | "Marathwada Region Gazette, 1973-1974",
+`layout='single_page'`, the same 8 field names as the existing template's
+left half (so a future merge into one smarter mixed-layout template stays
+easy). Manually classified both documents against it (automatic
+LLM-classification wasn't re-run; this was a direct, audited assignment,
+same mechanism T25's manual-override endpoint already provides) and ran
+real VLM extraction: Aurangabad-Shia wrote 170 facts, Ambajogai wrote 401.
+
+**Ground truth hand-verified 2026-09-02** by rendering page 2 of each to
+PNG and reading it directly against the extracted Facts (same method as
+every other entry in this file). Both pass at 100% recall on every
+checked field — `sect`, `object`, `wakf_name_col5`, and `mutawalli_name`
+all matched my independent reading exactly, including correct ditto-chain
+(TS5) expansion of "Do."/"Do," marks down the page.
+
+**Real bug found: a stamp-obscured seed row corrupts an entire page's
+ditto-filled values, not just its own row.** Ambajogai page 2 has a real
+ink stamp ("Maharashtra State Board Of Wakfs, Aurangabad") physically
+overlapping row 1's `deed_details`/`mutawalli_name` cells. The VLM
+misread the obscured text, and ditto-chain then correctly-per-its-own-
+logic propagated that one wrong reading down every "Do." row on the page
+— all 15 rows show the same garbled `deed_details` value. This is a new
+failure mode, not seen on the stamp-free pages checked so far: previous
+ditto-chain testing (TS5) never happened to hit a page where the *seed*
+row itself was misread. Excluded `deed_details` from this document's
+ground truth rather than guess at a fix — flagged, matching this file's
+established practice for real structural gaps.
+
+**Also fixed a real, silent bug in `accuracy_baseline.py` itself while
+adding these two documents**: `check_document()` queried
+`GET /facts/queue?category=low_confidence`, which only returns
+`in_review` facts. Every ground-truth value for these two new documents
+landed as a high-confidence `machine` fact (0.96-0.99 confidence) and
+would never have shown up there — the script would have silently reported
+0% recall on entirely correct extractions. Rewrote it to query
+`doc_dg_facts` directly (no more `--email`/`--password` needed either),
+which is what the script's own docstring already promised ("recovered
+*somewhere* in the document's Facts") but wasn't actually doing.
+
+**Corpus is now 5 real documents, 3 passing at 100% recall** (16/16
+hand-verified fields), 2 documented-failing (unchanged, pre-existing
+spread-join gap). Real `docker compose exec backend python3
+scripts/accuracy_baseline.py` output:
+
+```
+[1] Waqf Institution Registration File — 392 facts, 6/6 (100%)
+[4] Aurangabad-Shia.pdf (Form A) — 170 facts, 4/4 (100%)
+[5] Ambajogai (1).pdf (Form A) — 401 facts, 6/6 (100%)
+Corpus size: 5 real documents (3 passing, avg 100% recall; 2 documented-failing)
+```
+
 ## What's needed to actually close T25/T31/T32
 
 - **A1**: a real, official reference corpus with human-verified ground
-  truth across a representative document sample — not 2 documents one
-  person hand-checked in a session.
+  truth across a representative document sample — now 5 documents one
+  person hand-checked across two sessions, still not an official corpus
+  with representative coverage (no handwritten-heavy sample, no damaged/
+  torn-page sample, no non-gazette Wakf form type yet).
 - **D-4**: someone needs to agree what accuracy is "good enough" — this
   report has no pass/fail bar, it just states recall.
 - The gazette's left-page parse-retry fix (above) before that document can
   move from "documented known-failing" to "passing."
+- The stamp-obscured-seed-row ditto-corruption bug (above) — needs either
+  stamp/seal detection or a per-row confidence signal that can veto a
+  ditto-chain when the seed cell itself looks unreadable.
+- A real fix for Part B/C rows within a Form A document (currently only
+  the first 8 columns are captured for those rows) — would need either a
+  combined template that switches sub-layout per row, or per-row
+  classification instead of per-document.
 - Wiring `accuracy_baseline.py` (or its successor) into CI once real
   reference PDFs are committed to the repo — right now it depends on live
   data in a real tenant, which CI shouldn't depend on.
