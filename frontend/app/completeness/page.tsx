@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -112,6 +112,18 @@ export default function CompletenessDashboardPage() {
     }
   };
 
+  // Real documents are frequently unfiled (folder_id IS NULL) rather than
+  // organized into folders, so a blank dashboard on first load -- with no
+  // indication that "Root" is where the real data actually lives -- read
+  // as broken ("failing on real folders") when a user instead pasted or
+  // browsed to a folder that only had old, pre-page-tracking documents in
+  // it. Auto-loading Root on mount gives a real, non-empty view by
+  // default; Browse/Load still work exactly as before for any other folder.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    loadDashboard(ROOT_FOLDER_ID);
+  }, []);
+
   const openDrill = async (category: string) => {
     setDrillCategory(category);
     setDrillRows(null);
@@ -143,7 +155,7 @@ export default function CompletenessDashboardPage() {
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-[#0b57d0]" />
+            <BarChart3 className="w-5 h-5 text-[#0d2e5c]" />
             Completeness Dashboard
           </h1>
         </div>
@@ -151,15 +163,18 @@ export default function CompletenessDashboardPage() {
 
       <main className="max-w-5xl mx-auto px-6 py-6">
         <Card className="bg-white border border-[#e1e3e1] mb-6">
+          <p className="text-[11px] text-[#747775] mb-2">
+            Don&apos;t have a folder ID? Click <b>Browse folders</b> to pick a folder by name instead.
+          </p>
           <div className="flex gap-2">
             <input
               type="text"
               aria-label="Corpus folder ID"
-              placeholder="Corpus folder ID"
+              placeholder="Click Browse folders to pick one — or paste a folder ID here"
               value={folderId}
               onChange={(e) => setFolderId(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && loadDashboard()}
-              className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
+              className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0d2e5c]/40"
             />
             <Button variant="secondary" size="sm" loading={foldersLoading} onClick={openFolderPicker}>
               Browse folders
@@ -200,7 +215,7 @@ export default function CompletenessDashboardPage() {
 
         {loading && (
           <div className="flex justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-[#0b57d0]" />
+            <Loader2 className="w-6 h-6 animate-spin text-[#0d2e5c]" />
           </div>
         )}
 
@@ -223,10 +238,17 @@ export default function CompletenessDashboardPage() {
               {data.documents.pages_failed > 0 && (
                 <button
                   onClick={() => openDrill("failed_pages")}
-                  className="mt-3 text-xs font-bold text-[#0b57d0] hover:underline flex items-center gap-1"
+                  className="mt-3 text-xs font-bold text-[#0d2e5c] hover:underline flex items-center gap-1"
                 >
                   <FileWarning className="w-3.5 h-3.5" /> Drill into failed pages
                 </button>
+              )}
+              {data.documents.total > 0 && data.documents.pages_total === 0 && (
+                <p className="mt-3 text-xs text-[#747775] bg-[#f8f9fa] border border-[#e1e3e1] rounded-lg px-3 py-2">
+                  This folder has {data.documents.total} document{data.documents.total === 1 ? "" : "s"}, but none
+                  have a recorded page count — usually older documents uploaded before page-level tracking
+                  existed. Try a different folder, or <b>Root</b> for unfiled documents, to see real stats.
+                </p>
               )}
             </Card>
 
@@ -239,7 +261,7 @@ export default function CompletenessDashboardPage() {
               {data.missing_fields.count > 0 ? (
                 <button
                   onClick={() => openDrill("missing_fields")}
-                  className="text-xs font-bold text-[#0b57d0] hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-[#0d2e5c] hover:underline flex items-center gap-1"
                 >
                   <ListChecks className="w-3.5 h-3.5" /> Drill into missing fields
                 </button>
@@ -259,7 +281,7 @@ export default function CompletenessDashboardPage() {
               {data.data_loss.documents_with_loss > 0 ? (
                 <button
                   onClick={() => openDrill("data_loss_documents")}
-                  className="text-xs font-bold text-[#0b57d0] hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-[#0d2e5c] hover:underline flex items-center gap-1"
                 >
                   <FileWarning className="w-3.5 h-3.5" /> Drill into data loss
                 </button>
@@ -275,7 +297,7 @@ export default function CompletenessDashboardPage() {
               {data.page_furniture.documents_with_candidates > 0 && (
                 <button
                   onClick={() => openDrill("page_furniture_documents")}
-                  className="text-xs font-bold text-[#0b57d0] hover:underline flex items-center gap-1"
+                  className="text-xs font-bold text-[#0d2e5c] hover:underline flex items-center gap-1"
                 >
                   <ListChecks className="w-3.5 h-3.5" /> Drill into page furniture
                 </button>
@@ -288,10 +310,10 @@ export default function CompletenessDashboardPage() {
               <StatBar label="In review" value={data.facts.in_review} total={factTotal} color="bg-amber-500" />
               <StatBar label="Verified" value={data.facts.verified} total={factTotal} color="bg-green-500" />
               <div className="flex gap-3 mt-3">
-                <button onClick={() => openDrill("machine_facts")} className="text-xs font-bold text-[#0b57d0] hover:underline">
+                <button onClick={() => openDrill("machine_facts")} className="text-xs font-bold text-[#0d2e5c] hover:underline">
                   Drill into machine facts
                 </button>
-                <button onClick={() => openDrill("unverified_facts")} className="text-xs font-bold text-[#0b57d0] hover:underline">
+                <button onClick={() => openDrill("unverified_facts")} className="text-xs font-bold text-[#0d2e5c] hover:underline">
                   Drill into unverified (machine + in-review)
                 </button>
               </div>
@@ -304,7 +326,7 @@ export default function CompletenessDashboardPage() {
                   <div key={b.bucket} className="flex-1 flex flex-col items-center justify-end h-full">
                     <div className="text-xs font-mono mb-1">{b.count}</div>
                     <div
-                      className="w-full bg-[#0b57d0]/70 rounded-t"
+                      className="w-full bg-[#0d2e5c]/70 rounded-t"
                       style={{ height: `${Math.max(4, (b.count / histogramMax) * 100)}%` }}
                     />
                     <div className="text-[10px] text-[#747775] mt-1">{b.bucket}</div>
@@ -339,7 +361,7 @@ export default function CompletenessDashboardPage() {
               </div>
               <div className="px-6 pb-6">
                 {drillLoading ? (
-                  <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#0b57d0]" /></div>
+                  <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#0d2e5c]" /></div>
                 ) : drillRows && drillRows.length > 0 ? (
                   <div className="overflow-x-auto">
                     <table className="w-full text-xs">

@@ -141,6 +141,9 @@ async def change_password(user_id: uuid.UUID, current_password: str, new_passwor
     if not verify_password(current_password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Current password is incorrect")
 
+    if new_password == current_password:
+        raise HTTPException(status_code=400, detail="New password must be different from the current password")
+
     user.hashed_password = hash_password(new_password)
     await db.commit()
 

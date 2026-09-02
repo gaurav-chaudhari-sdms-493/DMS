@@ -342,7 +342,7 @@ export default function WorkbenchPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-[#1f1f1f]">
+    <div className="h-screen overflow-y-auto bg-[#f8f9fa] text-[#1f1f1f]">
       <header className="h-16 px-6 flex items-center justify-between border-b border-[#e1e3e1]/60 bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-4">
           <Link
@@ -354,7 +354,7 @@ export default function WorkbenchPage() {
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-[#0b57d0]" />
+            <ShieldCheck className="w-5 h-5 text-[#0d2e5c]" />
             Verification Workbench
           </h1>
         </div>
@@ -365,7 +365,7 @@ export default function WorkbenchPage() {
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap gap-2 mb-2">
             {CATEGORY_TABS.map((tab) => (
               <button
@@ -375,9 +375,9 @@ export default function WorkbenchPage() {
                 title={tab.description}
                 className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold border transition-colors ${
                   category === tab.key
-                    ? "bg-[#0b57d0] text-white border-[#0b57d0]"
+                    ? "bg-[#0d2e5c] text-white border-[#0d2e5c]"
                     : tab.available
-                    ? "bg-white text-[#444746] border-[#e1e3e1] hover:border-[#0b57d0]"
+                    ? "bg-white text-[#444746] border-[#e1e3e1] hover:border-[#0d2e5c]"
                     : "bg-[#f0f4f9] text-[#9aa0a6] border-[#e1e3e1] cursor-not-allowed"
                 }`}
               >
@@ -413,7 +413,7 @@ export default function WorkbenchPage() {
           <Card className="bg-white border border-[#e1e3e1] p-0 overflow-hidden">
             <div className="px-5 py-3 border-b border-[#e1e3e1] flex items-center justify-between">
               <span className="text-sm font-semibold text-[#1f1f1f]">Queue &mdash; {total} item{total === 1 ? "" : "s"}</span>
-              {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0b57d0]" />}
+              {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0d2e5c]" />}
             </div>
             {facts.length > 0 && (
               <div className="px-5 py-1.5 bg-[#fafbfc] border-b border-[#e1e3e1] text-[10px] text-[#9aa0a6] flex items-center gap-4">
@@ -445,7 +445,7 @@ export default function WorkbenchPage() {
                       checked={selectedFactIds.has(fact.fact_id)}
                       onChange={() => toggleFactSelection(fact.fact_id)}
                       onClick={(e) => e.stopPropagation()}
-                      className="shrink-0 w-4 h-4 accent-[#0b57d0]"
+                      className="shrink-0 w-4 h-4 accent-[#0d2e5c]"
                       title="Include in Bulk edit"
                     />
                     <button onClick={() => setSelectedIndex(idx)} className="flex-1 min-w-0 text-left flex items-center justify-between gap-4">
@@ -461,7 +461,7 @@ export default function WorkbenchPage() {
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {isMine && (
-                          <span title="Claimed by you"><Lock className="w-3.5 h-3.5 text-[#0b57d0]" /></span>
+                          <span title="Claimed by you"><Lock className="w-3.5 h-3.5 text-[#0d2e5c]" /></span>
                         )}
                         {isOthers && (
                           <span title="Claimed by another operator"><Lock className="w-3.5 h-3.5 text-[#9aa0a6]" /></span>
@@ -478,7 +478,7 @@ export default function WorkbenchPage() {
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 min-w-0">
           <Card className="bg-white border border-[#e1e3e1]">
             <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">Selected fact</h2>
             {!selected ? (
@@ -556,14 +556,17 @@ export default function WorkbenchPage() {
               fields are always excluded, no matter how confident.
             </p>
             <div className="space-y-2">
+              <p className="text-[11px] text-[#747775] -mt-1">
+                Don&apos;t have a folder ID? Click <b>Browse</b> to pick a folder by name instead.
+              </p>
               <div className="flex gap-2">
                 <input
                   type="text"
                   aria-label="Corpus folder ID"
-                  placeholder="Corpus folder ID"
+                  placeholder="Click Browse to pick a folder — or paste a folder ID here"
                   value={bulkFolderId}
                   onChange={(e) => setBulkFolderId(e.target.value)}
-                  className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
+                  className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0d2e5c]/40"
                 />
                 <Button variant="secondary" size="sm" loading={bulkFoldersLoading} onClick={openBulkFolderPicker}>
                   Browse
@@ -597,7 +600,7 @@ export default function WorkbenchPage() {
                   placeholder="Only confirm above this confidence, e.g. 0.8"
                   value={bulkThreshold}
                   onChange={(e) => setBulkThreshold(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0d2e5c]/40"
                 />
               </div>
               <div>
@@ -607,7 +610,7 @@ export default function WorkbenchPage() {
                   placeholder="Label this decision, e.g. Q1-2026-review"
                   value={bulkPolicyVersion}
                   onChange={(e) => setBulkPolicyVersion(e.target.value)}
-                  className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
+                  className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0d2e5c]/40"
                 />
                 <p className="text-[10px] text-[#9aa0a6] mt-1">A short name for this batch, so it can be found and reverted later if needed.</p>
               </div>
@@ -644,7 +647,7 @@ export default function WorkbenchPage() {
                 value={editValue}
                 onChange={(e) => { setEditValue(e.target.value); setEditPreview(null); }}
                 disabled={selectedFactIds.size === 0}
-                className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40 disabled:opacity-50"
+                className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0d2e5c]/40 disabled:opacity-50"
               />
               <div className="flex gap-2">
                 <Button
@@ -684,7 +687,7 @@ export default function WorkbenchPage() {
                 <span>
                   Edited {editResult.changed_count} fact{editResult.changed_count === 1 ? "" : "s"} — batch {editResult.batch_id.slice(0, 8)}&hellip;
                 </span>
-                <button onClick={undoBulkEdit} className="flex items-center gap-1 font-bold text-[#0b57d0] hover:underline shrink-0">
+                <button onClick={undoBulkEdit} className="flex items-center gap-1 font-bold text-[#0d2e5c] hover:underline shrink-0">
                   <Undo2 className="w-3.5 h-3.5" /> Undo
                 </button>
               </div>
