@@ -53,8 +53,17 @@ export default function TemplatesAdminPage() {
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState("");
 
-  const profile = typeof window !== "undefined" ? getUserProfile() : null;
-  const isAdmin = profile?.role === "it_admin";
+  // Read after mount, not during render: getUserProfile() reads
+  // localStorage, which doesn't exist during Next.js's server render, so
+  // computing isAdmin directly in the render body produced a real
+  // hydration mismatch (server always rendered the non-admin view, then
+  // the client immediately rendered the admin view) -- React errors
+  // #418/#423, confirmed live via a real it_admin signup opening this
+  // page.
+  const [isAdmin, setIsAdmin] = useState(false);
+  useEffect(() => {
+    setIsAdmin(getUserProfile()?.role === "it_admin");
+  }, []);
 
   const fetchTemplates = async () => {
     setLoading(true);

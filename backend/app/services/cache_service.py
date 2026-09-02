@@ -11,31 +11,41 @@ from app.schemas.search import SearchResponse
 logger = logging.getLogger(__name__)
 
 _redis_pool = None
+# The loop get_redis() itself observed via asyncio.get_running_loop() at
+# creation time -- NOT introspected from redis-py internals. The previous
+# guard read _redis_pool.connection_pool._loop / _redis_pool._loop, but
+# redis.asyncio doesn't reliably expose the pool's bound loop under either
+# name across versions, so a stale pool from a closed loop (the backend's
+# single long-lived loop is fine, but each Celery task runs its own fresh
+# asyncio.run() loop that closes when the task ends, same anti-pattern as
+# the DB engine bug fixed in worker.py/config_service.py) slipped past the
+# check and raised "Event loop is closed" on first real use -- caught and
+# logged as a warning by every caller below, so ingestion never failed, but
+# tenant cache invalidation silently no-op'd. Tracking our own loop
+# reference removes the dependency on those internals entirely.
+_redis_pool_loop = None
 
 async def init_redis():
-    global _redis_pool
+    global _redis_pool, _redis_pool_loop
     _redis_pool = aioredis.from_url(settings.redis_url, encoding="utf-8", decode_responses=True)
+    _redis_pool_loop = asyncio.get_running_loop()
 
 async def close_redis():
-    global _redis_pool
+    global _redis_pool, _redis_pool_loop
     if _redis_pool:
         try:
             await _redis_pool.aclose()
         except Exception:
             pass
         _redis_pool = None
+        _redis_pool_loop = None
 
 @asynccontextmanager
 async def get_redis():
-    global _redis_pool
-    try:
-        if _redis_pool:
-            running_loop = asyncio.get_running_loop()
-            pool_loop = getattr(_redis_pool.connection_pool, "_loop", None) or getattr(_redis_pool, "_loop", None)
-            if pool_loop is not None and pool_loop is not running_loop:
-                _redis_pool = None
-    except Exception:
+    global _redis_pool, _redis_pool_loop
+    if _redis_pool is not None and _redis_pool_loop is not asyncio.get_running_loop():
         _redis_pool = None
+        _redis_pool_loop = None
 
     if not _redis_pool:
         await init_redis()

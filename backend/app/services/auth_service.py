@@ -22,7 +22,8 @@ def verify_password(plain: str, hashed: str) -> bool:
         return False
 
 async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
-    """Creates a new tenant and an admin user."""
+    """Creates a new tenant and its founding user with full tenant-wide
+    administrative access."""
     stmt = select(User).where(User.email == body.email)
     res = await db.execute(stmt)
     if res.scalar_one_or_none():
@@ -39,7 +40,20 @@ async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
         full_name=body.full_name,
         hashed_password=hash_password(body.password),
         tenant_id=tenant.id,
-        role=UserRole.admin,
+        # T50's persona migration (0022_personas_departments.py) moved
+        # every existing 'admin' row onto 'it_admin', the modern
+        # system-level-access persona -- 'admin' is kept only because
+        # Postgres enum types can't drop values (see UserRole's own
+        # comment). Every RBAC check in the codebase (templates.py,
+        # governance.py, department_service.py's TENANT_WIDE_ROLES,
+        # document_service.py's it_admin fallback, the /admin analytics
+        # widget) gates on 'it_admin', never 'admin' -- so assigning the
+        # legacy value here left every new tenant's founding user locked
+        # out of template management, DMS Analytics, and every other
+        # tenant-wide action with no self-service way to fix it (no role
+        # UI exists). Found live: a fresh signup showed "This action
+        # requires one of: it_admin" on its own Admin Panel.
+        role=UserRole.it_admin,
     )
     db.add(user)
     await get_or_create_subscription(db, tenant.id)  # T81 — every tenant starts on a trial
