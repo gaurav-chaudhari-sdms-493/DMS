@@ -3,6 +3,7 @@ import React, { useState } from "react";
 import { ChevronDown, Folder as FolderIcon, MoreVertical, Star, Edit2, FolderInput, Trash2 } from "lucide-react";
 import type { Folder } from "@/types";
 import { onKeyActivate } from "@/lib/a11y";
+import { useDebouncedActivation } from "@/lib/useDebouncedActivation";
 
 interface SuggestedFoldersProps {
   folders: Folder[];
@@ -29,6 +30,7 @@ export function SuggestedFoldersSection({
 }: SuggestedFoldersProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const { handleClick, handleDoubleClick } = useDebouncedActivation();
 
   if (folders.length === 0) {
     return null;
@@ -63,9 +65,16 @@ export function SuggestedFoldersSection({
                 role="button"
                 tabIndex={0}
                 onClick={(e) => {
-                  if (onSelectFolder) onSelectFolder(item.raw, e.ctrlKey || e.metaKey || e.shiftKey);
+                  const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+                  if (isMulti) {
+                    if (onSelectFolder) onSelectFolder(item.raw, true);
+                    return;
+                  }
+                  handleClick(item.id, () => {
+                    if (onSelectFolder) onSelectFolder(item.raw, false);
+                  });
                 }}
-                onDoubleClick={() => onOpenFolder(item.raw)}
+                onDoubleClick={() => handleDoubleClick(item.id, () => onOpenFolder(item.raw))}
                 onContextMenu={(e) => {
                   if (onContextMenu) onContextMenu(e, item.raw);
                 }}

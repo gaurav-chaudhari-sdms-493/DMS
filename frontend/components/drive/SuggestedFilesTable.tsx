@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import type { DocumentListItem } from "@/types";
 import { onKeyActivate } from "@/lib/a11y";
+import { useDebouncedActivation } from "@/lib/useDebouncedActivation";
 
 interface SuggestedFilesTableProps {
   documents: DocumentListItem[];
@@ -53,6 +54,7 @@ export function SuggestedFilesTable({
   const [collapsed, setCollapsed] = useState(false);
   const [viewMode, setViewMode] = useState<"list" | "grid">("list");
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const { handleClick, handleDoubleClick } = useDebouncedActivation();
 
   const isImageFile = (filename: string) => {
     const ext = filename.split(".").pop()?.toLowerCase() || "";
@@ -258,9 +260,18 @@ export function SuggestedFilesTable({
                     return (
                       <tr
                         key={row.id}
-                        onClick={(e) => onSelectDoc(row.raw, e.ctrlKey || e.metaKey || e.shiftKey)}
+                        onClick={(e) => {
+                          const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+                          if (isMulti) {
+                            onSelectDoc(row.raw, true);
+                            return;
+                          }
+                          handleClick(row.id, () => onSelectDoc(row.raw, false));
+                        }}
                         onDoubleClick={() => {
-                          if (onPreviewDoc) onPreviewDoc(row.raw);
+                          handleDoubleClick(row.id, () => {
+                            if (onPreviewDoc) onPreviewDoc(row.raw);
+                          });
                         }}
                         onContextMenu={(e) => {
                           if (onContextMenu) onContextMenu(e, row.raw);
@@ -425,9 +436,18 @@ export function SuggestedFilesTable({
                     key={row.id}
                     role="button"
                     tabIndex={0}
-                    onClick={(e) => onSelectDoc(row.raw, e.ctrlKey || e.metaKey || e.shiftKey)}
+                    onClick={(e) => {
+                      const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+                      if (isMulti) {
+                        onSelectDoc(row.raw, true);
+                        return;
+                      }
+                      handleClick(row.id, () => onSelectDoc(row.raw, false));
+                    }}
                     onDoubleClick={() => {
-                      if (onPreviewDoc) onPreviewDoc(row.raw);
+                      handleDoubleClick(row.id, () => {
+                        if (onPreviewDoc) onPreviewDoc(row.raw);
+                      });
                     }}
                     onContextMenu={(e) => {
                       if (onContextMenu) onContextMenu(e, row.raw);

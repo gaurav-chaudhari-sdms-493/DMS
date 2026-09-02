@@ -25,6 +25,7 @@ import { offlineStore } from "@/lib/offlineStore";
 import { isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { onKeyActivate } from "@/lib/a11y";
+import { useDebouncedActivation } from "@/lib/useDebouncedActivation";
 import type { Folder, FolderTreeNode, DocumentListItem, DriveStats, SearchResponse, SearchResult } from "@/types";
 import { Info, FolderSearch, Eye, Trash2, RotateCcw, Sparkles, FolderPlus, Upload, FolderUp, UploadCloud, Clock, CheckSquare, X, Star, FolderInput, Download, Edit2 } from "lucide-react";
 
@@ -69,6 +70,7 @@ export default function DrivePage() {
   // Multi-Selection State
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const { handleClick: handleTrashRowClick, handleDoubleClick: handleTrashRowDoubleClick } = useDebouncedActivation();
 
   // Right-Click Item Context Menu State
   const [itemContextMenu, setItemContextMenu] = useState<{
@@ -1249,9 +1251,16 @@ export default function DrivePage() {
                         key={d.id}
                         role="button"
                         tabIndex={0}
-                        onClick={(e) => handleSelectDoc(d, e.ctrlKey || e.metaKey || e.shiftKey)}
+                        onClick={(e) => {
+                          const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+                          if (isMulti) {
+                            handleSelectDoc(d, true);
+                            return;
+                          }
+                          handleTrashRowClick(d.id, () => handleSelectDoc(d, false));
+                        }}
                         onKeyDown={onKeyActivate(() => setPreviewDoc(d))}
-                        onDoubleClick={() => setPreviewDoc(d)}
+                        onDoubleClick={() => handleTrashRowDoubleClick(d.id, () => setPreviewDoc(d))}
                         className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
                           isSelected ? "bg-[#c2e7ff] border-[#0d2e5c]" : "bg-[#f8f9fa] border-[#e1e3e1]"
                         }`}
