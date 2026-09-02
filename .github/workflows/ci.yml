@@ -86,7 +86,18 @@ jobs:
         # PR #8 merge commit's CI run failed the identical way before any
         # of this PR's changes existed.
         env:
+          # Same full env block as the pytest step below, not just
+          # POSTGRES_URL: app.config.Settings() is instantiated at import
+          # time (migrations/env.py imports app.database -> app.config),
+          # and redis_url has no default, so a real CI checkout (no
+          # backend/.env exists here -- it's gitignored) failed with
+          # "pydantic_core.ValidationError: redis_url Field required"
+          # even though POSTGRES_URL alone was enough locally, where a
+          # leftover backend/.env supplied the rest via load_dotenv().
           POSTGRES_URL: postgresql+asyncpg://postgres:password@localhost:5432/docsearch_db
+          REDIS_URL: redis://localhost:6379/0
+          APP_ENV: test
+          JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
         run: |
           cd backend
           alembic upgrade head
