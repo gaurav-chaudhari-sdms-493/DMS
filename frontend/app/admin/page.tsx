@@ -277,7 +277,7 @@ export default function AdminPage() {
     dmsData?.upload_timeline?.reduce((m, d) => Math.max(m, d.count), 0) || 1;
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-[#1f1f1f]">
+    <div className="h-screen overflow-y-auto bg-[#f8f9fa] text-[#1f1f1f]">
       {/* Header */}
       <header className="h-16 px-6 flex items-center justify-between border-b border-[#e1e3e1]/60 bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-4">
