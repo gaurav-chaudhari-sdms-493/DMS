@@ -478,7 +478,7 @@ export default function WorkbenchPage() {
           </Card>
         </div>
 
-        <div className="space-y-6">
+        <div className="space-y-6 lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)] lg:overflow-y-auto pr-2 pb-6">
           <Card className="bg-white border border-[#e1e3e1]">
             <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">Selected fact</h2>
             {!selected ? (
