@@ -183,6 +183,15 @@ def get_vlm_provider() -> VLMProvider | None:
     was available to actually validate it (see the class's own docstring
     for why). Wiring it in is real follow-up work, not a config flip,
     once someone with GPU hardware has run and verified it.
+
+    Automatic fallback: if the primary provider isn't already gemini and
+    a GOOGLE_API_KEY is configured, wraps it in FallbackVLMProvider so a
+    primary-provider failure (e.g. OpenRouter running out of credits —
+    a real live incident, 2026-09-02) retries against Gemini
+    automatically instead of needing a manual AI_VLM_PROVIDER edit +
+    restart. enforce_local() on the primary already refuses to start in
+    air-gapped mode before this point, so no separate air-gapped check is
+    needed for the fallback leg.
     """
     global _vlm_provider
     if _vlm_provider is not False:
@@ -195,7 +204,14 @@ def get_vlm_provider() -> VLMProvider | None:
     elif settings.ai_vlm_provider == 'openrouter' and settings.openrouter_api_key:
         enforce_local('VLM', 'openrouter')
         from app.ai.providers.openrouter_provider import OpenRouterVLMProvider
-        _vlm_provider = OpenRouterVLMProvider(api_key=settings.openrouter_api_key, model=settings.openrouter_vlm_model)
+        primary = OpenRouterVLMProvider(api_key=settings.openrouter_api_key, model=settings.openrouter_vlm_model)
+        if settings.google_api_key:
+            from app.ai.providers.gemini_provider import GeminiVLMProvider
+            from app.ai.providers.fallback_vlm_provider import FallbackVLMProvider
+            fallback = GeminiVLMProvider(api_key=settings.google_api_key, model=settings.gemini_vlm_model)
+            _vlm_provider = FallbackVLMProvider(primary=primary, fallback=fallback, fallback_name="gemini")
+        else:
+            _vlm_provider = primary
     else:
         _vlm_provider = None
 
