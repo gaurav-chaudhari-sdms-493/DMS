@@ -86,7 +86,8 @@ Anything the system can't confidently classify — the wrong form type, an illeg
 
 Clean modern PDFs are the easy case. The genuinely hard engineering work was making this reliable against a real 1973 government register — nine separate features built specifically for that:
 
-- **Table stitching (rows split across pages)** — When a table's row starts at the bottom of one page and finishes at the top of the next — or splits across a left and right facing page — the system reconnects it into one correct row instead of silently losing half of it.
+- **Continuation-row merge (top/bottom page splits)** — When a table's row starts at the bottom of one page and finishes at the top of the next, the system reconnects it into one correct row instead of silently losing half of it. Confirmed on real 16-page registration files, including one field rebuilt from 17 separate word-regions spanning two pages.
+- **Spread-join (left/right facing-page splits) — built, but not yet proven on a real match.** When a table splits across a left and right facing page, the system attempts to pair the two halves by matching a shared value (like a serial number). Its safe-refusal behavior is proven — every real spread document tested has correctly produced a flagged "couldn't confidently join" result rather than guessing — but no real document has yet produced a genuine successful left/right join. Treat this specific capability as engineering-complete but real-world-unproven until a real matching case is seen; don't claim or demo a live spread-join success.
 - **Ditto handling ("Do." marks)** — Old clerks wrote "Do." to mean "same as above." The system fills in the real repeated value automatically, while keeping the original mark on record — nothing is silently invented.
 - **Page furniture detection (stamps & headers)** — Repeated letterheads, stamps, and footers on every page are recognized and excluded, so they're never mistaken for actual data.
 - **Human-answer memory** — Once a person resolves a tricky judgment call for a given table layout, the system remembers it — future documents with the same shape don't re-ask the same question.
@@ -229,7 +230,7 @@ Every substantial piece of engineering scoped for this build is complete. What r
 
 | Area | Status | Notes |
 |---|---|---|
-| Reading & extraction | ✅ Built | OCR, VLM field extraction, classification, table stitching, ditto marks, handwriting handling — all working against real registers. |
+| Reading & extraction | 🟡 Mostly built | OCR, VLM field extraction, classification, ditto marks, continuation-row merge, and handwriting handling are all confirmed working against real registers. One piece — left/right spread-join across facing pages — is fully coded and correctly refuses to guess on a mismatch, but has not yet produced a confirmed successful join on real data; see §8. |
 | Human verification workbench | ✅ Built | Queues, confidence scores, calibration gate, bulk actions with undo. Click-through to the exact source rectangle works on the backend; the on-screen highlighted viewer panel is the one piece still to wire into the page. |
 | Search & Q&A | ✅ Built | Hybrid search, bilingual, cited/grounded AI answers, near-duplicate detection. |
 | Entity graph & legal records | ✅ Built | Tiered-trust linking, full amendment history, legal status tracking. |
@@ -256,7 +257,12 @@ In one hardening pass alone, all 76 core backend functions were exercised end-to
 
 A second, independent security review specifically targeted cross-tenant data isolation and found a separate, genuine gap: it was possible to link one organization's records to another organization's private data through the entity graph, with no ownership check at all. That was confirmed as real, fixed at the source, and locked in with new automated tests before it could ever reach a customer.
 
-> **Why this section exists:** the point of naming these bugs isn't to advertise flaws — it's that this is the standard of scrutiny this kind of system is held to before it touches a real legal record: find it yourself, fix it, and prove it can't silently happen again.
+**Table-stitching, checked directly against the live database (2026-09-02).** Rather than trust the automated test suite alone, every stitching handler was cross-checked against real documents already processed in the running system:
+- **Ditto-chain expansion:** 334 real "Do." marks correctly expanded to their real inherited value, across 124 real documents — including a real 68-page gazette register — plus 82 cases correctly flagged as unresolved rather than guessed.
+- **Continuation-row merge:** confirmed on two real 16-page registration files, with one field reconstructed from 17 separate regions spanning a real page boundary.
+- **Spread-join:** every real document that ever matched the spread-layout template has produced a correctly-flagged refusal ("no shared value between the two fragments") — never a confirmed successful join. The safe-refusal behavior is real and proven; the positive case is not yet demonstrated on real data. This is called out honestly in §7 rather than presented as fully proven.
+
+> **Why this section exists:** the point of naming these bugs and gaps isn't to advertise flaws — it's that this is the standard of scrutiny this kind of system is held to before it touches a real legal record: find it yourself, report it honestly, and prove it can't silently happen again.
 
 ---
 
@@ -282,6 +288,9 @@ That's the explicit design target. The system already has a hard switch that fai
 **"What's the single biggest open risk?"**
 No dedicated GPU yet for local AI extraction, so that one step still depends on a cloud model. The hardware requirement to fix that is now precisely known — it's a budget decision, not an unknown.
 
+**"Can you show a table that was split across a left and right page getting stitched together?"**
+Be straight about this one rather than attempt it live: that specific case (a two-page facing-page split) is built and its safety behavior is proven — it correctly refuses to guess rather than produce a wrong answer — but a real successful join hasn't been demonstrated yet. What *can* be shown live and is fully proven: a value split top-to-bottom across a page boundary being correctly reconnected, and "Do." ditto marks being correctly expanded — both confirmed on real registers.
+
 ---
 
 ## 10. Glossary
@@ -304,7 +313,7 @@ Every term used above, defined plainly, so nothing in a follow-up question catch
 | **JWT** | JSON Web Token — a signed, tamper-proof login credential the browser holds after signing in. |
 | **Air-gapped** | Running with zero connection to the outside internet — a hard requirement for some government deployments. |
 | **Ditto mark** | Old shorthand ("Do.") clerks wrote meaning "same value as the row above" — handled explicitly rather than mistaken for real data. |
-| **Table stitching** | Automatically reconnecting a table row that's split across two pages (or a left/right spread) back into one correct row. |
+| **Table stitching** | Automatically reconnecting a table row that's split across a page boundary back into one correct row. Two forms: top-to-bottom across consecutive pages (proven on real registers) and left/right across a facing-page spread (built, safe-refusal proven, a real successful join not yet demonstrated). |
 | **Entity graph** | A network linking the same real-world person, property, or organization across multiple separate documents. |
 | **Confidence score** | A number the AI attaches to each extracted value showing how sure it is — used to route uncertain answers to a human instead of guessing. |
 | **Human-in-the-loop** | A design rule that a person must explicitly confirm an AI's output before it's treated as an official fact. |
