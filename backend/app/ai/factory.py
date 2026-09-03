@@ -212,6 +212,17 @@ def get_vlm_provider() -> VLMProvider | None:
             _vlm_provider = FallbackVLMProvider(primary=primary, fallback=fallback, fallback_name="gemini")
         else:
             _vlm_provider = primary
+    elif settings.ai_vlm_provider == 'chandra' and settings.datalab_api_key:
+        enforce_local('VLM', 'chandra')
+        from app.ai.providers.chandra_provider import ChandraVLMProvider
+        primary = ChandraVLMProvider(api_key=settings.datalab_api_key)
+        if settings.google_api_key:
+            from app.ai.providers.gemini_provider import GeminiVLMProvider
+            from app.ai.providers.fallback_vlm_provider import FallbackVLMProvider
+            fallback = GeminiVLMProvider(api_key=settings.google_api_key, model=settings.gemini_vlm_model)
+            _vlm_provider = FallbackVLMProvider(primary=primary, fallback=fallback, fallback_name="gemini")
+        else:
+            _vlm_provider = primary
     else:
         _vlm_provider = None
 
