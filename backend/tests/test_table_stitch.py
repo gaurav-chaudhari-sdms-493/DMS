@@ -161,6 +161,38 @@ def test_join_rows_horizontally_ditto_marks_and_place_names_are_not_keys():
     assert len(result.pairs) == 3
 
 
+def test_join_rows_horizontally_equal_count_falls_back_to_rank_order():
+    """Real bug found live 2026-09-03, same document as the two fixes
+    above: with clean, genuine per-row bboxes on BOTH sides (not the
+    earlier degenerate-bbox bug), pixel-containment still failed on 11 of
+    18 rows — a real scanned register's two facing pages don't keep
+    perfectly identical row heights down the page, so a row can drift
+    into its neighbor's box well before any tolerance margin would help
+    (row 3 landed in row 2's box; by row 17 the drift covered a full row).
+    Equal row counts with no usable key on either side is itself strong
+    evidence these are the same rows in the same top-to-bottom order —
+    verified against the exact real span data that failed positionally:
+    rank order must succeed here even though bbox position doesn't."""
+    # Mirrors the real left/right vertical spans from that live document
+    # closely enough to reproduce the same containment failure pattern
+    # bbox-only matching hit (row 3 lands in row 2's span, not its own).
+    left = [
+        {"no": _f(f"{180+i}.", bbox=[0.1, 0.211 + i * 0.038, 0.5, 0.211 + (i + 1) * 0.038]), "village": _f(f"Village{i}")}
+        for i in range(6)
+    ]
+    right = [
+        {"no": _f("..", bbox=[0.5, 0.182 + i * 0.040, 0.9, 0.182 + (i + 1) * 0.040]), "remarks": _f(f"Remark{i}")}
+        for i in range(6)
+    ]
+    result = join_rows_horizontally(left, right, "no")
+    assert result.status == "ok"
+    assert len(result.pairs) == 6
+    # Rank order, not whatever bbox-position would have mismatched to.
+    for i, (l, r) in enumerate(result.pairs):
+        assert l["village"]["value"] == f"Village{i}"
+        assert r["remarks"]["value"] == f"Remark{i}"
+
+
 def test_join_rows_horizontally_zero_anchor_structural_absence():
     """Real-world case (a printed gazette continuation band that never
     repeats the row-number column at all, e.g. columns 9-19 of a wide

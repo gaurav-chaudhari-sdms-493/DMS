@@ -430,6 +430,21 @@ def join_rows_horizontally(left_rows: List[Dict[str, Any]], right_rows: List[Dic
             )
         groups = pair_leftovers_by_position(left_rows, right_rows)
         if groups is None:
+            # Real case found live 2026-09-03, same document as the fix
+            # above: bbox containment can fail even with clean, genuine
+            # per-row boxes on both sides — a real scanned register's two
+            # facing pages don't always keep perfectly identical row
+            # heights down the page, so position drifts (row 3 landing in
+            # row 2's box, row 17 in row 16's) without either side's boxes
+            # being wrong. When both sides have the SAME row count and
+            # neither has usable keys, equal counts is itself strong
+            # evidence they're the same rows in the same top-to-bottom
+            # order — for two column-bands of one wide table, that's
+            # exactly what "same count" means. Rank order is a more
+            # robust anchor than pixel position for this one case.
+            if len(left_rows) == len(right_rows):
+                pairs = list(zip(left_rows, right_rows))
+                return HorizontalJoinResult(status="ok", pairs=pairs)
             return HorizontalJoinResult(
                 status="needs_review",
                 reason=f"no shared '{key_field}' values between the two fragments and no reliable position data to pair by",

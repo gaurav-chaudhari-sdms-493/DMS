@@ -67,6 +67,12 @@ logger = logging.getLogger(__name__)
 
 RENDERABLE_EXTENSIONS = {"pdf", "jpg", "jpeg", "png", "bmp", "webp", "tiff"}
 
+# Higher than the default page-render resolution (150) — a spread's
+# right-hand band is routinely a dense, heavily-abbreviated wide table,
+# and low resolution makes tightly-packed columns harder for the OCR
+# engine to distinguish reliably. See _extract_spread_facts.
+SPREAD_RENDER_RESOLUTION = 300
+
 # Per-template field_schema convention this module reads (on top of T24's
 # name/type/required/validation keys), all optional:
 #   "role": "serial"             — the row-number column continuation-merge keys off
@@ -82,14 +88,14 @@ RENDERABLE_EXTENSIONS = {"pdf", "jpg", "jpeg", "png", "bmp", "webp", "tiff"}
 
 
 
-def _render_pdf_page_png(file_bytes: bytes, page_number: int) -> Optional[tuple[bytes, float, float, float]]:
+def _render_pdf_page_png(file_bytes: bytes, page_number: int, resolution: int = 150) -> Optional[tuple[bytes, float, float, float]]:
     """Returns (png_bytes, width, height, rotation) for one 1-indexed PDF page, or None."""
     import pdfplumber
     with pdfplumber.open(io.BytesIO(file_bytes)) as pdf:
         if page_number - 1 >= len(pdf.pages):
             return None
         page = pdf.pages[page_number - 1]
-        img = page.to_image(resolution=150).original
+        img = page.to_image(resolution=resolution).original
         buf = io.BytesIO()
         img.save(buf, format="PNG")
         rotation = float(getattr(page, "rotation", 0) or 0)
@@ -372,8 +378,18 @@ async def _extract_spread_facts(
 
         try:
             if ext == "pdf":
-                left_rendered = _render_pdf_page_png(file_bytes, left_page_number)
-                right_rendered = _render_pdf_page_png(file_bytes, right_page_number)
+                # Rendered at a higher resolution than the default 150 —
+                # a spread's right-hand band is routinely a dense,
+                # heavily-abbreviated wide table (seen live: an 11-column
+                # band packed with ditto marks). Live-tested 2026-09-03:
+                # the OCR engine's own table detection was inconsistent
+                # page-to-page on that exact content at 150 DPI (15 rows
+                # detected one call, 0 the next, same input) — more
+                # pixels to distinguish those tightly-packed columns is a
+                # real, low-risk lever to try before accepting that as
+                # unfixable.
+                left_rendered = _render_pdf_page_png(file_bytes, left_page_number, resolution=SPREAD_RENDER_RESOLUTION)
+                right_rendered = _render_pdf_page_png(file_bytes, right_page_number, resolution=SPREAD_RENDER_RESOLUTION)
             else:
                 # A standalone image is one page — a spread needs two, so
                 # there's nothing to pair for a non-PDF upload.
