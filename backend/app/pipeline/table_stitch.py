@@ -51,6 +51,7 @@ the class of model their comment documents hitting this failure mode on.
 """
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, FrozenSet, List, Optional, Tuple
 
@@ -242,7 +243,12 @@ def match_rows_by_key(left_rows: List[Dict[str, Any]], right_rows: List[Dict[str
     left_only, right_only)."""
     def _key_value(row: Dict[str, Any]) -> Any:
         v = row.get(key_field)
-        return v.get("value") if isinstance(v, dict) else v
+        v = v.get("value") if isinstance(v, dict) else v
+        # A serial/entry-number field never holds a bare ditto mark or an
+        # unrelated word — treat one as no key at all rather than a real
+        # value, so two placeholder marks on both sides (e.g. both rows
+        # happen to read "..") never get treated as a genuine key match.
+        return v if _looks_like_a_key_value(v) else None
 
     left_by_key: Dict[Any, Dict] = {}
     left_only: List[Dict] = []
@@ -338,6 +344,31 @@ class HorizontalJoinResult:
     reason: str = ""
 
 
+_HAS_DIGIT_RE = re.compile(r"\d")
+
+
+def _looks_like_a_key_value(v: Any) -> bool:
+    """Whether a value is plausibly a real serial/entry-number identifier,
+    not noise. Real bug found live 2026-09-03: a register's right-hand
+    band genuinely has no serial column at all — its first real column is
+    village-name/ditto data — but a column-position-mapped extraction
+    still lands SOME text in the field asked for matching, e.g. ".."
+    (a ditto mark) or "Kanadgaon" (a place name). Neither is remotely a
+    serial number, but both are non-empty strings, so a plain "is there
+    text here" check can't tell them apart from a real one.
+
+    Every serial/entry-number convention actually seen in this system's
+    real documents contains a digit somewhere — plain ("180"), decorated
+    ("180."), or alphanumeric ("B-175", "WB-1") — while a ditto mark is
+    pure punctuation and a place name is pure letters. Requiring a digit
+    is a safe, general test across all of those, without hardcoding any
+    single format (e.g. "must start with a digit" would wrongly reject
+    "B-175")."""
+    if not isinstance(v, str) or not v.strip():
+        return False
+    return bool(_HAS_DIGIT_RE.search(v))
+
+
 def _any_key_value(rows: List[Dict[str, Any]], key_field: str) -> bool:
     """Whether this side genuinely carries the key field, not just noise.
 
@@ -352,14 +383,22 @@ def _any_key_value(rows: List[Dict[str, Any]], key_field: str) -> bool:
     entirely and produced a wrong refusal on a case the fallback was
     explicitly built to handle. A single noisy extraction on an otherwise-
     blank side should never look like a side "genuinely carries" the
-    field — require a real majority instead of just one row."""
-    non_empty = 0
+    field — require a real majority instead of just one row.
+
+    Extended the same day, still live against the same document: fixing
+    the majority check alone wasn't enough once a different VLM's column-
+    position mapping filled EVERY row on that side with something
+    non-empty (ditto marks, an unrelated place name) — a real majority of
+    noise still isn't evidence the field is real. Both checks now require
+    the value to actually look like a key (_looks_like_a_key_value), not
+    merely be non-empty."""
+    real = 0
     for row in rows:
         v = row.get(key_field)
         v = v.get("value") if isinstance(v, dict) else v
-        if v not in (None, ""):
-            non_empty += 1
-    return non_empty > len(rows) / 2
+        if _looks_like_a_key_value(v):
+            real += 1
+    return real > len(rows) / 2
 
 
 def join_rows_horizontally(left_rows: List[Dict[str, Any]], right_rows: List[Dict[str, Any]], key_field: str) -> HorizontalJoinResult:

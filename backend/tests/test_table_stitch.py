@@ -135,6 +135,32 @@ def test_join_rows_horizontally_needs_review_on_total_disagreement():
     assert "no shared" in result.reason
 
 
+def test_join_rows_horizontally_ditto_marks_and_place_names_are_not_keys():
+    """Real bug found live 2026-09-03 against an actual scanned spread
+    document: the right-hand band genuinely has no serial column at all
+    (real structural absence), but a column-position-mapped extraction
+    still filled EVERY row's key slot with something non-empty — mostly
+    ditto marks ("..") plus one unrelated place name ("Kanadgaon"). A
+    plain majority-non-empty check saw that as "this side has real keys"
+    and wrongly refused instead of falling through to position-based
+    pairing. Neither a ditto mark nor a place name is a plausible serial
+    number (no digit in either), so this must still resolve as a
+    structural absence, same as if the field had been blank."""
+    left = [
+        {"no": _f("180.", bbox=[0.1, 0.10, 0.5, 0.15]), "village": _f("Adgaon")},
+        {"no": _f("181.", bbox=[0.1, 0.20, 0.5, 0.25]), "village": _f("Do.")},
+        {"no": _f("182.", bbox=[0.1, 0.30, 0.5, 0.35]), "village": _f("Do.")},
+    ]
+    right = [
+        {"no": _f("..", bbox=[0.5, 0.10, 0.9, 0.15]), "remarks": _f("East-River.")},
+        {"no": _f("Kanadgaon", bbox=[0.5, 0.20, 0.9, 0.25]), "remarks": _f("Situated in Survey No. 50.")},
+        {"no": _f("..", bbox=[0.5, 0.30, 0.9, 0.35]), "remarks": _f("West-Lane.")},
+    ]
+    result = join_rows_horizontally(left, right, "no")
+    assert result.status == "ok"
+    assert len(result.pairs) == 3
+
+
 def test_join_rows_horizontally_zero_anchor_structural_absence():
     """Real-world case (a printed gazette continuation band that never
     repeats the row-number column at all, e.g. columns 9-19 of a wide
