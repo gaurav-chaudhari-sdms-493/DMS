@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode, createElement } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode, createElement } from "react";
 import { offlineStore, syncOfflineData } from "@/lib/offlineStore";
 import { api, getBaseUrl } from "@/lib/api";
 
@@ -63,17 +63,28 @@ function useOnlineStatusInternal(): OnlineStatusValue {
     }
   }, [isSyncing, updatePendingCount]);
 
+  // Real bug found live 2026-09-03: a single failed check flipped isOnline
+  // to false immediately. Under a burst of concurrent search/chat requests
+  // competing for the browser's per-origin connection pool, this 4s-timeout
+  // probe could itself get queued behind them and abort — even though the
+  // backend was confirmed healthy throughout — incorrectly triggering the
+  // blocking "Internet Connection Required" modal. Require two consecutive
+  // failures before declaring offline so one contended check can't do that;
+  // a single successful check still restores online status immediately.
+  const consecutiveFailuresRef = useRef(0);
+
   // Check connectivity actively
   const checkConnectivity = useCallback(async () => {
     if (typeof window === "undefined") return;
     if (!navigator.onLine) {
+      consecutiveFailuresRef.current = 0;
       setIsOnline(false);
       return;
     }
 
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 4000);
+      const timeoutId = setTimeout(() => controller.abort(), 6000);
       const res = await fetch(`${getBaseUrl()}/api/v1/health`, {
         method: "GET",
         headers: { "ngrok-skip-browser-warning": "true" },
@@ -82,13 +93,19 @@ function useOnlineStatusInternal(): OnlineStatusValue {
       clearTimeout(timeoutId);
 
       const reachable = res.ok || res.status === 200 || res.status === 401 || res.status === 404;
-      setIsOnline(reachable);
-
-      if (reachable && offlineStore.getPendingCount() > 0 && !isSyncing) {
-        triggerSync();
+      if (reachable) {
+        consecutiveFailuresRef.current = 0;
+        setIsOnline(true);
+        if (offlineStore.getPendingCount() > 0 && !isSyncing) {
+          triggerSync();
+        }
+      } else {
+        consecutiveFailuresRef.current += 1;
+        if (consecutiveFailuresRef.current >= 2) setIsOnline(false);
       }
     } catch (_) {
-      setIsOnline(false);
+      consecutiveFailuresRef.current += 1;
+      if (consecutiveFailuresRef.current >= 2) setIsOnline(false);
     }
   }, [isSyncing, triggerSync]);
 

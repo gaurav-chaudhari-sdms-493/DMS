@@ -490,20 +490,38 @@ async def search(
         doc_texts = [docs_map[cid].content for cid, _ in merged]
 
         try:
-            reranked_primary = await reranker.rerank(query, doc_texts, top_n=limit * 2)
+            # Real bug found live 2026-09-03: rerank(..., top_n=limit*2) only
+            # returns each call's OWN top slice. A document scoring near-zero
+            # under the raw query but highly relevant under its translation
+            # (exactly the cross-script case this second pass exists for)
+            # isn't IN reranked_primary at all, so "if r_trans.index in
+            # rank_map" silently dropped it instead of adding it — verified
+            # live: a Marathi document scored 0.55 under the translated
+            # rerank (well above the 0.15 threshold) but was discarded here
+            # every time, making cross-script search fail on every query
+            # whose translation-relevant document wasn't already primary-
+            # relevant. top_n=len(doc_texts) scores every candidate under
+            # both queries, and the merge now adds a translated-only hit
+            # instead of requiring it to already exist.
+            reranked_primary = await reranker.rerank(query, doc_texts, top_n=len(doc_texts))
             if q_mr and q_mr != query:
                 try:
-                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=limit * 2)
+                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=len(doc_texts))
                     rank_map = {r.index: r for r in reranked_primary}
                     for r_trans in reranked_trans:
                         if r_trans.index in rank_map:
                             rank_map[r_trans.index].score = max(rank_map[r_trans.index].score, r_trans.score)
+                        else:
+                            rank_map[r_trans.index] = r_trans
                     reranked_primary = list(rank_map.values())
                 except Exception as ex:
                     logger.warning("Secondary translation rerank skipped: %s", ex)
 
             RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
-            relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
+            relevant_ranks = sorted(
+                (r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD),
+                key=lambda r: r.score, reverse=True,
+            )
         except Exception as e:
             logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
             reranked = False
@@ -564,20 +582,27 @@ async def search(
                         doc_texts = [hyde_docs_map[cid].content for cid, _ in hyde_merged]
 
                         try:
-                            reranked_primary = await reranker.rerank(query, doc_texts, top_n=limit * 2)
+                            # Same cross-script merge fix as the direct-search
+                            # pass above — see that comment for the root cause.
+                            reranked_primary = await reranker.rerank(query, doc_texts, top_n=len(doc_texts))
                             if q_mr and q_mr != query:
                                 try:
-                                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=limit * 2)
+                                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=len(doc_texts))
                                     rank_map = {r.index: r for r in reranked_primary}
                                     for r_trans in reranked_trans:
                                         if r_trans.index in rank_map:
                                             rank_map[r_trans.index].score = max(rank_map[r_trans.index].score, r_trans.score)
+                                        else:
+                                            rank_map[r_trans.index] = r_trans
                                     reranked_primary = list(rank_map.values())
                                 except Exception as ex:
                                     logger.warning("Secondary translation HyDE rerank skipped: %s", ex)
 
                             RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
-                            relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
+                            relevant_ranks = sorted(
+                                (r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD),
+                                key=lambda r: r.score, reverse=True,
+                            )
                         except Exception as e:
                             logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
                             reranked = False
