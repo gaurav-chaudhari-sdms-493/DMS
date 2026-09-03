@@ -339,12 +339,27 @@ class HorizontalJoinResult:
 
 
 def _any_key_value(rows: List[Dict[str, Any]], key_field: str) -> bool:
+    """Whether this side genuinely carries the key field, not just noise.
+
+    Real bug found live 2026-09-03 against an actual spread document: a
+    register whose right-hand band never prints the serial number at all
+    (a real, expected "structural absence" this module already has a
+    fallback for) had exactly ONE row where the VLM had misextracted a
+    village name into the sr_no slot — 14 of 15 rows correctly blank, one
+    stray non-empty value. That single value was enough for the old
+    "any row has something" check to conclude "both sides have real keys,
+    this is a genuine conflict," which skipped the position-based fallback
+    entirely and produced a wrong refusal on a case the fallback was
+    explicitly built to handle. A single noisy extraction on an otherwise-
+    blank side should never look like a side "genuinely carries" the
+    field — require a real majority instead of just one row."""
+    non_empty = 0
     for row in rows:
         v = row.get(key_field)
         v = v.get("value") if isinstance(v, dict) else v
         if v not in (None, ""):
-            return True
-    return False
+            non_empty += 1
+    return non_empty > len(rows) / 2
 
 
 def join_rows_horizontally(left_rows: List[Dict[str, Any]], right_rows: List[Dict[str, Any]], key_field: str) -> HorizontalJoinResult:

@@ -155,6 +155,31 @@ def test_join_rows_horizontally_zero_anchor_structural_absence():
     assert len(result.pairs) == 2
 
 
+def test_join_rows_horizontally_single_stray_value_is_still_structural_absence():
+    """Real bug found live 2026-09-03 against an actual scanned spread
+    document: a continuation band that structurally never repeats the row
+    key had one row where the VLM had misextracted an unrelated value
+    (a village name) into the key field — 14 of 15 real rows correctly
+    blank, one stray non-empty value. The old "any row has something"
+    check treated that single value as proof this side "genuinely carries"
+    the key, misclassifying an honest structural absence as a real
+    conflict and skipping the position-based fallback entirely. A clear
+    minority of stray values must not flip the verdict."""
+    left = [
+        {"no": _f("180"), "owner": _f("Priya", bbox=[0.1, 0.10, 0.5, 0.15])},
+        {"no": _f("181"), "owner": _f("Ravi", bbox=[0.1, 0.20, 0.5, 0.25])},
+        {"no": _f("182"), "owner": _f("Asha", bbox=[0.1, 0.30, 0.5, 0.35])},
+    ]
+    right = [
+        {"no": _f(""), "valuation": _f("100", bbox=[0.5, 0.10, 0.9, 0.15])},
+        {"no": _f("Kanadgaon"), "valuation": _f("200", bbox=[0.5, 0.20, 0.9, 0.25])},  # stray VLM misextraction
+        {"no": _f(""), "valuation": _f("300", bbox=[0.5, 0.30, 0.9, 0.35])},
+    ]
+    result = join_rows_horizontally(left, right, "no")
+    assert result.status == "ok"
+    assert len(result.pairs) == 3
+
+
 def test_join_rows_horizontally_explicit_conflict_never_overridden_by_position():
     """Position must never override an explicit disagreement, even when
     bbox data happens to be available — distinguishes real conflict from
