@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useState } from "react";
 import { Document, Page, pdfjs } from "react-pdf";
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
@@ -56,6 +56,29 @@ export default function RegionHighlightViewer({
   const [activeRegionId, setActiveRegionId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  // The fixed pixel width this used to render at overflowed the modal on
+  // phone/tablet-width screens (no horizontal scroll was offered, so the
+  // page image and its highlight box just clipped). Measure the actual
+  // container instead and never render wider than it.
+  //
+  // A plain useRef + useLayoutEffect(..., []) doesn't work here: this
+  // component early-returns a "Loading…" placeholder until `fact` arrives,
+  // so on first mount the container div doesn't exist yet and the
+  // one-shot effect finds a null ref forever. A callback ref re-fires once
+  // the div actually mounts (after loading finishes), so use that instead.
+  const [containerEl, setContainerEl] = useState<HTMLDivElement | null>(null);
+  const [containerWidth, setContainerWidth] = useState<number | null>(null);
+  useLayoutEffect(() => {
+    if (!containerEl) return;
+    setContainerWidth(containerEl.clientWidth);
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (width) setContainerWidth(width);
+    });
+    observer.observe(containerEl);
+    return () => observer.disconnect();
+  }, [containerEl]);
+
   useEffect(() => {
     let cancelled = false;
     api.facts
@@ -82,7 +105,8 @@ export default function RegionHighlightViewer({
   }
 
   const activeRegion = fact.regions.find((r) => r.region_id === activeRegionId) ?? fact.regions[0];
-  const renderHeight = renderWidth * (activeRegion.page_height / activeRegion.page_width);
+  const effectiveWidth = Math.min(renderWidth, containerWidth ?? renderWidth);
+  const renderHeight = effectiveWidth * (activeRegion.page_height / activeRegion.page_width);
 
   return (
     <div className="flex flex-col gap-3">
@@ -94,12 +118,12 @@ export default function RegionHighlightViewer({
       </div>
 
       {fact.regions.length > 1 && (
-        <div className="flex gap-2 text-xs">
+        <div className="flex gap-2 text-xs flex-wrap">
           {fact.regions.map((r) => (
             <button
               key={r.region_id}
               onClick={() => setActiveRegionId(r.region_id)}
-              className={`px-2 py-1 rounded border ${
+              className={`px-2 py-1.5 rounded border min-h-[36px] ${
                 r.region_id === activeRegion.region_id
                   ? "border-teal-500 text-teal-600"
                   : "border-neutral-300 text-neutral-500"
@@ -111,11 +135,11 @@ export default function RegionHighlightViewer({
         </div>
       )}
 
-      <div className="relative" style={{ width: renderWidth, height: renderHeight }}>
+      <div ref={setContainerEl} className="relative w-full" style={{ height: renderHeight || undefined }}>
         <Document file={fact.download_url} loading={<div className="text-sm text-neutral-500">Rendering page…</div>}>
           <Page
             pageNumber={activeRegion.page_number}
-            width={renderWidth}
+            width={effectiveWidth}
             rotate={activeRegion.rotation}
             renderAnnotationLayer={false}
             renderTextLayer={false}

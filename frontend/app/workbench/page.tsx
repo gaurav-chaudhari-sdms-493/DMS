@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -122,6 +122,19 @@ export default function WorkbenchPage() {
   const [viewingSourceFactId, setViewingSourceFactId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [categoryCounts, setCategoryCounts] = useState<Partial<Record<Category, number>>>({});
+  // Below `lg` the queue and the review panel stack into one column, so
+  // picking a row leaves the panel off-screen below it — a mouse user
+  // notices the highlighted row and scrolls, but on a tablet that's an easy
+  // miss. Scroll it into view, but only in that stacked layout: on desktop
+  // it's already visible beside the queue, so jumping there would be an
+  // unwanted scroll on every click.
+  const selectedCardRef = useRef<HTMLDivElement>(null);
+  const selectFact = (idx: number) => {
+    setSelectedIndex(idx);
+    if (typeof window !== "undefined" && window.matchMedia("(max-width: 1023px)").matches) {
+      selectedCardRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+  };
 
   const [bulkFolderId, setBulkFolderId] = useState("");
   const [bulkFolders, setBulkFolders] = useState<{ id: string; name: string; depth: number }[] | null>(null);
@@ -343,28 +356,32 @@ export default function WorkbenchPage() {
 
   return (
     <div className="h-screen overflow-y-auto bg-[#f8f9fa] text-[#1f1f1f]">
-      <header className="h-16 px-6 flex items-center justify-between border-b border-[#e1e3e1]/60 bg-white/80 backdrop-blur-md sticky top-0 z-20">
-        <div className="flex items-center gap-4">
+      <header className="min-h-16 px-3 sm:px-6 py-2 flex items-center justify-between gap-2 border-b border-[#e1e3e1]/60 bg-white/80 backdrop-blur-md sticky top-0 z-20">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0">
           <Link
             href="/drive"
-            className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9]"
+            className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-2 sm:px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9] shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Drive</span>
+            <span className="hidden sm:inline">Back to Drive</span>
           </Link>
-          <div className="h-5 w-px bg-[#e1e3e1]" />
-          <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
-            <ShieldCheck className="w-5 h-5 text-[#0d2e5c]" />
-            Verification Workbench
+          <div className="h-5 w-px bg-[#e1e3e1] hidden sm:block" />
+          <h1 className="text-base sm:text-lg font-bold text-[#1f1f1f] flex items-center gap-2 truncate">
+            <ShieldCheck className="w-5 h-5 text-[#0d2e5c] shrink-0" />
+            <span className="truncate">Verification Workbench</span>
           </h1>
         </div>
-        <div className="flex items-center gap-1.5 text-xs text-[#5f6368]">
+        {/* Keyboard shortcuts only mean something to a keyboard/mouse user —
+            hidden below lg, the same breakpoint the layout stacks at for
+            touch-oriented tablet/mobile use, where these hints just took up
+            space and pushed the header into two lines. */}
+        <div className="hidden lg:flex items-center gap-1.5 text-xs text-[#5f6368] shrink-0">
           <Keyboard className="w-4 h-4" />
           <span>&uarr;/&darr; navigate &middot; C claim &middot; R release &middot; Enter/A confirm &middot; H mark handwritten</span>
         </div>
       </header>
 
-      <main className="max-w-6xl mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6">
+      <main className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 sm:gap-6">
         <div className="min-w-0">
           <div className="flex flex-wrap gap-2 mb-2">
             {CATEGORY_TABS.map((tab) => (
@@ -440,15 +457,20 @@ export default function WorkbenchPage() {
                       idx === selectedIndex ? "bg-[#e8f0fe]" : "hover:bg-[#f8f9fa]"
                     }`}
                   >
-                    <input
-                      type="checkbox"
-                      checked={selectedFactIds.has(fact.fact_id)}
-                      onChange={() => toggleFactSelection(fact.fact_id)}
-                      onClick={(e) => e.stopPropagation()}
-                      className="shrink-0 w-4 h-4 accent-[#0d2e5c]"
-                      title="Include in Bulk edit"
-                    />
-                    <button onClick={() => setSelectedIndex(idx)} className="flex-1 min-w-0 text-left flex items-center justify-between gap-4">
+                    {/* Padded wrapper, not the input, so the visible
+                        checkbox stays compact while the tap target is
+                        still finger-sized on tablet/mobile. */}
+                    <span className="shrink-0 -m-2 p-2">
+                      <input
+                        type="checkbox"
+                        checked={selectedFactIds.has(fact.fact_id)}
+                        onChange={() => toggleFactSelection(fact.fact_id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="block w-4 h-4 accent-[#0d2e5c]"
+                        title="Include in Bulk edit"
+                      />
+                    </span>
+                    <button onClick={() => selectFact(idx)} className="flex-1 min-w-0 text-left flex items-center justify-between gap-4 py-1">
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-[#1f1f1f] truncate">{fieldLabel(fact.field_name)}</div>
                         <div className="text-xs text-[#747775] truncate">{formatValue(fact.value)}</div>
@@ -479,7 +501,7 @@ export default function WorkbenchPage() {
         </div>
 
         <div className="space-y-6 min-w-0">
-          <Card className="bg-white border border-[#e1e3e1]">
+          <Card ref={selectedCardRef} className="bg-white border border-[#e1e3e1] scroll-mt-20">
             <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">Selected fact</h2>
             {!selected ? (
               <p className="text-sm text-[#747775]">Select an item from the queue on the left to review it here.</p>
@@ -510,13 +532,18 @@ export default function WorkbenchPage() {
                     Handwritten source — can&apos;t be included in a threshold-based Bulk Confirm; needs individual review.
                   </div>
                 )}
+                {/* max-lg: below the breakpoint the layout stacks into one
+                    touch-oriented column, so these get a taller tap target
+                    (the default "sm" button is 32px — under the ~44px
+                    minimum a finger needs) without shrinking them back down
+                    on the mouse-driven two-column desktop layout. */}
                 <div className="flex flex-wrap gap-2 pt-2">
-                  <Button size="sm" variant="secondary" onClick={() => setViewingSourceFactId(selected.fact_id)} title="See exactly where this value was read from on the original page">
+                  <Button size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" onClick={() => setViewingSourceFactId(selected.fact_id)} title="See exactly where this value was read from on the original page">
                     <Eye className="w-3.5 h-3.5 mr-1.5" />
                     View Source
                   </Button>
                   <Button
-                    size="sm" variant="secondary" loading={actionLoading}
+                    size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" loading={actionLoading}
                     onClick={() => doAction(selected.claimed_by_actor_id ? "release" : "claim")}
                     title={selected.claimed_by_actor_id ? "Release (shortcut: R) — let another operator claim this" : "Claim (shortcut: C) — reserve this for yourself so no one else works on it at the same time"}
                   >
@@ -524,7 +551,7 @@ export default function WorkbenchPage() {
                     {selected.claimed_by_actor_id ? "Release" : "Claim"}
                   </Button>
                   <Button
-                    size="sm" loading={actionLoading} onClick={() => doAction("confirm")}
+                    size="sm" className="max-lg:h-11 max-lg:px-4" loading={actionLoading} onClick={() => doAction("confirm")}
                     title="Confirm (shortcut: Enter/A) — marks this value as human-verified and removes it from the queue"
                   >
                     <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
@@ -532,7 +559,7 @@ export default function WorkbenchPage() {
                   </Button>
                   {!selected.is_handwritten && (
                     <Button
-                      size="sm" variant="secondary" loading={actionLoading} onClick={() => doAction("mark_handwritten")}
+                      size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" loading={actionLoading} onClick={() => doAction("mark_handwritten")}
                       title="Mark Handwritten (shortcut: H) — flags this as handwritten so it's excluded from threshold-based Bulk Confirm"
                     >
                       <PenLine className="w-3.5 h-3.5 mr-1.5" />
@@ -697,15 +724,15 @@ export default function WorkbenchPage() {
       </main>
 
       {viewingSourceFactId && (
-        <div role="presentation" className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs" onClick={() => setViewingSourceFactId(null)}>
+        <div role="presentation" className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs" onClick={() => setViewingSourceFactId(null)}>
           <div
             role="presentation"
-            className="w-full max-w-3xl max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-3xl shadow-2xl text-[#1f1f1f] p-6"
+            className="w-full max-w-3xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-2xl sm:rounded-3xl shadow-2xl text-[#1f1f1f] p-4 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-bold">Source</h3>
-              <button onClick={() => setViewingSourceFactId(null)} className="p-1.5 text-[#747775] hover:text-[#1f1f1f] rounded-full hover:bg-[#f0f4f9]">
+              <button onClick={() => setViewingSourceFactId(null)} className="p-2.5 -m-1 text-[#747775] hover:text-[#1f1f1f] rounded-full hover:bg-[#f0f4f9]">
                 <X className="w-5 h-5" />
               </button>
             </div>
