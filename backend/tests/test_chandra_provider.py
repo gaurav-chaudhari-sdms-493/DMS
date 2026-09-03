@@ -92,3 +92,39 @@ def test_table_html_parser_skips_empty_cells():
     assert len(parser.rows[0]) == 2
     assert parser.rows[0][0]["text"] == ""
     assert parser.rows[0][1]["text"] == "x"
+
+
+def test_table_html_parser_drops_header_rows():
+    """Regression guard for the real bug found live 2026-09-03: a header
+    row (Chandra marks every cell <th>, inside <thead>) was getting fed
+    through as if it were a real data row, so the printed column labels
+    ("Serial No. and village") and the printed "(1)(2)(3)" number row
+    landed in the serial field instead of an actual row's data."""
+    html = (
+        "<table><thead>"
+        '<tr><th data-bbox="0 0 1 1">Serial No. and village</th><th data-bbox="0 0 1 1">Details</th></tr>'
+        '<tr><th data-bbox="0 0 1 1">(1)</th><th data-bbox="0 0 1 1">(2)</th></tr>'
+        "</thead><tbody>"
+        '<tr><td data-bbox="0 0 1 1">180. Adgaon</td><td data-bbox="0 0 1 1">Rs. 200</td></tr>'
+        "</tbody></table>"
+    )
+    parser = _TableHTMLParser()
+    parser.feed(html)
+    assert len(parser.rows) == 1
+    assert parser.rows[0][0]["text"] == "180. Adgaon"
+
+
+def test_table_html_parser_keeps_mixed_row_even_with_one_header_cell():
+    """A row that's mostly real data shouldn't be dropped just because one
+    cell came back tagged <th> — only an ALL-header row is Chandra's own
+    header convention; anything less is still real row data."""
+    html = (
+        "<table><tr>"
+        '<th data-bbox="0 0 1 1">180</th>'
+        '<td data-bbox="0 0 1 1">Adgaon</td>'
+        "</tr></table>"
+    )
+    parser = _TableHTMLParser()
+    parser.feed(html)
+    assert len(parser.rows) == 1
+    assert parser.rows[0][0]["text"] == "180"

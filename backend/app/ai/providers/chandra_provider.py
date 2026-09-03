@@ -88,6 +88,7 @@ class _TableHTMLParser(HTMLParser):
             self._current_cell = {
                 "bbox": _parse_bbox(attrs_d.get("data-bbox")),
                 "confidence": _parse_confidence(attrs_d.get("data-confidence")),
+                "is_header": tag == "th",
             }
         elif tag == "br" and self._current_cell is not None:
             # A multi-line cell's <br/>-separated lines otherwise
@@ -107,7 +108,17 @@ class _TableHTMLParser(HTMLParser):
             self._current_row.append(self._current_cell)
             self._current_cell = None
         elif tag == "tr" and self._current_row is not None:
-            if self._current_row:
+            # Real bug found live 2026-09-03: Chandra marks its own
+            # detected header/column-number rows distinctly (every cell a
+            # <th>, inside <thead>) — but this parser was treating them
+            # exactly like data rows, so the printed column headers and
+            # the printed "(1)(2)(3)" number row were getting mapped onto
+            # our schema's fields as if they were a real data row (e.g.
+            # sr_no="Serial No. and village" instead of an actual serial
+            # number). A row where every cell is a header is Chandra's
+            # header, not a data row — drop it rather than feed it
+            # downstream as bogus row data.
+            if self._current_row and not all(c["is_header"] for c in self._current_row):
                 self.rows.append(self._current_row)
             self._current_row = None
 
