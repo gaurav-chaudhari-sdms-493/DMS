@@ -173,6 +173,16 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
       } else if (Array.isArray(detail) && detail.length > 0) {
         // FastAPI validation errors: [{loc, msg, type}, ...]
         errorDetail = detail.map((d: any) => d?.msg || JSON.stringify(d)).join("; ");
+      } else if (detail && typeof detail === "object" && typeof detail.message === "string") {
+        // A structured error with extra context fields (e.g. duplicate-file
+        // detection's {message, existing_document_id, existing_document_title,
+        // existing_uploaded_at}) — real bug found live 2026-09-03: this shape
+        // fell through to the raw JSON.stringify below, so a user saw
+        // '{"detail":{"message":"An identical file already exists...' instead
+        // of a readable sentence. The extra fields are for callers that want
+        // to act on them programmatically, not for display — show the
+        // message text.
+        errorDetail = detail.message;
       } else {
         errorDetail = JSON.stringify(errJson);
       }
