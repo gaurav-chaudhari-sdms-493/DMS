@@ -54,14 +54,108 @@ def _paddle_ocr_image(pil_img) -> str:
     return "\n".join(lines)
 
 
+class _ChandraFullTextHTMLParser:
+    """Strips Chandra's HTML output to plain reading-order text. Unlike
+    ChandraVLMProvider's _TableHTMLParser (chandra_provider.py — table
+    cells only, mapped onto a field schema for the Facts pipeline), this
+    keeps every block of text on the page — paragraphs and table cells
+    alike — since chunking/embedding for general search only needs
+    readable text, not structure."""
+
+    _BLOCK_TAGS = {"p", "div", "tr", "table", "h1", "h2", "h3", "h4", "h5", "h6", "li", "br"}
+
+    def __init__(self) -> None:
+        from html.parser import HTMLParser
+
+        class _Inner(HTMLParser):
+            def __init__(inner_self):
+                super().__init__()
+                inner_self.parts: list[str] = []
+
+            def handle_starttag(inner_self, tag, attrs):
+                if tag in self._BLOCK_TAGS:
+                    inner_self.parts.append("\n")
+
+            def handle_endtag(inner_self, tag):
+                if tag in self._BLOCK_TAGS:
+                    inner_self.parts.append("\n")
+
+            def handle_data(inner_self, data):
+                if data:
+                    inner_self.parts.append(data)
+
+        self._parser = _Inner()
+
+    def feed(self, html: str) -> str:
+        self._parser.feed(html)
+        import re
+        text = "".join(self._parser.parts)
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+        return text.strip()
+
+
+def _chandra_ocr_image(pil_img) -> str:
+    """OCR via Chandra/Datalab's /convert endpoint, called synchronously
+    (this runs inside a thread via asyncio.to_thread, same as the
+    tesseract/paddle engines above) — a plain httpx.Client with
+    time.sleep polling, not the async client ChandraVLMProvider uses,
+    since mixing an event loop into an already-threaded sync call path
+    adds complexity with no upside here. Returns the whole page's plain
+    readable text (paragraphs and tables both), unlike ChandraVLMProvider
+    which maps only table cells onto a field schema for the Facts
+    pipeline — this is the general-purpose OCR replacement for
+    tesseract/paddle on handwritten/scanned pages."""
+    import time
+    import httpx
+    from app.config import settings
+
+    api_key = settings.datalab_api_key
+    if not api_key:
+        raise RuntimeError("DATALAB_API_KEY not configured")
+
+    buf = io.BytesIO()
+    pil_img.convert("RGB").save(buf, format="PNG")
+
+    with httpx.Client(timeout=60.0) as client:
+        submit = client.post(
+            "https://www.datalab.to/api/v1/convert",
+            headers={"X-API-Key": api_key},
+            files={"file": ("page.png", buf.getvalue(), "image/png")},
+            data={"output_format": "html", "mode": "accurate"},
+        )
+        if submit.status_code != 200:
+            raise Exception(f"Chandra convert request failed with status {submit.status_code}: {submit.text}")
+        check_url = submit.json().get("request_check_url")
+        if not check_url:
+            raise Exception(f"Chandra convert response missing request_check_url: {submit.text}")
+
+        elapsed = 0.0
+        interval = 3.0
+        timeout = 180.0
+        while elapsed < timeout:
+            time.sleep(interval)
+            elapsed += interval
+            poll = client.get(check_url, headers={"X-API-Key": api_key})
+            if poll.status_code != 200:
+                raise Exception(f"Chandra status poll failed with status {poll.status_code}: {poll.text}")
+            data = poll.json()
+            status = data.get("status")
+            if status == "complete":
+                return _ChandraFullTextHTMLParser().feed(data.get("html") or "")
+            if status == "failed":
+                raise Exception(f"Chandra conversion failed: {data.get('error')}")
+        raise Exception(f"Chandra conversion did not complete within {timeout}s")
+
+
 def extract_pages_from_file(file_bytes: bytes, filename: str, ocr_engine: str = "tesseract") -> List[Dict[str, Any]]:
     """
     Extract structured pages and text content from various file formats:
     PDF, Word (.docx), Excel (.xlsx, .csv), PowerPoint (.pptx), Markdown (.md),
     RTF (.rtf), JSON (.json), Images (.jpg, .png, etc.), and Plain Text files.
 
-    ocr_engine ('tesseract' | 'paddle') only affects the PDF/image paths —
-    every other format here doesn't involve OCR at all.
+    ocr_engine ('tesseract' | 'paddle' | 'chandra') only affects the
+    PDF/image paths — every other format here doesn't involve OCR at all.
     """
     ext = filename.lower().split(".")[-1] if "." in filename else ""
 
@@ -92,6 +186,8 @@ def _extract_image(file_bytes: bytes, filename: str, ocr_engine: str = "tesserac
         img = Image.open(io.BytesIO(file_bytes))
         if ocr_engine == "paddle":
             text = _paddle_ocr_image(img) or ""
+        elif ocr_engine == "chandra":
+            text = _chandra_ocr_image(img) or ""
         else:
             import pytesseract
             text = pytesseract.image_to_string(img, lang=TESSERACT_LANG) or ""
@@ -152,6 +248,8 @@ def _extract_pdf(file_bytes: bytes, filename: str = "", ocr_engine: str = "tesse
                         pil_img = page.to_image(resolution=150).original
                         if ocr_engine == "paddle":
                             ocr_text = _paddle_ocr_image(pil_img) or ""
+                        elif ocr_engine == "chandra":
+                            ocr_text = _chandra_ocr_image(pil_img) or ""
                         else:
                             import pytesseract
                             ocr_text = pytesseract.image_to_string(pil_img, lang=TESSERACT_LANG) or ""

@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     ai_embed_provider: Literal['openai', 'bgem3', 'gemini', 'cohere'] = 'bgem3'
     ai_embed_fallback_provider: Literal['cohere', 'openai', 'none'] = 'none'
     ai_rerank_provider: Literal['cohere', 'bgem3', 'none'] = 'cohere'
-    ai_ocr_provider: Literal['pdfplumber', 'llamaparse', 'paddleocr'] = 'pdfplumber'
+    ai_ocr_provider: Literal['pdfplumber', 'llamaparse', 'paddleocr', 'chandra'] = 'pdfplumber'
 
     # T22 — VLM extraction path. Gemini (direct) and OpenRouter (proxying any
     # OpenRouter-hosted vision model, openrouter_vlm_model) are wired up.
