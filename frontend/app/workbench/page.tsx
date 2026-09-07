@@ -531,7 +531,7 @@ export default function WorkbenchPage() {
               {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0d2e5c]" />}
             </div>
             {facts.length > 0 && (
-              <div className="px-5 py-1.5 bg-[#fafbfc] border-b border-[#e1e3e1] text-[10px] text-[#9aa0a6] flex items-center gap-4">
+              <div className="px-5 py-1.5 bg-[#fafbfc] border-b border-[#e1e3e1] text-[10px] text-[#444746] flex items-center gap-4">
                 <span>&#9744; check a row to include it in <b>Bulk edit</b>, below</span>
                 <span>Click a row to review it, right</span>
               </div>
@@ -573,7 +573,7 @@ export default function WorkbenchPage() {
                         <div className="text-sm font-medium text-[#1f1f1f] truncate">{fieldLabel(fact.field_name)}</div>
                         <div className="text-xs text-[#747775] truncate">{formatValue(fact.value)}</div>
                         {fact.document_title && (
-                          <div className="flex items-center gap-1 text-[10px] text-[#9aa0a6] truncate mt-0.5">
+                          <div className="flex items-center gap-1 text-[10px] text-[#444746] truncate mt-0.5">
                             <FileText className="w-3 h-3 shrink-0" />
                             <span className="truncate">{fact.document_title}</span>
                           </div>
@@ -584,7 +584,7 @@ export default function WorkbenchPage() {
                           <span title="Claimed by you"><Lock className="w-3.5 h-3.5 text-[#0d2e5c]" /></span>
                         )}
                         {isOthers && (
-                          <span title="Claimed by another operator"><Lock className="w-3.5 h-3.5 text-[#9aa0a6]" /></span>
+                          <span title="Claimed by another operator"><Lock className="w-3.5 h-3.5 text-[#444746]" /></span>
                         )}
                         <span className={`text-xs font-mono px-1.5 py-0.5 rounded border ${badge.className}`}>
                           {badge.text}
@@ -760,7 +760,7 @@ export default function WorkbenchPage() {
                   Folder was clicked and a 409 came back. */}
               {bulkFolderId.trim() && (
                 calibrationLoading ? (
-                  <div className="flex items-center gap-1.5 text-xs text-[#9aa0a6]">
+                  <div className="flex items-center gap-1.5 text-xs text-[#444746]">
                     <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking calibration status…
                   </div>
                 ) : calibrationStatus?.calibrated ? (
@@ -807,7 +807,7 @@ export default function WorkbenchPage() {
                   onChange={(e) => setBulkPolicyVersion(e.target.value)}
                   className="w-full text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0d2e5c]/40"
                 />
-                <p className="text-[10px] text-[#9aa0a6] mt-1">A short name for this batch, so it can be found and reverted later if needed.</p>
+                <p className="text-[10px] text-[#444746] mt-1">A short name for this batch, so it can be found and reverted later if needed.</p>
               </div>
               <Button size="sm" className="w-full bg-emerald-600 hover:bg-emerald-700" loading={bulkLoading} onClick={submitBulkConfirm}>
                 <Layers className="w-3.5 h-3.5 mr-1.5" />

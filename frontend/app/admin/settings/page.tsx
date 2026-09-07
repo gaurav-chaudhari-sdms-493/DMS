@@ -159,7 +159,7 @@ export default function SettingsAdminPage() {
                     <div className="min-w-0 flex-1">
                       <div className="text-xs font-mono text-[#0d2e5c] truncate">{row.key}</div>
                       <div className="text-sm text-[#444746] mt-0.5">{row.description}</div>
-                      <div className="flex items-center gap-1 text-[10px] text-[#9aa0a6] mt-1">
+                      <div className="flex items-center gap-1 text-[10px] text-[#444746] mt-1">
                         <Clock className="w-3 h-3" />
                         <span>updated {formatUpdatedAt(row.updated_at)}</span>
                       </div>

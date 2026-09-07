@@ -399,7 +399,7 @@ export default function Entity360Page() {
 
             <Card className="bg-white border border-[#e1e3e1]">
               <h3 className="text-sm font-bold mb-1">Linked entities ({data.linked_entities.length})</h3>
-              <p className="text-[10px] text-[#9aa0a6] mb-3">Other people, properties, or institutions connected to this one.</p>
+              <p className="text-[10px] text-[#444746] mb-3">Other people, properties, or institutions connected to this one.</p>
               {data.linked_entities.length === 0 && <p className="text-sm text-[#747775]">No linked entities.</p>}
               <div className="flex flex-col gap-2">
                 {data.linked_entities.map((e) => (
@@ -449,7 +449,7 @@ export default function Entity360Page() {
 
             <Card className="bg-white border border-[#e1e3e1]">
               <h3 className="text-sm font-bold mb-1">Linked facts ({data.linked_facts.length})</h3>
-              <p className="text-[10px] text-[#9aa0a6] mb-3">Extracted document fields tied to this entity.</p>
+              <p className="text-[10px] text-[#444746] mb-3">Extracted document fields tied to this entity.</p>
               {data.linked_facts.length === 0 && <p className="text-sm text-[#747775]">No linked facts.</p>}
               <div className="flex flex-col gap-2">
                 {data.linked_facts.map((e) => (
