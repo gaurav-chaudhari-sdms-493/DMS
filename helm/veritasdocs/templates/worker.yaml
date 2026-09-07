@@ -34,5 +34,16 @@ spec:
                 name: {{ include "veritasdocs.fullname" . }}-config
           env:
             {{- include "veritasdocs.appEnv" . | nindent 12 }}
+          {{- if .Values.hfCache.enabled }}
+          volumeMounts:
+            - name: hf-cache
+              mountPath: /root/.cache/huggingface
+          {{- end }}
           resources:
             {{- toYaml .Values.worker.resources | nindent 12 }}
+      {{- if .Values.hfCache.enabled }}
+      volumes:
+        - name: hf-cache
+          persistentVolumeClaim:
+            claimName: {{ include "veritasdocs.fullname" . }}-hf-cache
+      {{- end }}
