@@ -19,6 +19,7 @@ import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import RegionHighlightViewer from "@/components/drive/RegionHighlightViewer";
+import { useI18n } from "@/lib/i18n";
 
 interface FieldProvenance {
   kind: "base" | "amendment";
@@ -134,6 +135,7 @@ function TierBadge({ tier }: { tier: number }) {
 }
 
 export default function Entity360Page() {
+  const { t } = useI18n();
   const [nodeId, setNodeId] = useState("");
   const [data, setData] = useState<Entity360 | null>(null);
   const [loading, setLoading] = useState(false);
@@ -254,12 +256,12 @@ export default function Entity360Page() {
             className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9]"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Drive</span>
+            <span>{t("common.back", "Back to Drive")}</span>
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
             <Network className="w-5 h-5 text-[#0d2e5c]" />
-            Entity 360
+            {t("entities.title", "Entity 360")}
           </h1>
           {navHistory.length > 0 && (
             <button
