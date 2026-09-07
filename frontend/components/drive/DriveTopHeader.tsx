@@ -101,8 +101,8 @@ export function DriveTopHeader({
       {/* Center: Search Bar ("Search anything with Stark AI...") */}
       <form onSubmit={handleSubmit} className="flex-1 max-w-4xl">
         <div className="relative flex items-center group">
-          <button type="submit" aria-label="Search" className="absolute left-4 text-[#0b57d0] hover:text-[#0945a5] z-10 transition-transform group-hover:scale-110">
-            <Sparkles className="w-5 h-5 text-[#0b57d0] animate-pulse" />
+          <button type="submit" aria-label="Search" className="absolute left-4 text-[#0d2e5c] hover:text-[#0945a5] z-10 transition-transform group-hover:scale-110">
+            <Sparkles className="w-5 h-5 text-[#0d2e5c] animate-pulse" />
           </button>
 
           <input
@@ -111,7 +111,7 @@ export function DriveTopHeader({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder={t("header.search_placeholder", "Search anything with Stark AI...")}
-            className="w-full pl-14 pr-12 py-3.5 rounded-full bg-[#edf2fc] text-[#1f1f1f] placeholder:text-[#444746] text-base font-normal border border-[#d3d7dc]/60 hover:bg-[#e4ebf7] hover:border-[#0b57d0]/30 focus:outline-none focus:bg-white focus:shadow-xl focus:ring-2 focus:ring-[#0b57d0]/50 focus:border-[#0b57d0] transition-all duration-300 shadow-inner"
+            className="w-full pl-14 pr-12 py-3.5 rounded-full bg-[#edf2fc] text-[#1f1f1f] placeholder:text-[#444746] text-base font-normal border border-[#d3d7dc]/60 hover:bg-[#e4ebf7] hover:border-[#0d2e5c]/30 focus:outline-none focus:bg-white focus:shadow-xl focus:ring-2 focus:ring-[#0d2e5c]/50 focus:border-[#0d2e5c] transition-all duration-300 shadow-inner"
           />
 
           {query && (
@@ -157,7 +157,7 @@ export function DriveTopHeader({
                   id="reranker-strategy"
                   value={rerankProvider}
                   onChange={(e) => onChangeRerankProvider?.(e.target.value as "bgem3" | "cohere")}
-                  className="w-full px-3 py-2 rounded-lg border border-[#d3d7dc] bg-[#edf2fc] text-sm font-medium focus:outline-none focus:ring-1 focus:ring-[#0b57d0]"
+                  className="w-full px-3 py-2 rounded-lg border border-[#d3d7dc] bg-[#edf2fc] text-sm font-medium focus:outline-none focus:ring-1 focus:ring-[#0d2e5c]"
                 >
                   <option value="cohere">Cohere (API) — Fast cloud API, no local CPU/GPU load</option>
                   <option value="bgem3">Local (BGE) — no API cost, higher PC load</option>
@@ -172,7 +172,7 @@ export function DriveTopHeader({
                 <button
                   type="button"
                   onClick={() => onChangeGenerateSummary?.(!generateSummary)}
-                  className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${generateSummary ? "bg-[#0b57d0]" : "bg-[#d3d7dc]"}`}
+                  className={`relative w-11 h-6 rounded-full shrink-0 transition-colors ${generateSummary ? "bg-[#0d2e5c]" : "bg-[#d3d7dc]"}`}
                 >
                   <span
                     className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${generateSummary ? "translate-x-5" : ""}`}
@@ -191,7 +191,7 @@ export function DriveTopHeader({
           className="flex items-center gap-1.5 p-1 rounded-full hover:bg-[#e1e3e1]/60 transition-colors focus:outline-none"
         >
           <div
-            className="w-9 h-9 rounded-full bg-[#c2e7ff] text-[#001d35] font-bold text-xs flex items-center justify-center border border-[#727775] shadow-sm hover:ring-2 hover:ring-[#0b57d0] transition-all"
+            className="w-9 h-9 rounded-full bg-[#c2e7ff] text-[#001d35] font-bold text-xs flex items-center justify-center border border-[#727775] shadow-sm hover:ring-2 hover:ring-[#0d2e5c] transition-all"
             title="Account Menu"
           >
             {userInitials}

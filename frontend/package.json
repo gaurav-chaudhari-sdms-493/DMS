@@ -13,6 +13,8 @@
     "prebuild": "node -e \"require('fs').copyFileSync('node_modules/pdfjs-dist/build/pdf.worker.min.mjs','public/pdf.worker.min.mjs')\"",
     "start": "next start",
     "lint": "next lint",
+    "test:a11y": "playwright test",
+    "test:a11y:fast": "node scripts/run_a11y_audit.mjs",
     "desktop:dev": "electron .",
     "desktop:build": "BUILD_TARGET=desktop next build && electron-builder --linux AppImage deb",
     "tauri": "tauri",
@@ -53,7 +55,10 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@playwright/test": "^1.63.0",
     "@tauri-apps/cli": "^1.6.0",
+    "@types/jsdom": "^30.0.0",
     "@types/node": "20.19.43",
     "@types/react": "^18",
     "@types/react-dom": "^18",
@@ -63,8 +68,12 @@
     "eslint": "^8",
     "eslint-config-next": "14",
     "eslint-plugin-jsx-a11y": "^6.10.2",
+    "jsdom": "^30.0.1",
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
     "typescript": "5.9.3"
+  },
+  "optionalDependencies": {
+    "@next/swc-linux-x64-gnu": "^14.2.33"
   }
 }

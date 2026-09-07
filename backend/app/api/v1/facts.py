@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...schemas.auth import TokenPayload
-from ...deps import get_db, require_tenant_access, require_role
+from ...deps import get_tenant_db, require_tenant_access, require_role
 from ...services import fact_service, fact_verification_service
 
 router = APIRouter(prefix="/facts", tags=["Facts"])
@@ -31,7 +31,7 @@ async def get_adjudication_queue_api(
     limit: int = 50,
     offset: int = 0,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await fact_verification_service.get_adjudication_queue(db, tenant_id, category=category, limit=limit, offset=offset)
@@ -43,7 +43,7 @@ async def bulk_confirm_facts_api(
     threshold: float,
     policy_version: str,
     current_user: TokenPayload = Depends(require_role('admin', 'records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -61,7 +61,7 @@ async def bulk_confirm_facts_api(
 async def bulk_edit_facts_api(
     body: BulkEditRequest,
     current_user: TokenPayload = Depends(require_role('admin', 'records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -75,7 +75,7 @@ async def bulk_edit_facts_api(
 async def revert_bulk_edit_batch_api(
     batch_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('admin', 'records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -86,7 +86,7 @@ async def revert_bulk_edit_batch_api(
 async def get_fact_api(
     fact_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await fact_service.get_fact_with_regions(db, fact_id, tenant_id)
@@ -96,7 +96,7 @@ async def get_fact_api(
 async def claim_fact_api(
     fact_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('admin', 'records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -108,7 +108,7 @@ async def claim_fact_api(
 async def release_fact_api(
     fact_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('admin', 'records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -120,7 +120,7 @@ async def release_fact_api(
 async def mark_fact_handwritten_api(
     fact_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('admin', 'records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -133,7 +133,7 @@ async def resolve_stitch_ambiguity_api(
     fact_id: uuid.UUID,
     body: ResolveStitchAmbiguityRequest,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -145,7 +145,7 @@ async def resolve_stitch_ambiguity_api(
 async def confirm_fact_api(
     fact_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('admin', 'records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)

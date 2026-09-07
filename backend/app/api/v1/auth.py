@@ -16,10 +16,11 @@ from ...models.document_version import DocumentVersion
 from ...models.chunk import Chunk
 from ...models.folder import Folder
 
-from ...deps import get_db, get_request_ip, require_tenant_access
+from ...deps import get_db, get_tenant_db, get_request_ip, require_tenant_access
 from ...services.auth_service import (
     verify_password, create_access_token, create_refresh_token, sign_up,
-    create_password_reset_token, reset_password_with_token, change_password
+    create_password_reset_token, reset_password_with_token, change_password,
+    lookup_user_by_email, establish_tenant_context,
 )
 from ...services.audit_service import log_action
 
@@ -28,7 +29,7 @@ router = APIRouter()
 @router.get('/me', response_model=UserProfileResponse)
 async def get_current_user_profile(
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     user_id = uuid.UUID(current_user.sub)
     tenant_id = uuid.UUID(current_user.tenant_id)
@@ -121,7 +122,7 @@ async def get_current_user_profile(
 async def update_current_user_locale(
     body: UpdateLocaleRequest,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """T95 — persists the user's language choice for their next login on
     any device; the frontend also mirrors this to localStorage so the
@@ -140,7 +141,7 @@ async def update_current_user_locale(
 async def change_current_user_password(
     body: ChangePasswordRequest,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     """In-place password change for an already-logged-in user — the
     profile page's "Change Password" previously just linked to
@@ -159,7 +160,11 @@ async def sign_up_user(
     """Create a new tenant and an admin user."""
     new_user = await sign_up(body, db)
     ip_addr = await get_request_ip(request)
-    
+
+    # D-2 fix — sign_up() already committed once internally (see its own
+    # comments), so the tenant context it set doesn't survive into this
+    # route's own statements; the audit log insert below needs it again.
+    await establish_tenant_context(db, new_user.tenant_id)
     await log_action(
         db=db,
         actor_id=new_user.user_id,
@@ -176,16 +181,18 @@ async def sign_up_user(
 
 @router.post('/login', response_model=TokenResponse)
 async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
-    stmt = select(User).where(User.email == body.email)
-    res = await db.execute(stmt)
-    user = res.scalar_one_or_none()
-    
+    user = await lookup_user_by_email(db, body.email)
+
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid credentials")
         
     acc = create_access_token(user.id, user.tenant_id, user.role.value)
     ref = create_refresh_token(user.id, user.tenant_id, user.role.value)
-    
+
+    # D-2 fix — this session has only ever had app.login_lookup_email set
+    # (the email lookup above), not app.current_tenant_id; the audit log
+    # insert below is the first tenant-scoped write this request makes.
+    await establish_tenant_context(db, user.tenant_id)
     await log_action(db, user.id, user.tenant_id, "auth.login")
     
     from ...config import settings
@@ -225,14 +232,15 @@ async def refresh_token(
 
 @router.post('/forgot-password', response_model=ForgotPasswordResponse)
 async def forgot_password(body: ForgotPasswordRequest, db: AsyncSession = Depends(get_db)):
-    stmt = select(User).where(User.email == body.email)
-    res = await db.execute(stmt)
-    user = res.scalar_one_or_none()
-    
+    user = await lookup_user_by_email(db, body.email)
+
     if user:
         reset_token = create_password_reset_token(body.email)
         from ...services.email_service import send_password_reset_email
         await send_password_reset_email(user.email, reset_token)
+        # D-2 fix — same reasoning as login(): only app.login_lookup_email
+        # has been set on this session so far.
+        await establish_tenant_context(db, user.tenant_id)
         await log_action(db, user.id, user.tenant_id, "auth.forgot_password", details={"email": body.email})
         await db.commit()
         

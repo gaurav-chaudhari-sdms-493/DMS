@@ -31,6 +31,22 @@ have to be built here rather than in the ConfigMap.
       key: postgres-password
 - name: POSTGRES_URL
   value: "postgresql+asyncpg://veritasdocs:$(POSTGRES_PASSWORD)@{{ include "veritasdocs.fullname" . }}-postgres:5432/veritasdocs"
+- name: APP_DB_PASSWORD
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "veritasdocs.fullname" . }}-secrets
+      key: app-db-password
+- name: APP_POSTGRES_URL
+  # T93 clean-room finding: migration 0046 (D-2 RLS fix) creates the
+  # restricted `dms_app` role and requires APP_DB_PASSWORD to be set, or
+  # it raises outright — this chart never provided either var, so a fresh
+  # install failed at the pre-install migration Job before this was added.
+  # Without APP_POSTGRES_URL, backend/worker also fall back to the
+  # superuser connection (config.py logs a warning, doesn't fail), which
+  # silently reopens the exact RLS bypass D-2 fixed — same class of gap
+  # as this session's own docker-compose/.env and CI updates for the same
+  # migration, just never propagated into this chart until now.
+  value: "postgresql+asyncpg://dms_app:$(APP_DB_PASSWORD)@{{ include "veritasdocs.fullname" . }}-postgres:5432/veritasdocs"
 - name: REDIS_PASSWORD
   valueFrom:
     secretKeyRef:
@@ -88,5 +104,11 @@ have to be built here rather than in the ConfigMap.
     secretKeyRef:
       name: {{ include "veritasdocs.fullname" . }}-secrets
       key: llamaparse-api-key
+      optional: true
+- name: DATALAB_API_KEY
+  valueFrom:
+    secretKeyRef:
+      name: {{ include "veritasdocs.fullname" . }}-secrets
+      key: datalab-api-key
       optional: true
 {{- end -}}

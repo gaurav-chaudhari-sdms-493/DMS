@@ -160,7 +160,7 @@ async def poll_sftp_once() -> int:
     ingested = 0
     moves: dict[str, str] = {}
     async with AsyncSessionLocal() as db:
-        tenant_id, _ = await get_connector_actor(db)
+        tenant_id, user_id = await get_connector_actor(db)
         folder_cache: dict = {}
 
         for rel, content in stable_files.items():
@@ -178,7 +178,7 @@ async def poll_sftp_once() -> int:
             try:
                 folder_id = await get_or_create_folder_path(db, tenant_id, subfolder_segments, folder_cache) \
                     if subfolder_segments else None
-                resp = await ingest_bytes(content, filename, db, content_type=content_type, folder_id=folder_id)
+                resp = await ingest_bytes(content, filename, db, tenant_id, user_id, content_type=content_type, folder_id=folder_id)
                 logger.info("SFTP: ingested '%s' as document %s", rel, resp.document_id)
                 moves[rel] = PROCESSED_SUBDIR
                 ingested += 1

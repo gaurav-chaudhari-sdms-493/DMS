@@ -1,12 +1,15 @@
 import time
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
+from uuid import UUID
 
+from fastapi import HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 from sqlalchemy.pool import NullPool
 
 from app.config import settings
 from app.models.sys_config import SysConfig
+from app.services.audit_service import log_action
 
 _CACHE_TTL_SECONDS = 60
 
@@ -63,3 +66,56 @@ async def get_float(key: str, default: float) -> float:
 
 async def get_str(key: str, default: str) -> str:
     return str(await get_config(key, default))
+
+
+# T03 — the admin settings screen. Reads/writes through the caller's own
+# request-scoped `db` (get_tenant_db), not this module's own NullPool
+# _ConfigSession -- that one exists solely for the read-path's cross-loop
+# safety (see the comment above), and an admin edit is a single request on
+# the normal request-response path with no such loop-lifetime concern.
+async def list_all_config(db: AsyncSession) -> List[Dict[str, Any]]:
+    result = await db.execute(select(SysConfig).order_by(SysConfig.key))
+    rows = result.scalars().all()
+    return [
+        {
+            "key": row.key,
+            "value": row.value.get("v") if isinstance(row.value, dict) else row.value,
+            "description": row.description,
+            "updated_at": row.updated_at,
+        }
+        for row in rows
+    ]
+
+
+async def set_config(db: AsyncSession, key: str, value: float, actor_id: UUID, tenant_id: UUID) -> Dict[str, Any]:
+    """Edits an EXISTING threshold only -- deliberately refuses to create a
+    new key. A key nothing in the pipeline reads via get_int/get_float
+    would just sit there doing nothing, silently misleading whoever typed
+    it into thinking they'd changed real behavior. A genuinely new
+    threshold still needs a migration (same seeding pattern as 0009,
+    0028, 0030, 0040, 0041), because it needs a *default* for the
+    environments that haven't set it yet -- this endpoint has no way to
+    supply one."""
+    row = await db.get(SysConfig, key)
+    if not row:
+        raise HTTPException(status_code=404, detail=f"No config key '{key}' exists — see set_config()'s own docstring for why this doesn't create one")
+
+    old_value = row.value.get("v") if isinstance(row.value, dict) else row.value
+    row.value = {"v": value}
+    await db.flush()
+
+    await log_action(
+        db, actor_id, tenant_id, "config.update",
+        resource_type="sys_config", resource_id=None,
+        details={"key": key, "old_value": old_value, "new_value": value},
+    )
+    await db.commit()
+
+    # Invalidate the read cache immediately rather than waiting up to
+    # _CACHE_TTL_SECONDS -- an admin who just changed a threshold and
+    # watches the next document process through the old value would
+    # reasonably read that as the edit not having worked.
+    global _cache_loaded_at
+    _cache_loaded_at = 0.0
+
+    return {"key": key, "value": value, "description": row.description, "updated_at": row.updated_at}

@@ -4,7 +4,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...deps import get_db, require_role, require_tenant_access
+from ...deps import get_tenant_db, require_role, require_tenant_access
 from ...schemas.auth import TokenPayload
 from ...schemas.template import TemplateCreate, TemplateUpdate, TemplateResponse
 from ...services import template_service
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/templates", tags=["Templates"])
 async def list_templates_api(
     form_type: Optional[str] = None,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     return await template_service.list_templates(db, form_type=form_type)
 
@@ -25,7 +25,7 @@ async def list_templates_api(
 async def get_template_api(
     template_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     return await template_service.get_template_by_id(db, template_id)
 
@@ -34,7 +34,7 @@ async def get_template_api(
 async def create_template_api(
     body: TemplateCreate,
     current_user: TokenPayload = Depends(require_role("it_admin")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     actor_id = uuid.UUID(current_user.sub)
@@ -48,7 +48,7 @@ async def update_template_api(
     template_id: uuid.UUID,
     body: TemplateUpdate,
     current_user: TokenPayload = Depends(require_role("it_admin")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     actor_id = uuid.UUID(current_user.sub)
@@ -63,7 +63,7 @@ async def update_template_api(
 async def delete_template_api(
     template_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role("it_admin")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     actor_id = uuid.UUID(current_user.sub)

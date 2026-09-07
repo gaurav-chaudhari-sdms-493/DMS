@@ -65,14 +65,14 @@ async def test_ocr_cache_write_idempotent_first_write_wins():
 
 
 def test_vlm_cache_key_deterministic():
-    k1 = compute_vlm_cache_key("filehash1", 1, "prompt text")
-    k2 = compute_vlm_cache_key("filehash1", 1, "prompt text")
+    k1 = compute_vlm_cache_key("filehash1", 1, "prompt text", "chandra")
+    k2 = compute_vlm_cache_key("filehash1", 1, "prompt text", "chandra")
     assert k1 == k2
 
 
 def test_vlm_cache_key_varies_by_page_number():
-    k1 = compute_vlm_cache_key("filehash1", 1, "prompt text")
-    k2 = compute_vlm_cache_key("filehash1", 2, "prompt text")
+    k1 = compute_vlm_cache_key("filehash1", 1, "prompt text", "chandra")
+    k2 = compute_vlm_cache_key("filehash1", 2, "prompt text", "chandra")
     assert k1 != k2
 
 
@@ -80,14 +80,23 @@ def test_vlm_cache_key_varies_by_prompt():
     """A template's field_schema changing (or a spread's left vs right
     half) must produce a different prompt and therefore a different key
     -- never silently reuse a stale extraction."""
-    k1 = compute_vlm_cache_key("filehash1", 1, "prompt asking for field A")
-    k2 = compute_vlm_cache_key("filehash1", 1, "prompt asking for field B")
+    k1 = compute_vlm_cache_key("filehash1", 1, "prompt asking for field A", "chandra")
+    k2 = compute_vlm_cache_key("filehash1", 1, "prompt asking for field B", "chandra")
     assert k1 != k2
 
 
 def test_vlm_cache_key_varies_by_file_hash():
-    k1 = compute_vlm_cache_key("filehash1", 1, "prompt text")
-    k2 = compute_vlm_cache_key("filehash2", 1, "prompt text")
+    k1 = compute_vlm_cache_key("filehash1", 1, "prompt text", "chandra")
+    k2 = compute_vlm_cache_key("filehash2", 1, "prompt text", "chandra")
+    assert k1 != k2
+
+
+def test_vlm_cache_key_varies_by_vlm_provider():
+    """Switching AI_VLM_PROVIDER (e.g. gemini -> chandra) must never serve
+    a different provider's cached response for the same file/page/prompt
+    -- same convention as the OCR archive's ocr_engine scoping above."""
+    k1 = compute_vlm_cache_key("filehash1", 1, "prompt text", "gemini")
+    k2 = compute_vlm_cache_key("filehash1", 1, "prompt text", "chandra")
     assert k1 != k2
 
 
@@ -98,7 +107,7 @@ async def test_vlm_cache_round_trip():
             # Unique per run: doc_dg_vlm_archive rows persist across test
             # runs against this shared dev DB, so a hardcoded key would
             # find an earlier run's committed row already present.
-            key = compute_vlm_cache_key(f"test_vlm_roundtrip_{uuid.uuid4().hex}", 1, "a prompt")
+            key = compute_vlm_cache_key(f"test_vlm_roundtrip_{uuid.uuid4().hex}", 1, "a prompt", "chandra")
             assert await get_cached_vlm_response(db, key) is None
 
             await record_vlm_response(db, key, '{"rows": [], "marginalia": []}')
@@ -118,7 +127,7 @@ async def test_vlm_cache_write_once_ignores_a_second_record_call():
     overwrite_vlm_response instead, tested below."""
     async with AsyncSessionLocal() as db:
         try:
-            key = compute_vlm_cache_key(f"test_vlm_writeonce_{uuid.uuid4().hex}", 1, "a prompt")
+            key = compute_vlm_cache_key(f"test_vlm_writeonce_{uuid.uuid4().hex}", 1, "a prompt", "chandra")
             await record_vlm_response(db, key, "first response")
             await record_vlm_response(db, key, "second response")
             await db.commit()
@@ -132,7 +141,7 @@ async def test_vlm_cache_write_once_ignores_a_second_record_call():
 async def test_overwrite_vlm_response_replaces_an_existing_entry():
     async with AsyncSessionLocal() as db:
         try:
-            key = compute_vlm_cache_key(f"test_vlm_overwrite_{uuid.uuid4().hex}", 1, "a prompt")
+            key = compute_vlm_cache_key(f"test_vlm_overwrite_{uuid.uuid4().hex}", 1, "a prompt", "chandra")
             await record_vlm_response(db, key, "bad malformed response")
             await db.commit()
 
@@ -148,7 +157,7 @@ async def test_overwrite_vlm_response_replaces_an_existing_entry():
 async def test_overwrite_vlm_response_writes_fresh_key_like_record():
     async with AsyncSessionLocal() as db:
         try:
-            key = compute_vlm_cache_key(f"test_vlm_overwrite_fresh_{uuid.uuid4().hex}", 1, "a prompt")
+            key = compute_vlm_cache_key(f"test_vlm_overwrite_fresh_{uuid.uuid4().hex}", 1, "a prompt", "chandra")
             assert await get_cached_vlm_response(db, key) is None
 
             await overwrite_vlm_response(db, key, "first-ever response")

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import "./globals.css";
 import { Noto_Sans_Devanagari } from "next/font/google";
+import { I18nProvider } from "@/lib/i18n";
+import { OnlineStatusProvider } from "@/hooks/useOnlineStatus";
 
 const notoSansDevanagari = Noto_Sans_Devanagari({
   subsets: ["devanagari", "latin"],
@@ -22,8 +24,6 @@ export const metadata: Metadata = {
   },
 };
 
-import { I18nProvider } from "@/lib/i18n";
-
 export default function RootLayout({
   children,
 }: {
@@ -33,7 +33,7 @@ export default function RootLayout({
     <html lang="en" className={notoSansDevanagari.variable}>
       <body className="bg-gdriveBg min-h-screen text-gdriveTextMain overflow-hidden select-none">
         <I18nProvider>
-          {children}
+          <OnlineStatusProvider>{children}</OnlineStatusProvider>
         </I18nProvider>
       </body>
     </html>

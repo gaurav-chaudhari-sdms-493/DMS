@@ -18,8 +18,8 @@ T90/T91/T92). **Only part of that exists in this codebase right now:**
 
 | Surface | Local implementation? | Under `AIR_GAPPED=true` |
 |---|---|---|
-| Embeddings | Yes — `bgem3` (in-process `sentence_transformers`) | Works |
-| Reranking | Yes — `bgem3` cross-encoder | Works |
+| Embeddings | Yes — `bgem3` (in-process `sentence_transformers`) | Works **only if the HuggingFace model cache was pre-seeded before going offline** — see §5b, a real gap found and fixed 2026-09-07 |
+| Reranking | Yes — `bgem3` cross-encoder | Same caveat as Embeddings — same model, same cache |
 | OCR | Yes — `pdfplumber`, and now `paddleocr` (T90) with real Devanagari/Marathi support | Works |
 | LLM (chat, search answers) | **No** — only Groq/OpenAI/Anthropic exist | Refuses to start (`AirGappedViolation`) |
 | VLM (document field extraction) | **No** — only Gemini exists; `QwenVLMProvider` exists as unverified scaffolding (no GPU to validate it), not wired into the active config | Refuses to start (`AirGappedViolation`) |
@@ -134,13 +134,25 @@ image:
 
 secrets:
   postgresPassword: "<generate a real secret>"
+  # Password for the restricted `dms_app` Postgres role (D-2 RLS fix,
+  # migration 0046) — required, not optional: that migration raises
+  # outright if this is left unset, which fails the whole install at the
+  # pre-install migration Job. Found and fixed in this chart 2026-09-07
+  # (T93 clean-room install) — if your copy of this chart predates that,
+  # update it first.
+  appDbPassword: "<generate a real secret, different from postgresPassword>"
   redisPassword: "<generate a real secret>"
   jwtSecretKey: "<openssl rand -hex 32>"
   s3AccessKeyId: "<real value, not minioadmin>"
   s3SecretAccessKey: "<real value>"
   # SaaS profile only — leave blank for air-gapped:
   openaiApiKey: "..."
+  groqApiKey: "..."
+  googleApiKey: "..."
   cohereApiKey: "..."
+  # Required if app.ai.ocrProvider or app.ai.vlmProvider is "chandra"
+  # (Datalab's Chandra API — see app/ai/providers/chandra_provider.py).
+  datalabApiKey: "..."
 
 ingress:
   enabled: true
@@ -203,6 +215,83 @@ Object Lock can only be set at bucket-creation time, so if you ever see
 `s3ArchiveBucketName`, the fix is to recreate that bucket (it can't be
 retrofitted), not to change code.
 
+**A `helm upgrade` briefly restarts Postgres specifically (not Redis or
+MinIO), and `helm uninstall` never removes it — expected/self-healing for
+the first, a real manual step for the second.** Only `templates/postgres.yaml`
+uses `pre-install,pre-upgrade` Helm hooks (so it's guaranteed to exist
+before the migration Job runs on a first install — see the ordering
+comment in that file); `templates/redis.yaml` and `templates/minio.yaml`
+are regular templated resources, not hooks, and don't have either of
+these two behaviors. Confirmed live 2026-09-07, T93 clean-room install:
+after a `helm upgrade`, Postgres restarted (age reset) while
+Redis/MinIO's pod ages were untouched.
+
+*Upgrade behavior* — Postgres's PVC is untouched by the restart (no data
+loss: signed up a user, ran `helm upgrade`, watched Postgres restart,
+logged back in as that same user immediately after — worked, same PVC).
+What you WILL see for a few seconds: already-running backend/worker pods
+hold a now-dead pooled DB connection to the now-restarted Postgres and
+return a transient 500 (`asyncpg.exceptions.InterfaceError: connection is
+closed`) until the upgrade's own rolling update replaces those pods with
+fresh ones. This self-heals within the upgrade's normal rollout window —
+not a bug to chase.
+
+*Uninstall behavior* — because Postgres is a Helm hook resource, not a
+regular tracked one, `helm uninstall` does not remove it at all (Helm
+hooks aren't deleted on uninstall — their delete-policy options only
+cover install/upgrade-time replacement, not release removal). Confirmed
+live: after `helm uninstall veritasdocs -n veritasdocs` and the runbook's
+own `kubectl delete pvc ... -l app.kubernetes.io/instance=veritasdocs`
+step, `kubectl -n veritasdocs get all` still showed a running
+`veritasdocs-postgres` StatefulSet, Service, and pod — Redis/MinIO were
+gone as expected, only Postgres leaked. **Add this to step 7, every
+time:**
+
+```bash
+kubectl -n veritasdocs delete statefulset veritasdocs-postgres
+kubectl -n veritasdocs delete svc veritasdocs-postgres
+```
+
+A genuinely clean fix (making Postgres a regular resource like
+Redis/MinIO, with a different mechanism than hook-weight ordering to
+guarantee it exists before the migration Job) is a real architectural
+improvement nobody has done yet — not attempted in this pass, since it
+changes this chart's core install-ordering model and deserves its own
+focused review rather than a T93 side-fix.
+
+## 5b. The HuggingFace model cache — required reading for the air-gapped profile
+
+`bgem3` (embeddings + reranking, both local, both `sentence_transformers`
+based) downloads its model weights from `huggingface.co` on first use.
+This chart mounts a PVC (`hfCache`, on by default) at
+`/root/.cache/huggingface` in both backend and worker so that download
+only happens once per PVC lifetime, not on every pod restart — confirmed
+live 2026-09-07: a fresh install's first search/upload took several
+minutes (~2GB cold download into an empty PVC), a second one after the
+pods rolled was instant.
+
+**This matters far more for the air-gapped profile than the SaaS one.**
+`huggingface.co` is not in `egress_guard.py`'s `BLOCKED_AI_HOSTS` — a
+genuinely air-gapped network simply has no route there at all. If this
+PVC's underlying storage is empty when you cross the air gap, the very
+first embed call hangs or fails trying to reach a host that doesn't
+exist on that network, contradicting this runbook's own "Embeddings:
+Works" claim in the table at the top. **Pre-seed the cache before you go
+offline**: from a machine with internet access, run the backend image
+once against real (even temporary) storage, with a real document upload
+to force the download, then carry that populated volume across the air
+gap the same way you carry `veritasdocs-images.tar` — e.g. `docker cp`
+the container's `/root/.cache/huggingface` out, transfer it by your
+approved media process, and load it onto the air-gapped PVC before first
+use (a one-off `kubectl cp` into a pod mounting that PVC works for a
+`kind`/small cluster; a real production cluster's storage backend may
+have a faster bulk-load path).
+
+Not attempted in this pass: baking the model weights into the backend
+image at build time instead (would remove the need for this PVC/pre-seed
+step entirely, at the cost of a larger image) — a reasonable follow-up if
+the pre-seed step proves too fragile in practice.
+
 ## 6. Air-gapped profile: confirm both fail-closed layers are actually live
 
 `test_egress_guard.py` covers this in CI, but run it once live on your
@@ -250,6 +339,11 @@ uploading and searching a document — embeddings (bgem3), reranking
 ```bash
 helm uninstall veritasdocs -n veritasdocs
 kubectl delete pvc -n veritasdocs -l app.kubernetes.io/instance=veritasdocs   # StatefulSet volumes are not removed automatically
+# Postgres is a Helm hook resource (see §5's note above) -- `helm uninstall`
+# never removes it. Confirmed live 2026-09-07: without this, a "clean"
+# uninstall still leaves a running StatefulSet/Service/pod behind.
+kubectl delete statefulset veritasdocs-postgres -n veritasdocs
+kubectl delete svc veritasdocs-postgres -n veritasdocs
 ```
 
 ## What this chart intentionally leaves out

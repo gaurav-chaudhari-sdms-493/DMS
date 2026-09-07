@@ -180,7 +180,12 @@ export async function syncOfflineData(api: any): Promise<{ syncedActions: number
       if (action.type === "create_folder") {
         await api.folders.create(action.payload.name, action.payload.parent_id);
       } else if (action.type === "rename_folder") {
-        await api.folders.update(action.payload.folder_id, action.payload.new_name);
+        // Real bug found live 2026-09-02: this used to pass the raw new-name
+        // string as the PATCH body instead of { name: ... } -- the backend
+        // always rejected it with a 422 (body isn't a dict), so the action
+        // never got removed from the queue and stayed "pending" forever no
+        // matter how many times auto-sync or the "Sync Now" button ran.
+        await api.folders.update(action.payload.folder_id, { name: action.payload.new_name });
       } else if (action.type === "delete_folder") {
         if (api.folders.deletePermanent) {
           await api.folders.deletePermanent(action.payload.folder_id).catch(() => {});

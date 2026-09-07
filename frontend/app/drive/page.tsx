@@ -26,6 +26,7 @@ import { offlineStore } from "@/lib/offlineStore";
 import { isAuthenticated } from "@/lib/auth";
 import { api } from "@/lib/api";
 import { onKeyActivate } from "@/lib/a11y";
+import { useDebouncedActivation } from "@/lib/useDebouncedActivation";
 import type { Folder, FolderTreeNode, DocumentListItem, DriveStats, SearchResponse, SearchResult } from "@/types";
 import { Info, FolderSearch, Eye, Trash2, RotateCcw, Sparkles, FolderPlus, Upload, FolderUp, UploadCloud, Clock, CheckSquare, X, Star, FolderInput, Download, Edit2 } from "lucide-react";
 
@@ -70,6 +71,7 @@ export default function DrivePage() {
   // Multi-Selection State
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
+  const { handleClick: handleTrashRowClick, handleDoubleClick: handleTrashRowDoubleClick } = useDebouncedActivation();
 
   // Right-Click Item Context Menu State
   const [itemContextMenu, setItemContextMenu] = useState<{
@@ -420,41 +422,74 @@ export default function DrivePage() {
   };
 
   const handleSelectFolder = (folder: Folder, isMulti?: boolean) => {
+    // Same bug and same fix as handleSelectDoc above -- see its comment.
+    if (isMulti) {
+      setSelectedDocIds(new Set());
+      setSelectedFolderIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(folder.id)) next.delete(folder.id);
+        else next.add(folder.id);
+        return next;
+      });
+      return;
+    }
+
+    const isSoleSelection = selectedFolderIds.size === 1 && selectedFolderIds.has(folder.id) && selectedFolder?.id === folder.id;
+    if (isSoleSelection) {
+      setSelectedFolderIds(new Set());
+      setSelectedFolder(null);
+      setShowDetailPanel(false);
+      return;
+    }
+
     setSelectedDoc(null);
+    setSelectedDocIds(new Set());
     setSelectedFolder(folder);
     setShowDetailPanel(true);
-
-    setSelectedFolderIds((prev) => {
-      const next = new Set(isMulti ? prev : []);
-      if (next.has(folder.id)) {
-        next.delete(folder.id);
-      } else {
-        next.add(folder.id);
-      }
-      return next;
-    });
-    if (!isMulti) {
-      setSelectedDocIds(new Set());
-    }
+    setSelectedFolderIds(new Set([folder.id]));
   };
 
   const handleSelectDoc = (doc: DocumentListItem, isMulti?: boolean) => {
+    // Real bug found live 2026-09-02: unchecking an already-selected row's
+    // checkbox (or clicking an already-sole-selected row again) never
+    // actually deselected it. The old logic always built `next` from a
+    // FRESH empty set whenever isMulti was false, so `next.has(doc.id)`
+    // was always false for a plain click -- it could only ever add, never
+    // remove, no matter what was already selected. It also unconditionally
+    // reopened the detail panel on every call, including checkbox clicks
+    // that are meant to be pure bulk-selection with no detail-panel side
+    // effect -- which is what looked like the row "shifting" (the panel
+    // popping open/refocusing) on an action that should have just cleared
+    // a checkbox.
+    if (isMulti) {
+      // Bulk multi-select (checkbox, ctrl/shift+click) -- toggles the
+      // selection set only, never touches the single-doc detail panel.
+      setSelectedFolderIds(new Set());
+      setSelectedDocIds((prev) => {
+        const next = new Set(prev);
+        if (next.has(doc.id)) next.delete(doc.id);
+        else next.add(doc.id);
+        return next;
+      });
+      return;
+    }
+
+    // Plain click: single-select. Clicking the row that's already the
+    // sole selection deselects it and closes the detail panel, instead of
+    // silently re-adding it to an empty set (the actual bug).
+    const isSoleSelection = selectedDocIds.size === 1 && selectedDocIds.has(doc.id) && selectedDoc?.id === doc.id;
+    if (isSoleSelection) {
+      setSelectedDocIds(new Set());
+      setSelectedDoc(null);
+      setShowDetailPanel(false);
+      return;
+    }
+
     setSelectedFolder(null);
+    setSelectedFolderIds(new Set());
     setSelectedDoc(doc);
     setShowDetailPanel(true);
-
-    setSelectedDocIds((prev) => {
-      const next = new Set(isMulti ? prev : []);
-      if (next.has(doc.id)) {
-        next.delete(doc.id);
-      } else {
-        next.add(doc.id);
-      }
-      return next;
-    });
-    if (!isMulti) {
-      setSelectedFolderIds(new Set());
-    }
+    setSelectedDocIds(new Set([doc.id]));
   };
 
   const handleToggleSelectAll = () => {
@@ -995,8 +1030,8 @@ export default function DrivePage() {
         >
           {/* Drag and Drop Overlay Indicator */}
           {isDragging && (
-            <div className="absolute inset-0 bg-[#0b57d0]/10 backdrop-blur-md rounded-3xl border-2 border-dashed border-[#0b57d0] z-40 flex flex-col items-center justify-center p-8 text-center animate-fadeIn pointer-events-none">
-              <div className="w-20 h-20 bg-[#0b57d0] text-white rounded-full flex items-center justify-center shadow-xl shadow-[#0b57d0]/30 mb-4 animate-bounce">
+            <div className="absolute inset-0 bg-[#0d2e5c]/10 backdrop-blur-md rounded-3xl border-2 border-dashed border-[#0d2e5c] z-40 flex flex-col items-center justify-center p-8 text-center animate-fadeIn pointer-events-none">
+              <div className="w-20 h-20 bg-[#0d2e5c] text-white rounded-full flex items-center justify-center shadow-xl shadow-[#0d2e5c]/30 mb-4 animate-bounce">
                 <UploadCloud className="w-10 h-10" />
               </div>
               <h3 className="text-xl font-bold text-[#001d35] mb-1">Drop files here to upload to DMS</h3>
@@ -1047,7 +1082,7 @@ export default function DrivePage() {
                     <div className="flex items-center gap-3">
                       <button
                         onClick={() => setShowRightChatDrawer(!showRightChatDrawer)}
-                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0b57d0] hover:bg-[#0945a5] text-white rounded-full text-xs font-semibold shadow-sm transition-all"
+                        className="flex items-center gap-1.5 px-3 py-1.5 bg-[#0d2e5c] hover:bg-[#0945a5] text-white rounded-full text-xs font-semibold shadow-sm transition-all"
                       >
                         <Sparkles className="w-3.5 h-3.5" />
                         <span>{showRightChatDrawer ? "Hide AI Assistant" : "AI Persistent Chatbot"}</span>
@@ -1075,9 +1110,9 @@ export default function DrivePage() {
                       {searchResponse.results.length > 1 && (
                         <div className="p-3 bg-[#edf2fc]/60 border border-[#c4c7c5]/50 rounded-2xl flex items-center justify-between text-xs text-[#444746] mt-2 shadow-2xs">
                           <div className="flex items-center gap-2 font-medium">
-                            <Sparkles className="w-4 h-4 text-[#0b57d0]" />
+                            <Sparkles className="w-4 h-4 text-[#0d2e5c]" />
                             <span>Search Technology Used:</span>
-                            <span className="font-bold text-[#0b57d0] px-2.5 py-0.5 rounded-full bg-white border border-[#0b57d0]/20 shadow-2xs">
+                            <span className="font-bold text-[#0d2e5c] px-2.5 py-0.5 rounded-full bg-white border border-[#0d2e5c]/20 shadow-2xs">
                               {searchResponse.search_mode === "HyDE"
                                 ? "HyDE"
                                 : searchResponse.search_mode || "vector+keyword"}
@@ -1172,7 +1207,7 @@ export default function DrivePage() {
                         onClick={(e) => handleSelectFolder(f, e.ctrlKey || e.metaKey || e.shiftKey)}
                         onKeyDown={onKeyActivate(() => handleSelectFolder(f, false))}
                         className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
-                          isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
+                          isSelected ? "bg-[#c2e7ff] border-[#0d2e5c]" : "bg-[#f8f9fa] border-[#e1e3e1]"
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-2">
@@ -1223,11 +1258,18 @@ export default function DrivePage() {
                         key={d.id}
                         role="button"
                         tabIndex={0}
-                        onClick={(e) => handleSelectDoc(d, e.ctrlKey || e.metaKey || e.shiftKey)}
+                        onClick={(e) => {
+                          const isMulti = e.ctrlKey || e.metaKey || e.shiftKey;
+                          if (isMulti) {
+                            handleSelectDoc(d, true);
+                            return;
+                          }
+                          handleTrashRowClick(d.id, () => handleSelectDoc(d, false));
+                        }}
                         onKeyDown={onKeyActivate(() => setPreviewDoc(d))}
-                        onDoubleClick={() => setPreviewDoc(d)}
+                        onDoubleClick={() => handleTrashRowDoubleClick(d.id, () => setPreviewDoc(d))}
                         className={`p-4 rounded-2xl flex items-center justify-between shadow-2xs cursor-pointer select-none border transition-all ${
-                          isSelected ? "bg-[#c2e7ff] border-[#0b57d0]" : "bg-[#f8f9fa] border-[#e1e3e1]"
+                          isSelected ? "bg-[#c2e7ff] border-[#0d2e5c]" : "bg-[#f8f9fa] border-[#e1e3e1]"
                         }`}
                       >
                         <div className="min-w-0 flex-1 pr-2">
@@ -1525,7 +1567,7 @@ export default function DrivePage() {
                   }}
                   className="flex items-center gap-2.5 w-full px-3 py-2 rounded-xl hover:bg-[#f0f4f9] font-medium"
                 >
-                  <Eye className="w-4 h-4 text-[#0b57d0]" />
+                  <Eye className="w-4 h-4 text-[#0d2e5c]" />
                   <span>{itemContextMenu.type === "folder" ? "Open Folder" : "Preview"}</span>
                 </button>
               )}

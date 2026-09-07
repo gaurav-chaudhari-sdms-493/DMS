@@ -12,6 +12,7 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
 from pydantic import BaseModel, Field
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -94,7 +95,30 @@ async def receive_email_webhook(
             errors=[],
         )
 
-    tenant_id, _ = await get_connector_actor(db)
+    # D-2 fix — get_connector_actor looks up its fixed actor by email with
+    # no tenant context (there isn't one yet); iam_dg_users' RLS policy
+    # denies that by default, same as login/signup, unless this session's
+    # cache already has the actor from an earlier, superuser-connected
+    # caller. Never rely on that cache hit being lucky — set the same
+    # narrow login-lookup exception explicitly first.
+    from app.services.connector_ingest_service import DEFAULT_CONNECTOR_EMAIL
+    await db.execute(
+        text("SELECT set_config('app.login_lookup_email', :e, false)"),
+        {"e": DEFAULT_CONNECTOR_EMAIL},
+    )
+    tenant_id, user_id = await get_connector_actor(db)
+    # D-2 fix — this endpoint is authenticated by a shared webhook secret,
+    # not a per-tenant JWT, so get_tenant_db (which needs one) doesn't
+    # apply here; set the context explicitly the moment a tenant is known,
+    # same pattern worker.py's ingestion pipeline already uses. Without
+    # this, every INSERT below would be rejected by RLS's WITH CHECK once
+    # this route's plain get_db() session is the restricted, non-superuser
+    # AppSessionLocal connection. Session-scoped (false) so it survives
+    # ingest_bytes()/upload_document()'s own mid-request db.commit() —
+    # database.py's get_db() resets it centrally on the way out.
+    await db.execute(
+        text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": str(tenant_id)}
+    )
     ingested_count = 0
     skipped_count = 0
     ingested_details: List[IngestedAttachmentDetail] = []
@@ -110,7 +134,7 @@ async def receive_email_webhook(
 
         content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         try:
-            resp = await ingest_bytes(content, filename, db, content_type=content_type)
+            resp = await ingest_bytes(content, filename, db, tenant_id, user_id, content_type=content_type)
             logger.info("Email webhook: successfully ingested '%s' as document %s", filename, resp.document_id)
             ingested_count += 1
             ingested_details.append(

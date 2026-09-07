@@ -170,7 +170,7 @@ export default function TemplatesAdminPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-[#1f1f1f]">
+    <div className="h-screen overflow-y-auto bg-[#f8f9fa] text-[#1f1f1f]">
       <header className="h-16 px-6 flex items-center justify-between border-b border-[#e1e3e1]/60 bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-4">
           <Link
@@ -182,7 +182,7 @@ export default function TemplatesAdminPage() {
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
-            <LayoutTemplate className="w-5 h-5 text-[#0b57d0]" />
+            <LayoutTemplate className="w-5 h-5 text-[#0d2e5c]" />
             Form Templates
           </h1>
         </div>
@@ -215,7 +215,7 @@ export default function TemplatesAdminPage() {
 
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-8 h-8 text-[#0b57d0] animate-spin" />
+            <Loader2 className="w-8 h-8 text-[#0d2e5c] animate-spin" />
             <p className="text-sm text-[#444746]">Loading templates...</p>
           </div>
         ) : error ? (
@@ -250,7 +250,7 @@ export default function TemplatesAdminPage() {
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => openEdit(t)}
-                        className="p-2 rounded-lg text-[#444746] hover:text-[#0b57d0] hover:bg-[#f0f4f9] transition-colors"
+                        className="p-2 rounded-lg text-[#444746] hover:text-[#0d2e5c] hover:bg-[#f0f4f9] transition-colors"
                         title="Edit"
                       >
                         <Pencil className="w-4 h-4" />
@@ -269,7 +269,7 @@ export default function TemplatesAdminPage() {
                   {t.field_schema.map((f) => (
                     <span
                       key={f.name}
-                      className="px-2 py-0.5 rounded text-[11px] font-mono bg-[#edf2fc] text-[#0b57d0] border border-[#0b57d0]/10"
+                      className="px-2 py-0.5 rounded text-[11px] font-mono bg-[#edf2fc] text-[#0d2e5c] border border-[#0d2e5c]/10"
                       title={f.role ? `role: ${f.role}` : undefined}
                     >
                       {f.name}
@@ -358,7 +358,7 @@ export default function TemplatesAdminPage() {
                   </p>
                   <button
                     onClick={addField}
-                    className="text-xs font-semibold text-[#0b57d0] hover:underline flex items-center gap-1"
+                    className="text-xs font-semibold text-[#0d2e5c] hover:underline flex items-center gap-1"
                   >
                     <Plus className="w-3.5 h-3.5" /> Add field
                   </button>

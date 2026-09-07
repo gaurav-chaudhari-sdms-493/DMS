@@ -336,6 +336,13 @@ async def test_adjudication_unavailable_defaults_to_not_stitching():
                 assert ambiguous_fact.value["page_a"] == 1
                 assert ambiguous_fact.value["page_b"] == 2
                 assert "shape_hash" in ambiguous_fact.value
+
+                # Both pages must get a region, not just page A — otherwise
+                # a reviewer resolving this item can only ever see one side
+                # of the ambiguity it's asking them to judge.
+                region_res = await db.execute(select(FactRegion).where(FactRegion.fact_id == ambiguous_fact.id))
+                regions = region_res.scalars().all()
+                assert {r.page_id for r in regions} == {page_a.id, page_b.id}
             finally:
                 vlm_mod.get_llm_provider = orig_get_llm
         finally:

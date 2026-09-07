@@ -3,8 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional
 import uuid
 
-from app.database import get_db
-from app.deps import require_tenant_access, require_role
+from app.deps import get_tenant_db, require_tenant_access, require_role
 from app.schemas.auth import TokenPayload
 from app.schemas.folder import FolderCreate, FolderUpdate, FolderResponse, FolderTreeNode
 from app.services import folder_service, department_service
@@ -16,7 +15,7 @@ router = APIRouter(prefix="/folders", tags=["Folders"])
 async def create_folder(
     folder_in: FolderCreate,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -30,7 +29,7 @@ async def list_folders(
     is_starred: Optional[bool] = Query(None),
     is_trashed: bool = Query(False),
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     folders = await folder_service.list_folders(
@@ -57,7 +56,7 @@ async def list_folders(
 @router.get("/tree", response_model=List[FolderTreeNode])
 async def get_folder_tree(
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await folder_service.get_folder_tree(db, tenant_id)
@@ -67,7 +66,7 @@ async def get_folder_tree(
 async def get_folder(
     folder_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -80,7 +79,7 @@ async def update_folder(
     folder_id: uuid.UUID,
     folder_in: FolderUpdate,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -91,7 +90,7 @@ async def update_folder(
 async def toggle_star_folder(
     folder_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -102,7 +101,7 @@ async def toggle_star_folder(
 async def toggle_trash_folder(
     folder_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -113,7 +112,7 @@ async def toggle_trash_folder(
 async def delete_folder_permanently(
     folder_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('records_officer', 'department_head', 'it_admin')),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)

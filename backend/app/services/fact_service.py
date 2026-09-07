@@ -9,7 +9,17 @@ from sqlalchemy.orm import selectinload
 from app.models.fact import Fact
 from app.models.page import DocumentPage
 from app.models.document import Document
+from app.models.template import Template
 from app.services.storage_service import generate_presigned_url
+
+# Row-reconstruction tolerance for get_table_view_for_document: two facts
+# whose anchor regions land on the same page within this many page-height
+# fractions of each other are treated as the same original table row.
+# Chosen against this project's real 14-column Wakf Form B table (~15
+# rows per landscape page, each row occupying roughly 0.05-0.07 of page
+# height) -- half a row-height leaves enough margin to absorb ordinary
+# per-cell y-jitter within one row without bleeding into the row below.
+_ROW_CLUSTER_Y_TOLERANCE = 0.02
 
 
 async def get_fact_with_regions(db: AsyncSession, fact_id: UUID, tenant_id: UUID) -> dict:
@@ -137,3 +147,201 @@ async def create_fact_with_regions(
 
     await db.flush()
     return fact
+
+
+async def get_facts_for_document(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> dict:
+    """List every extracted field for one document, for the "what did
+    extraction actually produce" view no frontend screen currently shows
+    (found live 2026-09-04: opening a document's preview has no facts
+    panel at all -- the only places Facts ever surfaced were the
+    in-review-only adjudication queue and Entity 360's per-entity search,
+    neither of which lets you just look at one document).
+
+    `stitched` on a fact is TS1's own signal, not a heuristic re-derived
+    here: a fact whose regions land on more than one physical page can
+    only exist because _stitch_vertical_segments merged a continuation
+    row from a later page into the entry it belongs to -- that is the
+    literal, verifiable proof stitching happened for that field, the same
+    check used to confirm it live before this endpoint existed.
+    """
+    doc = await db.get(Document, document_id)
+    if not doc or doc.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    stmt = (
+        select(Fact)
+        .where(Fact.document_id == document_id, Fact.tenant_id == tenant_id)
+        .options(selectinload(Fact.regions))
+        .order_by(Fact.field_name)
+    )
+    res = await db.execute(stmt)
+    facts = res.scalars().all()
+
+    page_ids = {region.page_id for fact in facts for region in fact.regions}
+    pages_res = await db.execute(select(DocumentPage).where(DocumentPage.id.in_(page_ids)))
+    page_number_by_id = {p.id: p.page_number for p in pages_res.scalars().all()}
+
+    facts_out = []
+    for fact in facts:
+        page_numbers = sorted({
+            page_number_by_id[r.page_id] for r in fact.regions if r.page_id in page_number_by_id
+        })
+        facts_out.append({
+            "fact_id": str(fact.id),
+            "field_name": fact.field_name,
+            "value": fact.value,
+            "confidence": fact.confidence,
+            "status": fact.status,
+            "is_handwritten": fact.is_handwritten,
+            "page_numbers": page_numbers,
+            "stitched": len(page_numbers) > 1,
+        })
+
+    # Found live 2026-09-04: a document can easily have hundreds of facts
+    # (this exact one has 788) but only a handful are ever stitched or
+    # in_review -- sorted by plain field_name, those few signal-carrying
+    # rows were buried at random scroll positions among hundreds of
+    # identical-looking ones, making a real, working stitch look like
+    # nothing had happened. Surface in_review first (needs a decision),
+    # then stitched (the interesting proof), then everything else.
+    facts_out.sort(key=lambda f: (f["status"] != "in_review", not f["stitched"], f["field_name"]))
+
+    return {
+        "document_id": str(document_id),
+        "classification_status": doc.classification_status,
+        "matched_template_id": str(doc.matched_template_id) if doc.matched_template_id else None,
+        "facts": facts_out,
+        "stitched_field_count": sum(1 for f in facts_out if f["stitched"]),
+        "in_review_count": sum(1 for f in facts_out if f["status"] == "in_review"),
+    }
+
+
+def _unwrap_fact_value(value):
+    if isinstance(value, dict) and "v" in value:
+        return value["v"]
+    return value
+
+
+async def get_table_view_for_document(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> dict:
+    """Reassembles this document's facts into an actual table — rows x
+    columns, in the template's own column order — instead of the flat
+    per-field list get_facts_for_document returns. Found live 2026-09-04:
+    a flat list of ~788 individual field cards reads as "nothing
+    happened" even when extraction and stitching both worked correctly,
+    because it looks nothing like the source document's table structure a
+    reviewer actually recognizes.
+
+    No stored row identifier exists to group facts by (Fact/FactRegion
+    were never designed to carry one) -- rebuilt here from FactRegion's
+    existing (page, y0) instead: fields extracted from the same original
+    row land at (nearly) the same page/vertical position, so clustering
+    on that reconstructs rows without any schema change or re-extraction,
+    and works retroactively on documents already extracted before this
+    function existed. A stitched fact (regions on 2+ pages) is anchored
+    by its EARLIEST region -- the page/row its entry actually started on.
+
+    This is a display heuristic, not a source of truth: _ROW_CLUSTER_Y_TOLERANCE
+    is tuned for this project's real dense multi-column register tables,
+    not guaranteed correct for a wildly different layout. get_facts_for_document
+    remains the authoritative per-fact source (used for editing/confirming).
+    """
+    doc = await db.get(Document, document_id)
+    if not doc or doc.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    field_order: list[str] = []
+    header_field_names: set[str] = set()
+    if doc.matched_template_id:
+        template = await db.get(Template, doc.matched_template_id)
+        if template:
+            for f in template.field_schema:
+                if f.get("role") == "page_header":
+                    header_field_names.add(f["name"])
+                else:
+                    field_order.append(f["name"])
+
+    stmt = (
+        select(Fact)
+        .where(Fact.document_id == document_id, Fact.tenant_id == tenant_id)
+        .options(selectinload(Fact.regions))
+    )
+    res = await db.execute(stmt)
+    facts = [f for f in res.scalars().all() if not f.field_name.startswith("_")]
+
+    page_ids = {region.page_id for fact in facts for region in fact.regions}
+    pages_res = await db.execute(select(DocumentPage).where(DocumentPage.id.in_(page_ids)))
+    page_number_by_id = {p.id: p.page_number for p in pages_res.scalars().all()}
+
+    page_header: dict = {}
+    row_items: list[tuple[Fact, int, float]] = []  # (fact, anchor_page_number, anchor_y0)
+
+    for fact in facts:
+        if fact.field_name in header_field_names:
+            if fact.field_name not in page_header:
+                page_header[fact.field_name] = _unwrap_fact_value(fact.value)
+            continue
+
+        anchor = None
+        for r in fact.regions:
+            page_number = page_number_by_id.get(r.page_id)
+            if page_number is None:
+                continue
+            if anchor is None or (page_number, r.y0) < (anchor[0], anchor[1]):
+                anchor = (page_number, r.y0)
+        if anchor is None:
+            continue
+        row_items.append((fact, anchor[0], anchor[1]))
+
+    row_items.sort(key=lambda t: (t[1], t[2]))
+
+    clusters: list[dict] = []
+    for fact, page_number, y0 in row_items:
+        if (
+            clusters
+            and clusters[-1]["page_number"] == page_number
+            and abs(clusters[-1]["anchor_y"] - y0) <= _ROW_CLUSTER_Y_TOLERANCE
+        ):
+            clusters[-1]["facts"].append(fact)
+        else:
+            clusters.append({"page_number": page_number, "anchor_y": y0, "facts": [fact]})
+
+    rows_out = []
+    for cluster in clusters:
+        row: dict = {}
+        row_stitched = False
+        row_needs_review = False
+        for fact in cluster["facts"]:
+            row[fact.field_name] = _unwrap_fact_value(fact.value)
+            if len({r.page_id for r in fact.regions}) > 1:
+                row_stitched = True
+            if fact.status == "in_review":
+                row_needs_review = True
+        rows_out.append({
+            "page_number": cluster["page_number"],
+            "stitched": row_stitched,
+            # T22's row-coverage gate (ROW_COVERAGE_REVIEW_THRESHOLD)
+            # forces every field of a badly-under-populated row into
+            # in_review at write time -- surfaced here so a row that's
+            # probably mis-mapped page content (not a real table row)
+            # is visibly flagged, not indistinguishable from a normal one.
+            "needs_review": row_needs_review,
+            "values": row,
+        })
+
+    # Any field seen but absent from the template's own schema (e.g. a
+    # template with no field_schema on record, or a field the template
+    # was updated to drop after this document was extracted) still gets
+    # a column, appended after the schema's own order, so no data is
+    # silently dropped from the reconstructed table.
+    seen_fields = {name for row in rows_out for name in row["values"].keys()}
+    columns = field_order + sorted(seen_fields - set(field_order))
+
+    return {
+        "document_id": str(document_id),
+        "classification_status": doc.classification_status,
+        "page_header": page_header,
+        "columns": columns,
+        "rows": rows_out,
+        "row_count": len(rows_out),
+    }
+>>>>>>> feature-kunal-DMS

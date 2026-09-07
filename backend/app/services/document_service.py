@@ -9,9 +9,11 @@ from sqlalchemy import select, func, delete
 from sqlalchemy.orm import selectinload
 from uuid import UUID
 
+from ..database import establish_tenant_context
 from ..models.document import Document
 from ..models.document_version import DocumentVersion
 from ..models.folder import Folder
+from ..models.metadata_item import MetadataItem
 from ..schemas.document import (
     DocumentUploadResponse,
     DocumentDetailResponse,
@@ -122,6 +124,10 @@ async def upload_document(
     await db.flush()
     doc.current_version_id = version_id
     await db.commit()
+    # T96 clean-room finding — see database.py::establish_tenant_context's
+    # docstring: a mid-function commit followed by db.refresh() reproducibly
+    # 500'd under RLS with no tenant context visible to the follow-up SELECT.
+    await establish_tenant_context(db, tenant_id)
     await db.refresh(doc)
 
     await log_action(db, user_id, tenant_id, "document.create", resource_type="document", resource_id=doc.id, details={"title": doc.title})
@@ -254,7 +260,7 @@ async def get_document(
         .where(Document.id == document_id, Document.tenant_id == tenant_id)
         .options(
             selectinload(Document.versions),
-            selectinload(Document.metadata_items),
+            selectinload(Document.metadata_items).selectinload(MetadataItem.regions),
         )
     )
     res = await db.execute(stmt)
@@ -292,6 +298,10 @@ async def get_document(
             "value": m.value,
             "source": m.source,
             "confidence_score": m.confidence_score,
+            "regions": [
+                {"page_number": r.page_number, "x0": r.x0, "y0": r.y0, "x1": r.x1, "y1": r.y1}
+                for r in m.regions
+            ],
         })
         if m.key == "quality_flag" and isinstance(m.value, dict):
             q_flag = m.value.get("flag")
@@ -348,6 +358,7 @@ async def update_document(
         changes["title"] = doc_in.title
 
     await db.commit()
+    await establish_tenant_context(db, tenant_id)  # T96 — see database.py's docstring
     await db.refresh(doc)
 
     await log_action(db, actor_id, tenant_id, "document.update", resource_type="document", resource_id=doc.id, details=changes)
@@ -383,6 +394,7 @@ async def toggle_star_document(db: AsyncSession, document_id: UUID, tenant_id: U
 
     doc.is_starred = not doc.is_starred
     await db.commit()
+    await establish_tenant_context(db, tenant_id)  # T96 — see database.py's docstring
     await db.refresh(doc)
 
     await log_action(db, actor_id, tenant_id, "document.star_toggle", resource_type="document", resource_id=doc.id, details={"is_starred": doc.is_starred})
@@ -432,6 +444,7 @@ async def toggle_trash_document(db: AsyncSession, document_id: UUID, tenant_id: 
         doc.retention_class = "unclassified_permanent"
 
     await db.commit()
+    await establish_tenant_context(db, tenant_id)  # T96 — see database.py's docstring
     await db.refresh(doc)
 
     await log_action(db, actor_id, tenant_id, "document.trash_toggle", resource_type="document", resource_id=doc.id, details={"is_trashed": doc.is_trashed})

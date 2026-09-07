@@ -51,6 +51,11 @@ app:
 # --set or a private values file kept out of git (see the runbook).
 secrets:
   postgresPassword: "change_me_in_production"
+  # T93 clean-room finding: password for the restricted `dms_app` Postgres
+  # role migration 0046 creates (D-2 RLS fix) — that migration raises if
+  # this isn't set at all, so a value is required here even though it's a
+  # placeholder like the others.
+  appDbPassword: "change_me_in_production"
   redisPassword: "change_me_in_production"
   jwtSecretKey: "generate_with_openssl_rand_hex_32__min_32_chars"
   s3AccessKeyId: "minioadmin"
@@ -61,6 +66,12 @@ secrets:
   googleApiKey: ""
   cohereApiKey: ""
   llamaparseApiKey: ""
+  # T93 clean-room finding: added along with the Chandra OCR/VLM provider
+  # (backend/app/ai/providers/chandra_provider.py) — this chart had no
+  # field for it at all, so app.ai.ocrProvider/vlmProvider: chandra would
+  # silently run with an empty settings.datalab_api_key rather than a
+  # real one, same class of drift as APP_DB_PASSWORD above.
+  datalabApiKey: ""
 
 # ─── Bundled stateful dependencies ───────────────────────────────────────
 # Self-contained StatefulSets (no external chart repo dependency) so an
@@ -89,12 +100,47 @@ minio:
     - docsearch-documents
     - docsearch-archive
 
+# ─── HuggingFace model cache (T93 clean-room finding) ────────────────────
+# bgem3 (embeddings + reranking) downloads its weights from huggingface.co
+# on first use via sentence_transformers -- docker-compose.yml gives
+# backend+worker a shared `hf_cache` named volume for exactly this reason
+# (see its `hf_cache:` volume), but this chart had no equivalent, so every
+# fresh pod re-downloaded the full model from the internet. That's just
+# slow for the SaaS profile, but it's a real correctness gap for the
+# air-gapped profile: huggingface.co is NOT in egress_guard's
+# BLOCKED_AI_HOSTS (app/ai/egress_guard.py) -- a genuinely air-gapped
+# network has no route there at all, so the runbook's "Embeddings: Works"
+# claim under AIR_GAPPED=true is only true if this cache was already
+# populated before the network was cut. See the runbook's own new section
+# on pre-seeding this before an air-gapped transfer.
+#
+# ReadWriteOnce, not ReadWriteMany: broadly portable (most StorageClasses
+# support RWO; few support RWX), sufficient as long as backend+worker pods
+# land on the same node -- true for this chart's assumed small/single-node
+# deployments (postgres/redis/minio are single-replica StatefulSets, not
+# built for multi-node HA yet either). A genuinely multi-node HA install
+# needs an RWX-capable StorageClass here instead; not attempted in this
+# pass.
+hfCache:
+  enabled: true
+  storageSize: 10Gi
+
 # ─── Application components ──────────────────────────────────────────────
 backend:
   replicas: 2
   resources:
-    requests: { cpu: 500m, memory: 1Gi }
-    limits: { cpu: "2", memory: 4Gi }
+    # T93 clean-room finding: OOMKilled (exit 137) at the default 4Gi
+    # limit the first time a backend pod actually loaded the bgem3
+    # embedding model in-process for query-time embedding -- the same
+    # model worker.yaml already budgets 6Gi for below, but backend had
+    # less headroom despite doing the same in-process model load.
+    # Reproduced live 2026-09-07: `kubectl describe pod` showed
+    # `Last State: Terminated, Reason: OOMKilled` right after "Loading
+    # weights: 100%" in the logs, no Python traceback (SIGKILL, not a
+    # catchable exception). Matched worker's limit, which survived the
+    # identical model load without issue.
+    requests: { cpu: 500m, memory: 2Gi }
+    limits: { cpu: "2", memory: 6Gi }
 
 worker:
   replicas: 2

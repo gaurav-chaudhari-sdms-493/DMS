@@ -48,7 +48,7 @@ export const AISummary: React.FC<AISummaryProps> = ({ summary, citations = [] })
             <div className="mt-2.5 flex justify-start">
               <button
                 onClick={() => setIsExpanded(!isExpanded)}
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#edf2fc] hover:bg-[#c2e7ff] text-[#0b57d0] rounded-full text-xs font-bold border border-[#d3d7dc] transition-all cursor-pointer shadow-xs"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-[#edf2fc] hover:bg-[#c2e7ff] text-[#0d2e5c] rounded-full text-xs font-bold border border-[#d3d7dc] transition-all cursor-pointer shadow-xs"
               >
                 <span>{isExpanded ? "Show Less" : "Show More"}</span>
                 {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}

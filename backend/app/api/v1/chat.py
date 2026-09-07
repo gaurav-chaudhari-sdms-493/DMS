@@ -12,7 +12,7 @@ from app.schemas.chat import (
     UpdateSessionRequest
 )
 from app.schemas.auth import TokenPayload
-from app.deps import get_db, require_tenant_access, get_request_ip
+from app.deps import get_tenant_db, require_tenant_access, get_request_ip
 from app.services import chat_service
 
 router = APIRouter()
@@ -21,7 +21,7 @@ router = APIRouter()
 async def create_session(
     body: CreateSessionRequest,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -37,7 +37,7 @@ async def create_session(
 @router.get("/sessions", response_model=List[ChatSessionListItem])
 async def list_sessions(
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -52,7 +52,7 @@ async def list_sessions(
 async def get_session(
     session_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -72,7 +72,7 @@ async def update_session_title(
     session_id: uuid.UUID,
     body: UpdateSessionRequest,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -92,7 +92,7 @@ async def update_session_title(
 async def delete_session(
     session_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -113,7 +113,7 @@ async def send_message(
     body: SendMessageRequest,
     request: Request,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_tenant_db)
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)

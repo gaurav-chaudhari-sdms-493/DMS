@@ -5,6 +5,7 @@ from uuid import UUID
 from datetime import datetime
 from typing import List, Optional
 
+from app.database import establish_tenant_context
 from app.models.folder import Folder
 from app.models.document import Document
 from app.schemas.folder import FolderCreate, FolderUpdate, FolderResponse, FolderTreeNode
@@ -31,6 +32,7 @@ async def create_folder(
     )
     db.add(folder)
     await db.commit()
+    await establish_tenant_context(db, tenant_id)  # T96 — see database.py's docstring
     await db.refresh(folder)
 
     await log_action(db, user_id, tenant_id, "folder.create", resource_type="folder", resource_id=folder.id, details={"name": folder.name})
@@ -131,6 +133,7 @@ async def update_folder(
 
     folder.updated_at = datetime.utcnow()
     await db.commit()
+    await establish_tenant_context(db, tenant_id)  # T96 — see database.py's docstring
     await db.refresh(folder)
 
     await log_action(db, actor_id, tenant_id, "folder.update", resource_type="folder", resource_id=folder.id, details=changes)
@@ -143,6 +146,7 @@ async def toggle_star_folder(db: AsyncSession, folder_id: UUID, tenant_id: UUID,
     folder.is_starred = not folder.is_starred
     folder.updated_at = datetime.utcnow()
     await db.commit()
+    await establish_tenant_context(db, tenant_id)  # T96 — see database.py's docstring
     await db.refresh(folder)
 
     await log_action(db, actor_id, tenant_id, "folder.star_toggle", resource_type="folder", resource_id=folder.id, details={"is_starred": folder.is_starred})
@@ -156,6 +160,7 @@ async def toggle_trash_folder(db: AsyncSession, folder_id: UUID, tenant_id: UUID
     folder.trashed_at = datetime.utcnow() if folder.is_trashed else None
     folder.updated_at = datetime.utcnow()
     await db.commit()
+    await establish_tenant_context(db, tenant_id)  # T96 — see database.py's docstring
     await db.refresh(folder)
 
     await log_action(db, actor_id, tenant_id, "folder.trash_toggle", resource_type="folder", resource_id=folder.id, details={"is_trashed": folder.is_trashed})

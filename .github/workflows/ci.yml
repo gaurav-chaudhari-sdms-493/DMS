@@ -33,6 +33,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Start MinIO
+        # Not a `services:` entry: the minio/minio image needs `server
+        # /data` passed as its container command (bare `docker run
+        # minio/minio` just prints --help and exits), and GitHub Actions
+        # service containers have no way to override CMD. config.py's
+        # defaults (s3_endpoint_url=http://localhost:9000, aws creds
+        # minioadmin/minioadmin) already match this exactly, so no extra
+        # env vars are needed in the pytest step below. Any test that does
+        # a real upload (test_document_bulk_upload_partial_failures, etc.)
+        # was failing here with "Could not connect to the endpoint URL"
+        # since no S3-compatible service existed in this job at all.
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            echo "waiting for minio..."; sleep 2
+          done
+
       - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
@@ -57,12 +77,56 @@ jobs:
           # suppressions real.
           flake8 --select=F backend/app backend/migrations
 
+      - name: Run Alembic Migrations
+        # The postgres service container above starts genuinely empty --
+        # nothing in this workflow ever ran migrations against it, so
+        # every test touching a real table failed with UndefinedTableError
+        # ("relation ... does not exist"), not because of anything the
+        # test suite itself was verifying. Confirmed pre-existing: the
+        # PR #8 merge commit's CI run failed the identical way before any
+        # of this PR's changes existed.
+        env:
+          # Same full env block as the pytest step below, not just
+          # POSTGRES_URL: app.config.Settings() is instantiated at import
+          # time (migrations/env.py imports app.database -> app.config),
+          # and redis_url has no default, so a real CI checkout (no
+          # backend/.env exists here -- it's gitignored) failed with
+          # "pydantic_core.ValidationError: redis_url Field required"
+          # even though POSTGRES_URL alone was enough locally, where a
+          # leftover backend/.env supplied the rest via load_dotenv().
+          POSTGRES_URL: postgresql+asyncpg://postgres:password@localhost:5432/docsearch_db
+          REDIS_URL: redis://localhost:6379/0
+          APP_ENV: test
+          JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
+          # D-2 fix, migration 0046 — creates the restricted `dms_app` role
+          # (NOSUPERUSER NOBYPASSRLS) RLS actually needs to enforce against;
+          # read from env at migration time so no password is ever
+          # hardcoded in a migration file. Throwaway value for this
+          # ephemeral CI Postgres instance, same as POSTGRES_PASSWORD above.
+          APP_DB_PASSWORD: ci_dms_app_password_not_secret
+        run: |
+          cd backend
+          alembic upgrade head
+
       - name: Run Backend Pytest Suite
         env:
           POSTGRES_URL: postgresql+asyncpg://postgres:password@localhost:5432/docsearch_db
           REDIS_URL: redis://localhost:6379/0
           APP_ENV: test
           JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
+          # D-2 fix — same restricted role the migration step above created;
+          # without this, AppSessionLocal falls back to the superuser
+          # connection (database.py's own documented fallback) and
+          # test_rls_enforcement.py would be testing a connection real
+          # production traffic doesn't actually use.
+          APP_POSTGRES_URL: postgresql+asyncpg://dms_app:ci_dms_app_password_not_secret@localhost:5432/docsearch_db
+          # test_cohere_reranker.py::test_cohere_reranker_execution makes a
+          # real, unmocked call to Cohere's rerank API -- inert (empty
+          # string, same failure as before) until a COHERE_API_KEY repo
+          # secret is actually added in GitHub settings; wiring it here so
+          # it works the moment that secret exists, without a further code
+          # change.
+          COHERE_API_KEY: ${{ secrets.COHERE_API_KEY }}
         run: |
           cd backend
           pytest tests/ --cov-report=json
@@ -144,3 +208,118 @@ jobs:
         run: |
           cd frontend
           npx next lint
+
+  accessibility-scan:
+    # T96 — the static jsx-a11y lint above (frontend-checks) only catches
+    # what's visible in JSX structure (missing labels/keyboard handlers).
+    # It cannot catch color contrast, focus order, or anything that only
+    # exists once the page actually renders with real data -- for that,
+    # this job runs a real axe-core scan (via @axe-core/playwright)
+    # against the live, running app, backend included, covering every
+    # route including the authenticated ones (e.g. /workbench, never
+    # covered by any prior a11y pass -- see frontend/tests/a11y/).
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: docsearch_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+
+    env:
+      POSTGRES_URL: postgresql+asyncpg://postgres:password@localhost:5432/docsearch_db
+      APP_POSTGRES_URL: postgresql+asyncpg://dms_app:ci_dms_app_password_not_secret@localhost:5432/docsearch_db
+      REDIS_URL: redis://localhost:6379/0
+      APP_ENV: test
+      JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
+      APP_DB_PASSWORD: ci_dms_app_password_not_secret
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+          for i in $(seq 1 15); do
+            curl -sf http://localhost:9000/minio/health/live && break
+            echo "waiting for minio..."; sleep 2
+          done
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Backend Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Alembic Migrations
+        run: |
+          cd backend
+          alembic upgrade head
+
+      - name: Start Backend
+        run: |
+          cd backend
+          nohup uvicorn app.main:app --host 0.0.0.0 --port 8000 > backend.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:8000/api/docs > /dev/null && break
+            echo "waiting for backend..."; sleep 2
+          done
+          curl -sf http://localhost:8000/api/docs > /dev/null || (cat backend.log && exit 1)
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Frontend Dependencies
+        run: |
+          cd frontend
+          npm ci
+
+      - name: Build Frontend
+        run: |
+          cd frontend
+          NEXT_PUBLIC_API_URL=http://localhost:8000 npm run build
+
+      - name: Start Frontend
+        run: |
+          cd frontend
+          nohup npm start > frontend.log 2>&1 &
+          for i in $(seq 1 30); do
+            curl -sf http://localhost:3000 > /dev/null && break
+            echo "waiting for frontend..."; sleep 2
+          done
+          curl -sf http://localhost:3000 > /dev/null || (cat frontend.log && exit 1)
+
+      - name: Run Accessibility Scan
+        run: |
+          cd frontend
+          PLAYWRIGHT_BASE_URL=http://localhost:3000 PLAYWRIGHT_API_URL=http://localhost:8000 npx playwright test
+
+      - name: Upload Playwright Report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-a11y-report
+          path: frontend/playwright-report/
+          retention-days: 14

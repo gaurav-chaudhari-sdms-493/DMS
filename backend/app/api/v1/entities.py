@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...schemas.auth import TokenPayload
-from ...deps import get_db, require_tenant_access, require_role
+from ...deps import get_tenant_db, require_tenant_access, require_role
 from ...services import entity_360_service, entity_graph_service
 
 router = APIRouter(prefix="/entities", tags=["Entities"])
@@ -32,7 +32,7 @@ class EntityEdgeCreate(BaseModel):
 async def create_entity_node_api(
     node_in: EntityNodeCreate,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -57,7 +57,7 @@ async def check_entity_duplicate_api(
     entity_type: str,
     label: str,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """Same check as create_entity_node_api's possible_duplicates, but
     before creating anything — for a UI to warn a user while they're still
@@ -72,7 +72,7 @@ async def check_entity_duplicate_api(
 async def create_entity_edge_api(
     edge_in: EntityEdgeCreate,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """T56 — the create-edge half of the API. create_node, confirm/revert
     and bulk-confirm/revert were all wired up, but nothing ever exposed
@@ -109,7 +109,7 @@ async def create_entity_edge_api(
 async def search_entity_nodes_api(
     q: str,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     nodes = await entity_graph_service.search_nodes(db, tenant_id, q)
@@ -120,7 +120,7 @@ async def search_entity_nodes_api(
 async def get_entity_360_api(
     node_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await entity_360_service.get_entity_360_view(db, tenant_id, node_id)
@@ -130,7 +130,7 @@ async def get_entity_360_api(
 async def confirm_edge_api(
     edge_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -142,7 +142,7 @@ async def confirm_edge_api(
 async def revert_edge_api(
     edge_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -156,7 +156,7 @@ async def bulk_confirm_edges_api(
     threshold: float,
     policy_version: str,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -174,7 +174,7 @@ async def bulk_confirm_edges_api(
 async def revert_bulk_edge_batch_api(
     batch_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
