@@ -11,7 +11,7 @@ from ...schemas.document import (
 )
 from ...schemas.auth import TokenPayload
 from ...deps import get_db, require_tenant_access, require_role
-from ...services import document_service, classification_service, duplicate_service
+from ...services import document_service, classification_service, duplicate_service, fact_service
 import uuid
 
 router = APIRouter()
@@ -127,6 +127,26 @@ async def get_document_api(
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
     return await document_service.get_document(document_id, tenant_id, db, actor_id=user_id)
+
+
+@router.get('/{document_id}/facts')
+async def get_document_facts_api(
+    document_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await fact_service.get_facts_for_document(db, document_id, tenant_id)
+
+
+@router.get('/{document_id}/facts/table')
+async def get_document_table_view_api(
+    document_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await fact_service.get_table_view_for_document(db, document_id, tenant_id)
 
 
 @router.patch('/{document_id}', response_model=DocumentListItem)

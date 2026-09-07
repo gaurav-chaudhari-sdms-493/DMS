@@ -19,6 +19,10 @@ import {
   FileText,
   Layers,
   SlidersHorizontal,
+  ArrowUpDown,
+  ArrowLeftRight,
+  Ban,
+  ShieldAlert,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -47,7 +51,7 @@ interface QueueFact {
   claimed_by_actor_id: string | null;
 }
 
-type Category = "low_confidence" | "handwritten" | "marginalia" | "join_mismatch";
+type Category = "low_confidence" | "handwritten" | "marginalia" | "join_mismatch" | "stitch_ambiguous";
 
 // Raw backend sentinel field names (used internally to route facts into
 // the right queue) previously leaked straight into the UI verbatim —
@@ -93,9 +97,29 @@ const CATEGORY_TABS: { key: Category; label: string; description: string; availa
     description: "A two-page entry the system couldn't reliably match left-to-right — needs a human to pair the halves.",
     available: true,
   },
+  // TS4 — the backend queue category and resolve endpoint
+  // (POST /facts/{id}/resolve-stitch-ambiguity) existed with no frontend
+  // path to reach them; this pair was only ever visible buried inside
+  // "Needs Review", where the only available action (Confirm) marked it
+  // verified without ever recording which relation it was, so the same
+  // page-shape kept coming back unresolved on every future document.
+  {
+    key: "stitch_ambiguous",
+    label: "Continuation Unclear",
+    description: "A page pair the system couldn't confidently classify as the same table continuing, a side-by-side spread, or unrelated. Your answer here applies automatically to every future document with this same page shape.",
+    available: true,
+  },
 ];
 
 function formatValue(value: any): string {
+  // A "_stitch_ambiguous" fact's raw value is {page_a, page_b, reason,
+  // shape_hash} — useful to the resolve endpoint, but as a queue-row
+  // subtitle it rendered as unreadable raw JSON (the same class of
+  // "sentinel data leaking into the UI" bug fieldLabel() already fixes
+  // for the field name itself).
+  if (value && typeof value === "object" && "page_a" in value && "page_b" in value) {
+    return `Page ${value.page_a} ↔ page ${value.page_b}`;
+  }
   if (value && typeof value === "object" && "v" in value) return String(value.v);
   if (value && typeof value === "object") return JSON.stringify(value);
   return String(value);
@@ -158,6 +182,53 @@ export default function WorkbenchPage() {
   const [bulkPolicyVersion, setBulkPolicyVersion] = useState("");
   const [bulkLoading, setBulkLoading] = useState(false);
   const [bulkResult, setBulkResult] = useState<{ confirmed_count: number; batch_id: string } | null>(null);
+
+  // T59 — previously the only way to learn a folder wasn't calibrated was
+  // to submit Bulk Confirm and get a 409 back. Look it up as soon as a
+  // folder is chosen so the gate is visible before the submit attempt.
+  const [calibrationStatus, setCalibrationStatus] = useState<{ calibrated: boolean; calibrated_at?: string | null; sample_size?: number | null } | null>(null);
+  const [calibrationLoading, setCalibrationLoading] = useState(false);
+  const [calibrateActionLoading, setCalibrateActionLoading] = useState(false);
+
+  useEffect(() => {
+    const folderId = bulkFolderId.trim();
+    if (!folderId) {
+      setCalibrationStatus(null);
+      return;
+    }
+    let cancelled = false;
+    setCalibrationLoading(true);
+    // Debounced — bulkFolderId updates on every keystroke when typed
+    // directly rather than picked via Browse.
+    const timer = setTimeout(() => {
+      api.governance
+        .getCalibrationStatus(folderId)
+        .then((status) => !cancelled && setCalibrationStatus(status))
+        .catch(() => !cancelled && setCalibrationStatus(null))
+        .finally(() => !cancelled && setCalibrationLoading(false));
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [bulkFolderId]);
+
+  const calibrateThisFolder = async () => {
+    const folderId = bulkFolderId.trim();
+    if (!folderId) return;
+    setCalibrateActionLoading(true);
+    setError("");
+    try {
+      await api.governance.calibrateCorpus(folderId);
+      const status = await api.governance.getCalibrationStatus(folderId);
+      setCalibrationStatus(status);
+      setNotice("Folder calibrated — Bulk Confirm is now unlocked for it.");
+    } catch (e: any) {
+      setError(e?.message || "Failed to calibrate this folder");
+    } finally {
+      setCalibrateActionLoading(false);
+    }
+  };
 
   // T80 — bulk edit: select rows, preview the change, then apply. One
   // typed value replaces every selected row's value — the common case
@@ -305,6 +376,28 @@ export default function WorkbenchPage() {
     }
   };
 
+  // TS4 — answer a stitch-ambiguity item. Deliberately its own action, not
+  // routed through doAction("confirm"): the generic Confirm endpoint would
+  // mark the fact verified without ever recording which relation it was,
+  // leaving the underlying ambiguity to resurface unresolved on every
+  // future document sharing this page shape.
+  const resolveAmbiguity = async (relation: "vertical" | "horizontal" | "unrelated") => {
+    if (!selected) return;
+    setActionLoading(true);
+    setError("");
+    setNotice("");
+    try {
+      await api.facts.resolveStitchAmbiguity(selected.fact_id, relation);
+      const relationLabel = relation === "vertical" ? "same table continuing" : relation === "horizontal" ? "a side-by-side spread" : "unrelated tables";
+      setNotice(`Recorded as ${relationLabel} — applies to every future document with this page shape.`);
+      await loadQueue(category);
+    } catch (e: any) {
+      setError(e?.message || "Failed to resolve this continuation");
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
   // T54 — keyboard-first navigation: ↑/↓ move the selection, 'c' claims,
   // 'r' releases, Enter or 'a' confirms the selected fact. Ignored while
   // a text input has focus so typing into the bulk-confirm form doesn't
@@ -324,6 +417,11 @@ export default function WorkbenchPage() {
         doAction("claim");
       } else if (e.key === "r" || e.key === "R") {
         doAction("release");
+      } else if (category === "stitch_ambiguous") {
+        // This queue's confirm/handwritten shortcuts don't apply — its
+        // review action is resolveAmbiguity(), which has no natural
+        // single-key shortcut of its own (three choices, not one).
+        return;
       } else if (e.key === "Enter" || e.key === "a" || e.key === "A") {
         doAction("confirm");
       } else if (e.key === "h" || e.key === "H") {
@@ -513,20 +611,33 @@ export default function WorkbenchPage() {
                     <span className="truncate">{selected.document_title}</span>
                   </div>
                 )}
-                <div>
-                  <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Field</div>
-                  <div className="text-sm text-[#1f1f1f]">{fieldLabel(selected.field_name)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Value</div>
-                  <div className="text-sm text-[#1f1f1f] break-words">{formatValue(selected.value)}</div>
-                </div>
-                <div>
-                  <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Confidence</div>
-                  <div className={`inline-block text-sm font-mono mt-0.5 px-2 py-0.5 rounded border ${confidenceBadge(selected.confidence).className}`}>
-                    {selected.confidence?.toFixed(3) ?? "—"}
+                {category === "stitch_ambiguous" ? (
+                  <div>
+                    <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">What&apos;s unclear</div>
+                    <div className="text-sm text-[#1f1f1f]">
+                      Page {selected.value?.page_a ?? "?"} and page {selected.value?.page_b ?? "?"} share a similar
+                      field layout, but the system couldn&apos;t confidently tell whether page {selected.value?.page_b ?? "?"} is
+                      the same table continuing, a side-by-side spread, or an unrelated table.
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div>
+                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Field</div>
+                      <div className="text-sm text-[#1f1f1f]">{fieldLabel(selected.field_name)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Value</div>
+                      <div className="text-sm text-[#1f1f1f] break-words">{formatValue(selected.value)}</div>
+                    </div>
+                    <div>
+                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Confidence</div>
+                      <div className={`inline-block text-sm font-mono mt-0.5 px-2 py-0.5 rounded border ${confidenceBadge(selected.confidence).className}`}>
+                        {selected.confidence?.toFixed(3) ?? "—"}
+                      </div>
+                    </div>
+                  </>
+                )}
                 {selected.is_handwritten && (
                   <div className="text-xs font-bold text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
                     Handwritten source — can&apos;t be included in a threshold-based Bulk Confirm; needs individual review.
@@ -550,21 +661,49 @@ export default function WorkbenchPage() {
                     {selected.claimed_by_actor_id ? <Unlock className="w-3.5 h-3.5 mr-1.5" /> : <Lock className="w-3.5 h-3.5 mr-1.5" />}
                     {selected.claimed_by_actor_id ? "Release" : "Claim"}
                   </Button>
-                  <Button
-                    size="sm" className="max-lg:h-11 max-lg:px-4" loading={actionLoading} onClick={() => doAction("confirm")}
-                    title="Confirm (shortcut: Enter/A) — marks this value as human-verified and removes it from the queue"
-                  >
-                    <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                    Confirm
-                  </Button>
-                  {!selected.is_handwritten && (
-                    <Button
-                      size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" loading={actionLoading} onClick={() => doAction("mark_handwritten")}
-                      title="Mark Handwritten (shortcut: H) — flags this as handwritten so it's excluded from threshold-based Bulk Confirm"
-                    >
-                      <PenLine className="w-3.5 h-3.5 mr-1.5" />
-                      Mark Handwritten
-                    </Button>
+                  {category === "stitch_ambiguous" ? (
+                    <>
+                      <Button
+                        size="sm" className="max-lg:h-11 max-lg:px-4" loading={actionLoading} onClick={() => resolveAmbiguity("vertical")}
+                        title="The same table continues onto the next page — rows should stitch together"
+                      >
+                        <ArrowUpDown className="w-3.5 h-3.5 mr-1.5" />
+                        Same table continues
+                      </Button>
+                      <Button
+                        size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" loading={actionLoading} onClick={() => resolveAmbiguity("horizontal")}
+                        title="These two pages are a side-by-side spread of one wider table"
+                      >
+                        <ArrowLeftRight className="w-3.5 h-3.5 mr-1.5" />
+                        Side-by-side spread
+                      </Button>
+                      <Button
+                        size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" loading={actionLoading} onClick={() => resolveAmbiguity("unrelated")}
+                        title="These are two genuinely separate tables — do not stitch"
+                      >
+                        <Ban className="w-3.5 h-3.5 mr-1.5" />
+                        Unrelated
+                      </Button>
+                    </>
+                  ) : (
+                    <>
+                      <Button
+                        size="sm" className="max-lg:h-11 max-lg:px-4" loading={actionLoading} onClick={() => doAction("confirm")}
+                        title="Confirm (shortcut: Enter/A) — marks this value as human-verified and removes it from the queue"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
+                        Confirm
+                      </Button>
+                      {!selected.is_handwritten && (
+                        <Button
+                          size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" loading={actionLoading} onClick={() => doAction("mark_handwritten")}
+                          title="Mark Handwritten (shortcut: H) — flags this as handwritten so it's excluded from threshold-based Bulk Confirm"
+                        >
+                          <PenLine className="w-3.5 h-3.5 mr-1.5" />
+                          Mark Handwritten
+                        </Button>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -616,6 +755,35 @@ export default function WorkbenchPage() {
                     </button>
                   ))}
                 </div>
+              )}
+              {/* T59 — previously this state was invisible until Confirm
+                  Folder was clicked and a 409 came back. */}
+              {bulkFolderId.trim() && (
+                calibrationLoading ? (
+                  <div className="flex items-center gap-1.5 text-xs text-[#9aa0a6]">
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" /> Checking calibration status…
+                  </div>
+                ) : calibrationStatus?.calibrated ? (
+                  <div className="flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg px-2.5 py-1.5">
+                    <ShieldCheck className="w-3.5 h-3.5 shrink-0" />
+                    Calibrated{calibrationStatus.sample_size ? ` — sample of ${calibrationStatus.sample_size}` : ""}
+                    {calibrationStatus.calibrated_at ? `, ${new Date(calibrationStatus.calibrated_at).toLocaleDateString()}` : ""}
+                  </div>
+                ) : (
+                  <div className="flex items-center justify-between gap-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2.5 py-1.5">
+                    <span className="flex items-center gap-1.5">
+                      <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                      Not calibrated — Confirm Folder will be refused until a human certifies this corpus.
+                    </span>
+                    <button
+                      onClick={calibrateThisFolder}
+                      disabled={calibrateActionLoading}
+                      className="shrink-0 font-bold text-amber-800 hover:underline disabled:opacity-50"
+                    >
+                      {calibrateActionLoading ? "Calibrating…" : "Calibrate now"}
+                    </button>
+                  </div>
+                )
               )}
               <div>
                 <input
@@ -727,7 +895,7 @@ export default function WorkbenchPage() {
         <div role="presentation" className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs" onClick={() => setViewingSourceFactId(null)}>
           <div
             role="presentation"
-            className="w-full max-w-3xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-2xl sm:rounded-3xl shadow-2xl text-[#1f1f1f] p-4 sm:p-6"
+            className="w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-2xl sm:rounded-3xl shadow-2xl text-[#1f1f1f] p-4 sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-center justify-between mb-4">
@@ -736,7 +904,7 @@ export default function WorkbenchPage() {
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <RegionHighlightViewer factId={viewingSourceFactId} renderWidth={640} />
+            <RegionHighlightViewer factId={viewingSourceFactId} renderWidth={900} />
           </div>
         </div>
       )}

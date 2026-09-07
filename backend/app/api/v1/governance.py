@@ -104,6 +104,29 @@ async def calibrate_corpus_api(
     }
 
 
+@router.get("/calibrate-corpus/{corpus_folder_id}/status")
+async def get_calibration_status_api(
+    corpus_folder_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_db),
+):
+    """Read-only calibration check for the workbench's bulk-confirm panel
+    — lets the UI show calibrated/not-calibrated up front instead of only
+    surfacing it as a 409 after submit."""
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    calibration = await corpus_calibration_service.get_calibration_status(db, tenant_id, corpus_folder_id)
+    if not calibration:
+        return {"corpus_folder_id": str(corpus_folder_id), "calibrated": False}
+    return {
+        "corpus_folder_id": str(corpus_folder_id),
+        "calibrated": True,
+        "calibrated_by_actor_id": str(calibration.calibrated_by_actor_id),
+        "calibrated_at": calibration.calibrated_at.isoformat() if calibration.calibrated_at else None,
+        "sample_size": calibration.sample_size,
+        "notes": calibration.notes,
+    }
+
+
 @router.get("/completeness/{corpus_folder_id}/drill")
 async def get_completeness_drill_api(
     corpus_folder_id: str,

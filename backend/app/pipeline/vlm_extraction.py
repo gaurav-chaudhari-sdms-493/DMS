@@ -84,6 +84,25 @@ SPREAD_RENDER_RESOLUTION = 300
 #                                   own (see ditto_chain.py's own docstring for why
 #                                   this is never inferred automatically)
 #   "type": "blob"               — free-text cell to run through parse_blob_cell
+#   "role": "page_header"        — printed ONCE in the page's header area (e.g. a
+#                                   Maharashtra 7/12 form's "गाव/ता./जि." village/
+#                                   taluka/district line above the row table), never
+#                                   repeated per table row. Found live 2026-09-04:
+#                                   without this, a field like "village" was asked
+#                                   for on every row like an ordinary column, so the
+#                                   model — unable to find it inside any row — filled
+#                                   it with the nearest table cell instead (a serial
+#                                   number, a column abbreviation) rather than the
+#                                   real header text a few lines above. Excluded from
+#                                   the row-per-row prompt schema and from
+#                                   full_schema_fields (TS1's stitch-coverage
+#                                   denominator, extract_facts_for_document) since it
+#                                   can never appear inside a row's field set either
+#                                   way. Only wired for the single_page path
+#                                   (extract_facts_for_document) — _extract_spread_facts
+#                                   is itself an unvalidated, A1-blocked mechanism (see
+#                                   its own docstring) that no registered template uses
+#                                   yet, so it isn't worth compounding here.
 
 
 
@@ -112,15 +131,46 @@ def _render_image_page_png(file_bytes: bytes) -> tuple[bytes, float, float, floa
 
 
 def _build_extraction_prompt(field_schema: List[dict]) -> str:
+    header_field_schema = [f for f in field_schema if f.get("role") == "page_header"]
+    row_field_schema = [f for f in field_schema if f.get("role") != "page_header"]
+
     schema_for_prompt = [
         {"name": f["name"], "type": f.get("type", "string"), "required": f.get("required", False)}
-        for f in field_schema
+        for f in row_field_schema
     ]
+    header_schema_for_prompt = [
+        {"name": f["name"], "type": f.get("type", "string"), "required": f.get("required", False)}
+        for f in header_field_schema
+    ]
+
+    header_json_contract = (
+        ', "page_header": { "<field_name>": {"value": <string|number|null>, '
+        '"bbox": [x0,y0,x1,y1], "confidence": <0.0-1.0>, "is_handwritten": <bool>}, ... }'
+        if header_field_schema else ""
+    )
+    header_rule = (
+        "- \"page_header\" fields are printed ONCE on this page, in the form's header "
+        "area (e.g. a \"Village: X  Taluka: Y  District: Z\" line printed once above "
+        "the row table) — never repeated per table row, and never sourced from a table "
+        "cell, row number, or column abbreviation below the header. Extract each into "
+        "the top-level \"page_header\" object exactly once. If a page_header field "
+        "genuinely is not visible on this page (e.g. a continuation page with no "
+        "repeated header line), omit its key from \"page_header\" entirely rather than "
+        "guessing a nearby table value.\n"
+        if header_field_schema else ""
+    )
+    header_schema_block = (
+        f"Page-header field schema (once per page, in the header area — never a "
+        f"row column):\n{json.dumps(header_schema_for_prompt, ensure_ascii=False)}\n\n"
+        if header_field_schema else ""
+    )
+
     return (
         "You are reading one page of a scanned government register. Return ONLY valid JSON "
         "(no markdown fences) shaped exactly like this:\n"
         '{"rows": [ { "<field_name>": {"value": <string|number|null>, '
-        '"bbox": [x0,y0,x1,y1], "confidence": <0.0-1.0>, "is_handwritten": <bool>}, ... } ], '
+        '"bbox": [x0,y0,x1,y1], "confidence": <0.0-1.0>, "is_handwritten": <bool>}, ... } ]'
+        f'{header_json_contract}, '
         '"marginalia": [ {"text": <string>, "bbox": [x0,y0,x1,y1]}, ... ]}\n\n'
         "Rules:\n"
         "- One entry in \"rows\" per data row visible on this page (a page with a single "
@@ -141,10 +191,24 @@ def _build_extraction_prompt(field_schema: List[dict]) -> str:
         "- \"is_handwritten\" is true when THAT SPECIFIC VALUE is handwritten (pen/pencil "
         "ink) rather than printed/typed — set it per field, not per page; a printed form "
         "with one handwritten entry has is_handwritten=false on every other field.\n"
+        f"{header_rule}"
         "- \"marginalia\": any handwritten note, stamp annotation, or remark on the page "
         "that is NOT an answer to one of the schema's fields (e.g. a note in the margin, "
         "an interlineation, a struck-through correction) — each with its own bbox. Do not "
         "put marginalia text into a field's value.\n\n"
+        f"{header_schema_block}"
+        # chandra_provider.py's _extract_field_names() recovers the row
+        # field list by exact-matching this literal "Field schema:\n"
+        # marker with rfind() and json.loads()-ing everything after it —
+        # Chandra doesn't consume the rest of this prompt as instructions
+        # at all (see that provider's module docstring). This marker text
+        # and its trailing JSON array MUST stay the last thing in the
+        # prompt, verbatim, with nothing appended after it, or Chandra's
+        # column-to-field mapping silently gets zero fields and returns
+        # empty rows for every page (a real regression hit live
+        # 2026-09-04 while adding page_header support: renaming this to
+        # "Field schema (per data row):" and appending the header schema
+        # block after it broke the marker match).
         f"Field schema:\n{json.dumps(schema_for_prompt, ensure_ascii=False)}"
     )
 
@@ -165,7 +229,7 @@ def _valid_bbox(bbox: Any) -> bool:
     )
 
 
-def _parse_vlm_response(raw: str) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+def _parse_vlm_response(raw: str) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
     text = raw.strip()
     if text.startswith("```"):
         text = text.split("```")[1]
@@ -183,9 +247,11 @@ def _parse_vlm_response(raw: str) -> tuple[List[Dict[str, Any]], List[Dict[str, 
     data = json.loads(text.strip(), strict=False)
     rows = data.get("rows", [])
     marginalia = data.get("marginalia", [])
+    page_header = data.get("page_header", {})
     return (
         rows if isinstance(rows, list) else [],
         marginalia if isinstance(marginalia, list) else [],
+        page_header if isinstance(page_header, dict) else {},
     )
 
 
@@ -201,8 +267,11 @@ async def _call_vlm_cached(db: AsyncSession, vlm, file_hash: str, page_number: i
     field subset) never re-spends a Gemini call. The cache key includes
     the prompt itself, so a left-half vs right-half spread call (or a
     template's field_schema changing) naturally gets its own cache entry
-    rather than colliding."""
-    cache_key = compute_vlm_cache_key(file_hash, page_number, prompt)
+    rather than colliding. It also includes the configured VLM provider
+    (settings.ai_vlm_provider), so switching providers never replays a
+    stale response cached under the old one — same convention as the
+    OCR archive's ocr_engine key."""
+    cache_key = compute_vlm_cache_key(file_hash, page_number, prompt, settings.ai_vlm_provider)
     try:
         cached = await get_cached_vlm_response(db, cache_key)
     except Exception as e:
@@ -225,7 +294,7 @@ VLM_PARSE_RETRY_ATTEMPTS = 3
 
 async def _call_vlm_with_parse_retry(
     db: AsyncSession, vlm, file_hash: str, page_number: int, image_bytes: bytes, prompt: str,
-) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], Dict[str, Any]]:
     """T31/T32 follow-up (documented in T31_T32_regression_corpus_notes.md):
     on a real 1973 gazette's dense left-hand page, the VLM returned
     malformed JSON at a different position on 3 separate live attempts —
@@ -251,7 +320,7 @@ async def _call_vlm_with_parse_retry(
             else await vlm.extract_structured(image_bytes, prompt)
         )
         try:
-            rows, marginalia = _parse_vlm_response(raw)
+            rows, marginalia, page_header = _parse_vlm_response(raw)
         except Exception as e:
             # Not just json.JSONDecodeError: a malformed-but-valid-JSON
             # reply (e.g. a bare list instead of the expected object) can
@@ -266,17 +335,17 @@ async def _call_vlm_with_parse_retry(
 
         if attempt > 0:
             try:
-                cache_key = compute_vlm_cache_key(file_hash, page_number, prompt)
+                cache_key = compute_vlm_cache_key(file_hash, page_number, prompt, settings.ai_vlm_provider)
                 await overwrite_vlm_response(db, cache_key, raw)
             except Exception as e:
                 logger.warning(f"VLM cache rewrite failed for page {page_number}: {e}")
-        return rows, marginalia
+        return rows, marginalia, page_header
 
     logger.error(
         f"VLM response unparseable for page {page_number} after "
         f"{VLM_PARSE_RETRY_ATTEMPTS} attempts, giving up: {last_error}"
     )
-    return [], []
+    return [], [], {}
 
 
 async def _get_or_create_page(
@@ -343,19 +412,45 @@ async def _extract_spread_facts(
          tagging, or does the real register put every field on a
          predictable side (e.g. "left" = columns 1-N, "right" = the
          rest) that could be inferred from column order instead?
-      2. Is role:"serial" really printed on BOTH halves of a real spread,
-         or only once (e.g. left page only, right page continues
-         wordlessly) — if the latter, the current "ask serial on both
-         sides" assumption is wrong and needs a different pairing key.
+      2. CONFIRMED 2026-09-07, read-only re-run against the real
+         waqf_gazette_1973_spread_FIXED.pdf (District Aurangabad, 1973 —
+         the one real document currently matched to this template):
+         role:"serial" is NOT printed on the right-hand band at all — 17
+         of 18 right-side rows came back the ditto placeholder "..", one
+         came back a stray leaked village name ("Kanadgaon"), zero came
+         back a real serial number. So yes, the "ask serial on both
+         sides" prompt assumption is wrong for this real layout — but
+         it's already harmless: _looks_like_a_key_value's majority check
+         (see its docstring, and test_join_rows_horizontally_ditto_marks_
+         and_place_names_are_not_keys / ..._single_stray_value_is_still_
+         structural_absence in test_table_stitch.py) correctly recognizes
+         this as "no real keys on this side," not a genuine conflict, and
+         falls through to the equal-row-count positional fallback, which
+         paired all 18 rows correctly (join status "ok", zero
+         _join_mismatch). The synthetic tests already modeling exactly
+         this ditto/stray-value shape turned out to accurately predict
+         real scan behavior. Left unchanged: still asking for serial on
+         the right side is mildly wasteful (one extra field slot, one
+         occasional noisy value that gets filtered out) but not wrong
+         enough to justify a prompt change on an N=1 sample — a second
+         real spread would need to confirm this generalizes before
+         trimming the right-side prompt to skip serial entirely.
       3. Does bbox vertical position (the TS1 fallback) actually line up
          between two facing pages in a real bound-register scan, given
          that the left/right pages are photographed separately and may
          have different skew/crop/margin — or does it need a per-page
-         normalisation step first?
+         normalisation step first? Not directly exercised by the
+         2026-09-07 re-run above — that page pair joined via the
+         EQUAL-COUNT rank-order fallback (table_stitch.join_rows_
+         horizontally's zero-anchor path), not real bbox-position
+         matching, so this item is still open.
       4. Sample size: one confirmed real spread is enough to catch a
          structurally wrong assumption, but not enough to trust the
          _join_mismatch rate as a real-world number — treat an initial
-         validation as "does this break," not "is this accurate."
+         validation as "does this break," not "is this accurate." Still
+         true after the 2026-09-07 finding above: N=1 real document,
+         1 real page-pair confirmed working — a genuine positive result,
+         not a closed investigation.
     """
     serial_field = _find_role_field(field_schema, "serial")
     if not serial_field:
@@ -399,8 +494,8 @@ async def _extract_spread_facts(
             left_png, left_w, left_h, left_rot = left_rendered
             right_png, right_w, right_h, right_rot = right_rendered
 
-            left_rows, _ = await _call_vlm_with_parse_retry(db, vlm, file_hash, left_page_number, left_png, left_prompt)
-            right_rows, _ = await _call_vlm_with_parse_retry(db, vlm, file_hash, right_page_number, right_png, right_prompt)
+            left_rows, _, _ = await _call_vlm_with_parse_retry(db, vlm, file_hash, left_page_number, left_png, left_prompt)
+            right_rows, _, _ = await _call_vlm_with_parse_retry(db, vlm, file_hash, right_page_number, right_png, right_prompt)
             if not left_rows or not right_rows:
                 continue
 
@@ -482,6 +577,22 @@ async def _extract_spread_facts(
 
 ADJUDICATION_CONFIDENCE_THRESHOLD = 0.6
 
+# Live bug, 2026-09-04: Chandra's /convert (chandra_provider.py) isn't
+# instruction-following — it maps whatever table structure IT detected on
+# a page onto our field list purely by column ORDER, with no idea some
+# pages (a document's own cover/notice page, say) aren't this template's
+# table at all. Confirmed live: a Wakf gazette's non-tabular cover page
+# still produced a "row", with a Marathi legal-notice paragraph split
+# across just 3 of the template's 14 fields (sr_no/wakf_name/sect) —
+# nowhere close to the ~12-14 fields a genuine row of this table
+# populates. Below this fraction of the template's row-level fields
+# actually populated, a row is far more likely mis-mapped page content
+# than a genuinely sparse real entry — forced into review rather than
+# either silently trusted as ordinary machine-confidence data or
+# silently discarded (a real row that happens to be this sparse still
+# gets a human's eyes, never lost).
+ROW_COVERAGE_REVIEW_THRESHOLD = 0.4
+
 
 async def _write_stitch_ambiguous_fact(
     db: AsyncSession, tenant_id: UUID, document_id: UUID, version_id: UUID,
@@ -515,7 +626,13 @@ async def _write_stitch_ambiguous_fact(
     )
     db.add(fact)
     await db.flush()
+    # Both pages get a full-page region so a reviewer can see page A and
+    # page B side by side — previously only page A was ever recorded here
+    # (page B lived only as a bare number in `value.page_b`), so even a
+    # frontend built to compare the two pages had nothing to render for
+    # the second one.
     db.add(FactRegion(tenant_id=tenant_id, fact_id=fact.id, page_id=prev_pe["page"].id, x0=0.0, y0=0.0, x1=1.0, y1=1.0))
+    db.add(FactRegion(tenant_id=tenant_id, fact_id=fact.id, page_id=pe["page"].id, x0=0.0, y0=0.0, x1=1.0, y1=1.0))
 
 
 async def _stitch_vertical_segments(
@@ -639,7 +756,12 @@ async def extract_facts_for_document(
     ditto_fields = [f["name"] for f in field_schema if f.get("ditto_eligible")]
     chain_anchor_field = _find_role_field(field_schema, "chain_anchor")
     blob_fields = [f["name"] for f in field_schema if f.get("type") == "blob"]
-    full_schema_fields = frozenset(f["name"] for f in field_schema)
+    header_fields = [f for f in field_schema if f.get("role") == "page_header"]
+    # page_header fields never appear inside a row's field set either way
+    # (they're asked for once per page, not per row) -- excluded here so
+    # TS1's stitch-coverage comparison (decide_relation) isn't judged
+    # against a denominator it can never actually reach.
+    full_schema_fields = frozenset(f["name"] for f in field_schema if f.get("role") != "page_header")
     stitch_exclude_fields = frozenset({serial_field}) if serial_field else frozenset()
     file_hash = hashlib.sha256(file_bytes).hexdigest()
 
@@ -661,12 +783,15 @@ async def extract_facts_for_document(
                     break
                 png_bytes, width, height, rotation = _render_image_page_png(file_bytes)
 
-            rows, marginalia = await _call_vlm_with_parse_retry(db, vlm, file_hash, page_number, png_bytes, prompt)
-            if not rows and not marginalia:
+            rows, marginalia, page_header = await _call_vlm_with_parse_retry(db, vlm, file_hash, page_number, png_bytes, prompt)
+            if not rows and not marginalia and not page_header:
                 continue
 
             page = await _get_or_create_page(db, tenant_id, document_id, version_id, page_number, width, height, rotation)
-            page_extractions.append({"page_number": page_number, "rows": rows, "marginalia": marginalia, "page": page})
+            page_extractions.append({
+                "page_number": page_number, "rows": rows, "marginalia": marginalia,
+                "page_header": page_header, "page": page,
+            })
 
         except Exception as e:
             # str(e) alone can be empty (httpx.ReadTimeout and friends
@@ -722,8 +847,23 @@ async def extract_facts_for_document(
             source_indices = merged_row.get("_source_row_indices", [])
             if not source_indices:
                 continue
+
+            # T22 quality gate (see ROW_COVERAGE_REVIEW_THRESHOLD) — how
+            # much of this template's row-level schema this merged row
+            # actually populated, regardless of per-field confidence.
+            populated_field_count = sum(
+                1 for name in full_schema_fields
+                if merged_row.get("no" if name == serial_field else name) not in (None, "")
+            )
+            row_is_low_coverage = (
+                bool(full_schema_fields)
+                and (populated_field_count / len(full_schema_fields)) < ROW_COVERAGE_REVIEW_THRESHOLD
+            )
+
             for field_def in field_schema:
                 field_name = field_def["name"]
+                if field_def.get("role") == "page_header":
+                    continue
                 row_key = "no" if field_name == serial_field else field_name
                 if row_key not in merged_row:
                     continue
@@ -762,6 +902,8 @@ async def extract_facts_for_document(
 
                 fact_confidence = (sum(confidences) / len(confidences)) if confidences else None
                 fact_status = classify_confidence(field_def, fact_confidence, is_handwritten=field_is_handwritten)
+                if row_is_low_coverage:
+                    fact_status = "in_review"
 
                 # TS5 — ditto-filled fields carry both the resolved value
                 # and the literal mark that was actually read; a mark
@@ -800,6 +942,54 @@ async def extract_facts_for_document(
                         x0=float(x0), y0=float(y0), x1=float(x1), y1=float(y1),
                     ))
                 facts_written += 1
+
+        # page_header fields (village/taluka/district on a 7/12 record,
+        # etc.) never appear inside merged_plain's row keys -- they're
+        # asked for once per page, in the header area, not per row (see
+        # the "role": "page_header" convention note above) -- so they're
+        # written separately here instead of via the per-row loop above.
+        # One Fact per header field per segment, sourced from the first
+        # page in the segment that actually reported it; a continuation
+        # page legitimately omits it (the prompt says so), so later pages
+        # are a fallback, not an error.
+        for field_def in header_fields:
+            field_name = field_def["name"]
+            src_field = None
+            src_page = None
+            for pe in segment:
+                candidate = pe.get("page_header", {}).get(field_name)
+                if isinstance(candidate, dict) and _valid_bbox(candidate.get("bbox")):
+                    src_field = candidate
+                    src_page = pe["page"]
+                    break
+            if src_field is None:
+                continue
+            value = src_field.get("value")
+            if value is None or value == "":
+                continue
+
+            header_confidence = src_field.get("confidence")
+            header_confidence = float(header_confidence) if header_confidence is not None else None
+            header_is_handwritten = bool(src_field.get("is_handwritten"))
+
+            fact = Fact(
+                tenant_id=tenant_id,
+                document_id=document_id,
+                version_id=version_id,
+                field_name=field_name,
+                value=value if isinstance(value, (dict, list)) else {"v": value},
+                confidence=header_confidence,
+                is_handwritten=header_is_handwritten,
+                status=classify_confidence(field_def, header_confidence, is_handwritten=header_is_handwritten),
+            )
+            db.add(fact)
+            await db.flush()
+            x0, y0, x1, y1 = src_field["bbox"]
+            db.add(FactRegion(
+                tenant_id=tenant_id, fact_id=fact.id, page_id=src_page.id,
+                x0=float(x0), y0=float(y0), x1=float(x1), y1=float(y1),
+            ))
+            facts_written += 1
 
         # T30 — marginalia: handwritten notes that aren't an answer to any
         # schema field. Reuses Fact+FactRegion (T06's click-through contract)

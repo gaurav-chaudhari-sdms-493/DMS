@@ -147,3 +147,55 @@ async def test_different_template_schema_does_not_reuse_cache(monkeypatch):
         finally:
             await db.rollback()
             await db.close()
+
+
+@pytest.mark.asyncio
+async def test_switching_vlm_provider_does_not_reuse_the_old_providers_cache(monkeypatch):
+    """Live bug, 2026-09-04: compute_vlm_cache_key didn't include the VLM
+    provider, unlike the OCR archive's ocr_engine-scoped lookup. Switching
+    AI_VLM_PROVIDER (e.g. gemini -> chandra) then silently kept serving
+    whatever the OLD provider had cached for the same file/page/prompt,
+    defeating the switch. Same file bytes, same field_schema, only
+    settings.ai_vlm_provider differs between the two calls -- the second
+    must genuinely call its own VLM, not replay the first provider's
+    response."""
+    import app.pipeline.vlm_extraction as vlm_mod
+    pdf_bytes = _one_page_pdf_bytes()
+
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, doc_id, version_id = await _make_doc(db)
+            template = FakeTemplate(SCHEMA)
+
+            monkeypatch.setattr(vlm_mod.settings, "ai_vlm_provider", "gemini")
+            gemini_vlm = AsyncMock()
+            gemini_vlm.extract_structured.return_value = json.dumps({
+                "rows": [{"owner_name": {"value": "Gemini Owner", "bbox": [0.1, 0.1, 0.5, 0.2], "confidence": 0.9}}],
+                "marginalia": [],
+            })
+            monkeypatch.setattr(vlm_mod, "get_vlm_provider", lambda: gemini_vlm)
+            await extract_facts_for_document(
+                db, tenant_id, doc_id, version_id, pdf_bytes, "ts3.pdf", pages_text=[{}], template=template,
+            )
+            await db.commit()
+            assert gemini_vlm.extract_structured.call_count == 1
+
+            tenant_id_2, doc_id_2, version_id_2 = await _make_doc(db)
+            monkeypatch.setattr(vlm_mod.settings, "ai_vlm_provider", "chandra")
+            chandra_vlm = AsyncMock()
+            chandra_vlm.extract_structured.return_value = json.dumps({
+                "rows": [{"owner_name": {"value": "Chandra Owner", "bbox": [0.1, 0.1, 0.5, 0.2], "confidence": 0.9}}],
+                "marginalia": [],
+            })
+            monkeypatch.setattr(vlm_mod, "get_vlm_provider", lambda: chandra_vlm)
+            written_2 = await extract_facts_for_document(
+                db, tenant_id_2, doc_id_2, version_id_2, pdf_bytes, "ts3.pdf", pages_text=[{}], template=template,
+            )
+            await db.commit()
+
+            assert chandra_vlm.extract_structured.call_count == 1  # genuinely called, not a cache hit on gemini's entry
+            res = await db.execute(select(Fact).where(Fact.document_id == doc_id_2, Fact.field_name == "owner_name"))
+            assert res.scalar_one().value["v"] == "Chandra Owner"
+        finally:
+            await db.rollback()
+            await db.close()

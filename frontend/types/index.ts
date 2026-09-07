@@ -99,6 +99,46 @@ export interface DriveStats {
   total_trashed: number;
 }
 
+export interface DocumentFact {
+  fact_id: string;
+  field_name: string;
+  value: unknown;
+  confidence: number | null;
+  status: "machine" | "in_review" | "verified";
+  is_handwritten: boolean;
+  page_numbers: number[];
+  // True when this field's regions land on more than one physical page —
+  // the only reliable, verifiable signal that TS1 (vertical stitching)
+  // actually merged a continuation row from a later page into this entry,
+  // rather than a heuristic guess re-derived in the UI.
+  stitched: boolean;
+}
+
+export interface DocumentTableRow {
+  page_number: number;
+  stitched: boolean;
+  needs_review: boolean;
+  values: Record<string, unknown>;
+}
+
+export interface DocumentTableViewResponse {
+  document_id: string;
+  classification_status: string;
+  page_header: Record<string, unknown>;
+  columns: string[];
+  rows: DocumentTableRow[];
+  row_count: number;
+}
+
+export interface DocumentFactsResponse {
+  document_id: string;
+  classification_status: string;
+  matched_template_id?: string | null;
+  facts: DocumentFact[];
+  stitched_field_count: number;
+  in_review_count: number;
+}
+
 export interface SearchResult {
   document_id: string;
   document_name: string;

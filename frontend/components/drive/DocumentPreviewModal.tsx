@@ -22,9 +22,14 @@ import {
   Table,
   Presentation,
   FileSpreadsheet,
+  Layers,
+  AlertTriangle,
+  ListChecks,
+  Pencil,
+  Loader2,
 } from "lucide-react";
 import { MarkdownViewer } from "../chat/MarkdownViewer";
-import type { DocumentListItem } from "@/types";
+import type { DocumentListItem, DocumentFactsResponse, DocumentTableViewResponse } from "@/types";
 import { api } from "@/lib/api";
 
 interface DocumentPreviewModalProps {
@@ -66,6 +71,35 @@ export function DocumentPreviewModal({
   const [chatInput, setChatInput] = useState("");
   const [aiThinking, setAiThinking] = useState(false);
   const chatBottomRef = useRef<HTMLDivElement | null>(null);
+
+  // Extracted Facts panel state — surfaces what T22 (VLM extraction) and
+  // TS1 (stitching) actually produced for this document. Before this,
+  // there was no UI anywhere that showed whether a document's continuation
+  // rows got merged across pages or flagged for human review; opening the
+  // preview looked identical whether extraction ran, stitched something,
+  // or never even classified.
+  const [showFacts, setShowFacts] = useState(false);
+  const [factsData, setFactsData] = useState<DocumentFactsResponse | null>(null);
+  const [factsLoading, setFactsLoading] = useState(false);
+  const [factsError, setFactsError] = useState<string | null>(null);
+  // Table view reconstructs the flat fact list back into an actual
+  // rows-x-columns table (matching the source document's own structure)
+  // instead of ~hundreds of individual field cards -- a flat list reads
+  // as "nothing happened" even when stitching worked correctly, because
+  // it looks nothing like the table a reviewer recognizes from the scan.
+  const [factsView, setFactsView] = useState<"list" | "table">("table");
+  const [tableData, setTableData] = useState<DocumentTableViewResponse | null>(null);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [tableError, setTableError] = useState<string | null>(null);
+  // Human-in-the-loop edit/confirm on the facts panel -- wires into the
+  // T51/T80 review endpoints that already existed (confirm, bulk-edit
+  // with dry-run preview + revert) but had no UI surfacing them next to
+  // the extracted data itself; previously only reachable via a separate
+  // Workbench trip.
+  const [editingFactId, setEditingFactId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [factActionId, setFactActionId] = useState<string | null>(null);
+  const [factActionError, setFactActionError] = useState<string | null>(null);
 
   // Extensible Drag Resizable Width for In-Document AI Chatbot
   const [chatWidth, setChatWidth] = useState<number>(420);
@@ -139,6 +173,26 @@ export function DocumentPreviewModal({
     setActiveSheetIdx(0);
     setChatMessages([]);
     setChatInput("");
+    setFactsData(null);
+    setFactsError(null);
+    setTableData(null);
+    setTableError(null);
+
+    if (isOpen && doc) {
+      setFactsLoading(true);
+      api.documents
+        .getFacts(doc.id)
+        .then((data) => setFactsData(data))
+        .catch((e) => setFactsError(e?.message || "Failed to load extracted facts"))
+        .finally(() => setFactsLoading(false));
+
+      setTableLoading(true);
+      api.documents
+        .getTableView(doc.id)
+        .then((data) => setTableData(data))
+        .catch((e) => setTableError(e?.message || "Failed to load the reconstructed table"))
+        .finally(() => setTableLoading(false));
+    }
 
     if (isOpen && doc) {
       const isPending = doc.status === "pending" || doc.status === "processing";
@@ -206,6 +260,58 @@ export function DocumentPreviewModal({
       navigator.clipboard.writeText(textContent);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
+  const refetchFacts = () => {
+    api.documents
+      .getFacts(doc.id)
+      .then((data) => setFactsData(data))
+      .catch((e) => setFactsError(e?.message || "Failed to load extracted facts"));
+    api.documents
+      .getTableView(doc.id)
+      .then((data) => setTableData(data))
+      .catch((e) => setTableError(e?.message || "Failed to load the reconstructed table"));
+  };
+
+  const startEditFact = (factId: string, currentValue: unknown) => {
+    const raw = currentValue as any;
+    const currentText = raw && typeof raw === "object" && "v" in raw ? String(raw.v) : String(raw);
+    setEditingFactId(factId);
+    setEditValue(currentText);
+    setFactActionError(null);
+  };
+
+  const cancelEditFact = () => {
+    setEditingFactId(null);
+    setEditValue("");
+  };
+
+  const saveEditFact = async (factId: string) => {
+    setFactActionId(factId);
+    setFactActionError(null);
+    try {
+      await api.facts.bulkEdit([{ fact_id: factId, new_value: { v: editValue } }]);
+      setEditingFactId(null);
+      setEditValue("");
+      refetchFacts();
+    } catch (e: any) {
+      setFactActionError(e?.message || "Failed to save the edit");
+    } finally {
+      setFactActionId(null);
+    }
+  };
+
+  const confirmFact = async (factId: string) => {
+    setFactActionId(factId);
+    setFactActionError(null);
+    try {
+      await api.facts.confirm(factId);
+      refetchFacts();
+    } catch (e: any) {
+      setFactActionError(e?.message || "Failed to confirm this fact");
+    } finally {
+      setFactActionId(null);
     }
   };
 
@@ -333,7 +439,38 @@ export function DocumentPreviewModal({
         {/* Right Actions Toolbar & AI Chatbot Toggle */}
         <div className="flex items-center gap-3">
           <button
-            onClick={() => setShowChat(!showChat)}
+            onClick={() => {
+              setShowFacts(!showFacts);
+              if (!showFacts) setShowChat(false);
+            }}
+            className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-xs relative ${
+              showFacts
+                ? "bg-[#0d2e5c] text-white shadow-blue-500/20"
+                : "bg-white/10 text-white hover:bg-white/20 border border-white/10"
+            }`}
+            title="What extraction and stitching actually produced for this document"
+          >
+            <ListChecks className="w-4 h-4 text-emerald-300" />
+            <span>Extracted Facts</span>
+            {!!factsData && factsData.stitched_field_count > 0 && (
+              <span className="flex items-center gap-1 bg-emerald-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                <Layers className="w-3 h-3" />
+                {factsData.stitched_field_count}
+              </span>
+            )}
+            {!!factsData && factsData.in_review_count > 0 && (
+              <span className="flex items-center gap-1 bg-amber-500/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                <AlertTriangle className="w-3 h-3" />
+                {factsData.in_review_count}
+              </span>
+            )}
+          </button>
+
+          <button
+            onClick={() => {
+              setShowChat(!showChat);
+              if (!showChat) setShowFacts(false);
+            }}
             className={`flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold transition-all shadow-xs ${
               showChat
                 ? "bg-[#0d2e5c] text-white shadow-blue-500/20"
@@ -838,6 +975,296 @@ export function DocumentPreviewModal({
                 </button>
               </div>
             </form>
+          </aside>
+        )}
+
+        {/* Right Extracted Facts Drawer — what T22/TS1 actually produced */}
+        {showFacts && (
+          <aside
+            style={{ width: factsView === "table" ? "min(900px, 90vw)" : "420px" }}
+            className="flex-shrink-0 border-l border-[#e1e3e1] bg-white flex flex-col h-full shadow-2xl animate-fadeIn relative z-20 transition-[width]"
+          >
+            <div className="p-4 border-b border-[#e1e3e1] flex items-center justify-between bg-[#f8fafd] shadow-2xs">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-600 to-teal-600 flex items-center justify-center text-white shadow-md shadow-emerald-500/20">
+                  <ListChecks className="w-4.5 h-4.5 text-white" />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-[#1f1f1f]">Extracted Facts</h3>
+                  <span className="text-[10px] text-[#747775] block font-medium">
+                    {factsData ? `Status: ${factsData.classification_status}` : "Loading…"}
+                  </span>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <div className="flex items-center bg-white border border-[#d3d7dc] rounded-full p-0.5 text-[10px] font-bold">
+                  <button
+                    onClick={() => setFactsView("table")}
+                    className={`px-2.5 py-1 rounded-full transition-colors ${
+                      factsView === "table" ? "bg-[#0d2e5c] text-white" : "text-[#444746] hover:bg-[#f8fafd]"
+                    }`}
+                    title="Reconstructed table — rows and columns like the source document"
+                  >
+                    Table
+                  </button>
+                  <button
+                    onClick={() => setFactsView("list")}
+                    className={`px-2.5 py-1 rounded-full transition-colors ${
+                      factsView === "list" ? "bg-[#0d2e5c] text-white" : "text-[#444746] hover:bg-[#f8fafd]"
+                    }`}
+                    title="Flat list — one card per extracted field, editable"
+                  >
+                    List
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowFacts(false)}
+                  className="p-1.5 rounded-full text-[#444746] hover:bg-[#e1e3e1] transition-colors"
+                  title="Close"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {factsView === "table" ? (
+              <div className="flex-1 overflow-auto p-4 scrollbar-thin">
+                {tableLoading && (
+                  <div className="text-xs text-[#747775] text-center py-8">Reconstructing the table…</div>
+                )}
+                {tableError && (
+                  <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{tableError}</div>
+                )}
+                {tableData && tableData.row_count === 0 && (
+                  <div className="text-xs text-[#747775] text-center py-8">No rows reconstructed for this document yet.</div>
+                )}
+                {tableData && Object.keys(tableData.page_header).length > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 mb-3">
+                    {Object.entries(tableData.page_header).map(([k, v]) => (
+                      <span
+                        key={k}
+                        className="flex items-center gap-1 bg-[#edf2fc] text-[#0d2e5c] border border-[#d3d7dc] text-[10px] font-bold px-2 py-1 rounded-full"
+                      >
+                        {k}: {String(v)}
+                      </span>
+                    ))}
+                  </div>
+                )}
+                {tableData && tableData.row_count > 0 && (
+                  <table className="text-[11px] border-collapse w-full">
+                    <thead className="sticky top-0 z-10">
+                      <tr>
+                        <th className="bg-[#f8fafd] border border-[#e1e3e1] px-2 py-1.5 text-left font-bold text-[#444746] whitespace-nowrap">pg</th>
+                        <th className="bg-[#f8fafd] border border-[#e1e3e1] px-1 py-1.5 w-6"></th>
+                        {tableData.columns.map((col) => (
+                          <th
+                            key={col}
+                            className="bg-[#f8fafd] border border-[#e1e3e1] px-2 py-1.5 text-left font-mono font-bold text-[#0d2e5c] whitespace-nowrap"
+                          >
+                            {col}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {tableData.rows.map((row, i) => (
+                        <tr
+                          key={i}
+                          title={row.needs_review ? "Low field coverage — likely mis-mapped page content, needs a human look" : undefined}
+                          className={
+                            row.needs_review
+                              ? "bg-amber-50"
+                              : row.stitched
+                              ? "bg-emerald-50/60"
+                              : i % 2 === 0
+                              ? "bg-white"
+                              : "bg-[#fafbfc]"
+                          }
+                        >
+                          <td className="border border-[#e1e3e1] px-2 py-1.5 text-[#747775] whitespace-nowrap">
+                            {row.stitched ? (
+                              <span className="flex items-center gap-0.5 text-emerald-700 font-bold" title="This row's fields were stitched across pages">
+                                <Layers className="w-3 h-3" />
+                                {row.page_number}
+                              </span>
+                            ) : (
+                              row.page_number
+                            )}
+                          </td>
+                          <td className="border border-[#e1e3e1] px-1 py-1.5 text-center">
+                            {row.needs_review && (
+                              <AlertTriangle
+                                className="w-3.5 h-3.5 text-amber-600 inline-block"
+                                aria-label="Needs review"
+                              />
+                            )}
+                          </td>
+                          {tableData.columns.map((col) => (
+                            <td key={col} className="border border-[#e1e3e1] px-2 py-1.5 text-[#1f1f1f] max-w-[220px] truncate" title={String(row.values[col] ?? "")}>
+                              {row.values[col] !== undefined ? String(row.values[col]) : ""}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
+              </div>
+            ) : (
+            <div className="flex-1 overflow-y-auto p-4 space-y-2 scrollbar-thin">
+              {factsLoading && (
+                <div className="text-xs text-[#747775] text-center py-8">Loading extracted facts…</div>
+              )}
+
+              {factsError && (
+                <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{factsError}</div>
+              )}
+
+              {factsData && factsData.classification_status !== "classified" && (
+                <div className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  This document hasn&apos;t matched a registered template ({factsData.classification_status}), so
+                  no fields were extracted and nothing could be stitched.
+                </div>
+              )}
+
+              {factsData && factsData.facts.length === 0 && factsData.classification_status === "classified" && (
+                <div className="text-xs text-[#747775] text-center py-8">No fields extracted for this document yet.</div>
+              )}
+
+              {factsData && factsData.facts.length > 0 && (
+                <>
+                  {(factsData.stitched_field_count > 0 || factsData.in_review_count > 0) && (
+                    <div className="flex items-center gap-2 mb-2">
+                      {factsData.stitched_field_count > 0 && (
+                        <span className="flex items-center gap-1 bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold px-2 py-1 rounded-full">
+                          <Layers className="w-3 h-3" />
+                          {factsData.stitched_field_count} field{factsData.stitched_field_count === 1 ? "" : "s"} stitched across pages
+                        </span>
+                      )}
+                      {factsData.in_review_count > 0 && (
+                        <span className="flex items-center gap-1 bg-amber-50 text-amber-700 border border-amber-200 text-[10px] font-bold px-2 py-1 rounded-full">
+                          <AlertTriangle className="w-3 h-3" />
+                          {factsData.in_review_count} needs human review
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  {factActionError && (
+                    <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg p-2 mb-2">{factActionError}</div>
+                  )}
+                  {factsData.facts.map((f) => {
+                    const raw = f.value as any;
+                    const displayValue =
+                      raw && typeof raw === "object" && "v" in raw
+                        ? String(raw.v)
+                        : typeof raw === "object"
+                        ? JSON.stringify(raw)
+                        : String(raw);
+                    // Sentinel rows (_stitch_ambiguous, _join_mismatch,
+                    // _marginalia) aren't ordinary field values — they go
+                    // through their own resolution flow (Workbench's
+                    // resolve-stitch-ambiguity), not the generic
+                    // edit/confirm actions below.
+                    const isSentinel = f.field_name.startsWith("_");
+                    const isEditing = editingFactId === f.fact_id;
+                    const isBusy = factActionId === f.fact_id;
+                    return (
+                      <div
+                        key={f.fact_id}
+                        className={`border rounded-lg p-3 text-xs ${
+                          f.status === "in_review" ? "border-amber-300 bg-amber-50/50" : "border-[#e1e3e1] bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-mono font-bold text-[#0d2e5c]">{f.field_name}</span>
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {f.stitched && (
+                              <span
+                                className="flex items-center gap-1 bg-emerald-100 text-emerald-700 text-[10px] font-bold px-1.5 py-0.5 rounded-full"
+                                title={`Merged from pages ${f.page_numbers.join(", ")}`}
+                              >
+                                <Layers className="w-3 h-3" />
+                                pages {f.page_numbers.join(", ")}
+                              </span>
+                            )}
+                            {f.status === "in_review" && (
+                              <span className="flex items-center gap-1 bg-amber-200 text-amber-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                <AlertTriangle className="w-3 h-3" />
+                                review
+                              </span>
+                            )}
+                            {f.status === "verified" && (
+                              <span className="flex items-center gap-1 bg-emerald-200 text-emerald-800 text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                                <Check className="w-3 h-3" />
+                                verified
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        {isEditing ? (
+                          <div className="mt-1.5 space-y-1.5">
+                            <input
+                              type="text"
+                              value={editValue}
+                              onChange={(e) => setEditValue(e.target.value)}
+                              className="w-full px-2 py-1.5 rounded border border-[#0d2e5c] text-xs focus:outline-none focus:ring-2 focus:ring-[#0d2e5c]/30"
+                            />
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                onClick={() => saveEditFact(f.fact_id)}
+                                disabled={isBusy}
+                                className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#0d2e5c] text-white text-[10px] font-bold disabled:opacity-50"
+                              >
+                                {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                Save
+                              </button>
+                              <button
+                                onClick={cancelEditFact}
+                                disabled={isBusy}
+                                className="px-2.5 py-1 rounded-full border border-[#d3d7dc] text-[#444746] text-[10px] font-bold disabled:opacity-50"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <>
+                            <p className="text-[#1f1f1f] mt-1 break-words">{displayValue}</p>
+                            {f.confidence !== null && (
+                              <p className="text-[10px] text-[#747775] mt-1">confidence: {(f.confidence * 100).toFixed(0)}%</p>
+                            )}
+                            {!isSentinel && (
+                              <div className="flex items-center gap-1.5 mt-2">
+                                <button
+                                  onClick={() => startEditFact(f.fact_id, f.value)}
+                                  disabled={isBusy}
+                                  className="flex items-center gap-1 px-2 py-1 rounded-full border border-[#d3d7dc] text-[#444746] hover:bg-[#f8fafd] text-[10px] font-bold disabled:opacity-50"
+                                >
+                                  <Pencil className="w-3 h-3" />
+                                  Edit
+                                </button>
+                                {f.status === "in_review" && (
+                                  <button
+                                    onClick={() => confirmFact(f.fact_id)}
+                                    disabled={isBusy}
+                                    className="flex items-center gap-1 px-2 py-1 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold disabled:opacity-50"
+                                  >
+                                    {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Check className="w-3 h-3" />}
+                                    Confirm
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+            )}
           </aside>
         )}
       </div>
