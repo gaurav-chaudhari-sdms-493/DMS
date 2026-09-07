@@ -1,5 +1,5 @@
 "use client";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import {
   ArrowLeft,
@@ -29,6 +29,7 @@ import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import RegionHighlightViewer from "@/components/drive/RegionHighlightViewer";
 import type { FolderTreeNode } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 function flattenFolders(nodes: FolderTreeNode[], depth = 0): { id: string; name: string; depth: number }[] {
   const out: { id: string; name: string; depth: number }[] = [];
@@ -53,70 +54,14 @@ interface QueueFact {
 
 type Category = "low_confidence" | "handwritten" | "marginalia" | "join_mismatch" | "stitch_ambiguous";
 
-// Raw backend sentinel field names (used internally to route facts into
-// the right queue) previously leaked straight into the UI verbatim —
-// "_marginalia" as if it were a real field. This is the only place that
-// needs to know about them; everywhere else just calls fieldLabel().
-const SENTINEL_LABELS: Record<string, string> = {
-  _marginalia: "Handwritten margin note",
-  _join_mismatch: "Table join couldn't be matched",
-  _stitch_ambiguous: "Table continuation unclear",
-};
-
-function fieldLabel(fieldName: string): string {
-  return SENTINEL_LABELS[fieldName] || fieldName;
+interface CategoryTab {
+  key: Category;
+  label: string;
+  description: string;
+  available: boolean;
 }
 
-const CATEGORY_TABS: { key: Category; label: string; description: string; available: boolean }[] = [
-  {
-    key: "low_confidence",
-    label: "Needs Review",
-    description: "Every field waiting on a human decision, sorted worst-confidence first — not only low-scoring ones.",
-    available: true,
-  },
-  {
-    key: "handwritten",
-    label: "Handwritten",
-    description: "Fields the system read from handwriting rather than print. Excludes margin notes — see \"Marginalia\".",
-    available: true,
-  },
-  // T30 — marginalia now has a real capture path (VLM extraction writes
-  // "_marginalia"-sentinel Facts for handwritten notes outside any field).
-  {
-    key: "marginalia",
-    label: "Marginalia",
-    description: "Handwritten notes found outside any known field on the page (margin notes, stamps, annotations).",
-    available: true,
-  },
-  // T26 — spread-join wiring; the left/right layout convention it reads
-  // is a best-effort guess, not modeled on a real scanned spread (no
-  // reference corpus yet, T25 stays blocked on A1).
-  {
-    key: "join_mismatch",
-    label: "Join Mismatches",
-    description: "A two-page entry the system couldn't reliably match left-to-right — needs a human to pair the halves.",
-    available: true,
-  },
-  // TS4 — the backend queue category and resolve endpoint
-  // (POST /facts/{id}/resolve-stitch-ambiguity) existed with no frontend
-  // path to reach them; this pair was only ever visible buried inside
-  // "Needs Review", where the only available action (Confirm) marked it
-  // verified without ever recording which relation it was, so the same
-  // page-shape kept coming back unresolved on every future document.
-  {
-    key: "stitch_ambiguous",
-    label: "Continuation Unclear",
-    description: "A page pair the system couldn't confidently classify as the same table continuing, a side-by-side spread, or unrelated. Your answer here applies automatically to every future document with this same page shape.",
-    available: true,
-  },
-];
-
 function formatValue(value: any): string {
-  // A "_stitch_ambiguous" fact's raw value is {page_a, page_b, reason,
-  // shape_hash} — useful to the resolve endpoint, but as a queue-row
-  // subtitle it rendered as unreadable raw JSON (the same class of
-  // "sentinel data leaking into the UI" bug fieldLabel() already fixes
-  // for the field name itself).
   if (value && typeof value === "object" && "page_a" in value && "page_b" in value) {
     return `Page ${value.page_a} ↔ page ${value.page_b}`;
   }
@@ -134,6 +79,7 @@ function confidenceBadge(confidence: number | null): { text: string; className: 
 }
 
 export default function WorkbenchPage() {
+  const { t } = useI18n();
   const [category, setCategory] = useState<Category>("low_confidence");
   const [facts, setFacts] = useState<QueueFact[]>([]);
   const [total, setTotal] = useState(0);
@@ -146,6 +92,46 @@ export default function WorkbenchPage() {
   const [viewingSourceFactId, setViewingSourceFactId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [categoryCounts, setCategoryCounts] = useState<Partial<Record<Category, number>>>({});
+
+  const fieldLabel = useCallback((fieldName: string): string => {
+    if (fieldName === "_marginalia") return t("workbench.sentinel.marginalia", "Handwritten margin note");
+    if (fieldName === "_join_mismatch") return t("workbench.sentinel.join_mismatch", "Table join couldn't be matched");
+    if (fieldName === "_stitch_ambiguous") return t("workbench.sentinel.stitch_ambiguous", "Table continuation unclear");
+    return fieldName;
+  }, [t]);
+
+  const categoryTabs: CategoryTab[] = useMemo(() => [
+    {
+      key: "low_confidence",
+      label: t("workbench.tab.needs_review", "Needs Review"),
+      description: t("workbench.tab.needs_review_desc", "Every field waiting on a human decision, sorted worst-confidence first — not only low-scoring ones."),
+      available: true,
+    },
+    {
+      key: "handwritten",
+      label: t("workbench.tab.handwritten", "Handwritten"),
+      description: t("workbench.tab.handwritten_desc", 'Fields the system read from handwriting rather than print. Excludes margin notes — see "Marginalia".'),
+      available: true,
+    },
+    {
+      key: "marginalia",
+      label: t("workbench.tab.marginalia", "Marginalia"),
+      description: t("workbench.tab.marginalia_desc", "Handwritten notes found outside any known field on the page (margin notes, stamps, annotations)."),
+      available: true,
+    },
+    {
+      key: "join_mismatch",
+      label: t("workbench.tab.join_mismatches", "Join Mismatches"),
+      description: t("workbench.tab.join_mismatches_desc", "A two-page entry the system couldn't reliably match left-to-right — needs a human to pair the halves."),
+      available: true,
+    },
+    {
+      key: "stitch_ambiguous",
+      label: t("workbench.tab.continuation_unclear", "Continuation Unclear"),
+      description: t("workbench.tab.continuation_unclear_desc", "A page pair the system couldn't confidently classify as the same table continuing, a side-by-side spread, or unrelated. Your answer here applies automatically to every future document with this same page shape."),
+      available: true,
+    },
+  ], [t]);
   // Below `lg` the queue and the review panel stack into one column, so
   // picking a row leaves the panel off-screen below it — a mouse user
   // notices the highlighted row and scrolls, but on a tablet that's an easy
@@ -325,7 +311,7 @@ export default function WorkbenchPage() {
   // count matters) call per category, once, so every tab shows a real
   // number up front.
   useEffect(() => {
-    CATEGORY_TABS.forEach((tab) => {
+    categoryTabs.forEach((tab) => {
       api.facts.getQueue(tab.key, 1, 0)
         .then((data) => setCategoryCounts((prev) => ({ ...prev, [tab.key]: data.total || 0 })))
         .catch(() => {});
@@ -461,12 +447,12 @@ export default function WorkbenchPage() {
             className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-2 sm:px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9] shrink-0"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span className="hidden sm:inline">Back to Drive</span>
+            <span className="hidden sm:inline">{t("common.back", "Back to Drive")}</span>
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1] hidden sm:block" />
           <h1 className="text-base sm:text-lg font-bold text-[#1f1f1f] flex items-center gap-2 truncate">
             <ShieldCheck className="w-5 h-5 text-[#0d2e5c] shrink-0" />
-            <span className="truncate">Verification Workbench</span>
+            <span className="truncate">{t("workbench.title", "Verification Workbench")}</span>
           </h1>
         </div>
         {/* Keyboard shortcuts only mean something to a keyboard/mouse user —
@@ -481,10 +467,15 @@ export default function WorkbenchPage() {
 
       <main className="max-w-6xl mx-auto px-3 sm:px-6 py-4 sm:py-6 grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-4 sm:gap-6">
         <div className="min-w-0">
-          <div className="flex flex-wrap gap-2 mb-2">
-            {CATEGORY_TABS.map((tab) => (
+          <div role="tablist" aria-label="Adjudication queues" className="flex flex-wrap gap-2 mb-2">
+            {categoryTabs.map((tab) => (
               <button
                 key={tab.key}
+                role="tab"
+                id={`tab-${tab.key}`}
+                aria-selected={category === tab.key}
+                aria-controls="queue-panel"
+                tabIndex={category === tab.key ? 0 : -1}
                 disabled={!tab.available}
                 onClick={() => tab.available && setCategory(tab.key as Category)}
                 title={tab.description}
@@ -498,6 +489,7 @@ export default function WorkbenchPage() {
               >
                 {tab.label}
                 <span
+                  aria-label={`${categoryCounts[tab.key] ?? 0} items`}
                   className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
                     category === tab.key ? "bg-white/20" : "bg-[#f0f4f9] text-[#5f6368]"
                   }`}
@@ -508,27 +500,27 @@ export default function WorkbenchPage() {
             ))}
           </div>
           <p className="flex items-center gap-1.5 text-xs text-[#5f6368] mb-4">
-            <Info className="w-3.5 h-3.5 shrink-0" />
-            {CATEGORY_TABS.find((t) => t.key === category)?.description}
+            <Info className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+            {categoryTabs.find((t) => t.key === category)?.description}
           </p>
 
           {error && (
-            <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div role="alert" aria-live="assertive" className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-red-50 border border-red-200 text-sm text-red-700">
+              <AlertCircle className="w-4 h-4 shrink-0" aria-hidden="true" />
               {error}
             </div>
           )}
           {notice && (
-            <div className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-50 border border-green-200 text-sm text-green-700">
-              <CheckCircle2 className="w-4 h-4 shrink-0" />
+            <div role="status" aria-live="polite" className="mb-4 flex items-center gap-2 px-4 py-2.5 rounded-xl bg-green-50 border border-green-200 text-sm text-green-700">
+              <CheckCircle2 className="w-4 h-4 shrink-0" aria-hidden="true" />
               {notice}
             </div>
           )}
 
-          <Card className="bg-white border border-[#e1e3e1] p-0 overflow-hidden">
+          <Card id="queue-panel" role="tabpanel" aria-labelledby={`tab-${category}`} className="bg-white border border-[#e1e3e1] p-0 overflow-hidden">
             <div className="px-5 py-3 border-b border-[#e1e3e1] flex items-center justify-between">
               <span className="text-sm font-semibold text-[#1f1f1f]">Queue &mdash; {total} item{total === 1 ? "" : "s"}</span>
-              {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0d2e5c]" />}
+              {loading && <Loader2 className="w-4 h-4 animate-spin text-[#0d2e5c]" aria-label="Loading queue items" />}
             </div>
             {facts.length > 0 && (
               <div className="px-5 py-1.5 bg-[#fafbfc] border-b border-[#e1e3e1] text-[10px] text-[#444746] flex items-center gap-4">
@@ -565,26 +557,32 @@ export default function WorkbenchPage() {
                         onChange={() => toggleFactSelection(fact.fact_id)}
                         onClick={(e) => e.stopPropagation()}
                         className="block w-4 h-4 accent-[#0d2e5c]"
+                        aria-label={`Select ${fieldLabel(fact.field_name)} for bulk edit`}
                         title="Include in Bulk edit"
                       />
                     </span>
-                    <button onClick={() => selectFact(idx)} className="flex-1 min-w-0 text-left flex items-center justify-between gap-4 py-1">
+                    <button
+                      onClick={() => selectFact(idx)}
+                      aria-label={`Review ${fieldLabel(fact.field_name)}, value ${formatValue(fact.value)}, confidence ${fact.confidence !== null ? (fact.confidence * 100).toFixed(0) + '%' : 'unrated'}`}
+                      aria-pressed={idx === selectedIndex}
+                      className="flex-1 min-w-0 text-left flex items-center justify-between gap-4 py-1"
+                    >
                       <div className="min-w-0">
                         <div className="text-sm font-medium text-[#1f1f1f] truncate">{fieldLabel(fact.field_name)}</div>
                         <div className="text-xs text-[#747775] truncate">{formatValue(fact.value)}</div>
                         {fact.document_title && (
                           <div className="flex items-center gap-1 text-[10px] text-[#444746] truncate mt-0.5">
-                            <FileText className="w-3 h-3 shrink-0" />
+                            <FileText className="w-3 h-3 shrink-0" aria-hidden="true" />
                             <span className="truncate">{fact.document_title}</span>
                           </div>
                         )}
                       </div>
                       <div className="flex items-center gap-2 shrink-0">
                         {isMine && (
-                          <span title="Claimed by you"><Lock className="w-3.5 h-3.5 text-[#0d2e5c]" /></span>
+                          <span title="Claimed by you" aria-label="Claimed by you"><Lock className="w-3.5 h-3.5 text-[#0d2e5c]" aria-hidden="true" /></span>
                         )}
                         {isOthers && (
-                          <span title="Claimed by another operator"><Lock className="w-3.5 h-3.5 text-[#444746]" /></span>
+                          <span title="Claimed by another operator" aria-label="Claimed by another operator"><Lock className="w-3.5 h-3.5 text-[#444746]" aria-hidden="true" /></span>
                         )}
                         <span className={`text-xs font-mono px-1.5 py-0.5 rounded border ${badge.className}`}>
                           {badge.text}
@@ -600,9 +598,9 @@ export default function WorkbenchPage() {
 
         <div className="space-y-6 min-w-0">
           <Card ref={selectedCardRef} className="bg-white border border-[#e1e3e1] scroll-mt-20">
-            <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">Selected fact</h2>
+            <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">{t("workbench.label.status", "Selected fact")}</h2>
             {!selected ? (
-              <p className="text-sm text-[#747775]">Select an item from the queue on the left to review it here.</p>
+              <p className="text-sm text-[#747775]">{t("workbench.empty_queue", "Select an item from the queue on the left to review it here.")}</p>
             ) : (
               <div className="space-y-3">
                 {selected.document_title && (
@@ -613,7 +611,7 @@ export default function WorkbenchPage() {
                 )}
                 {category === "stitch_ambiguous" ? (
                   <div>
-                    <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">What&apos;s unclear</div>
+                    <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">{t("workbench.sentinel.stitch_ambiguous", "What's unclear")}</div>
                     <div className="text-sm text-[#1f1f1f]">
                       Page {selected.value?.page_a ?? "?"} and page {selected.value?.page_b ?? "?"} share a similar
                       field layout, but the system couldn&apos;t confidently tell whether page {selected.value?.page_b ?? "?"} is
@@ -623,15 +621,15 @@ export default function WorkbenchPage() {
                 ) : (
                   <>
                     <div>
-                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Field</div>
+                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">{t("workbench.label.field", "Field")}</div>
                       <div className="text-sm text-[#1f1f1f]">{fieldLabel(selected.field_name)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Value</div>
+                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">{t("workbench.label.extracted_value", "Value")}</div>
                       <div className="text-sm text-[#1f1f1f] break-words">{formatValue(selected.value)}</div>
                     </div>
                     <div>
-                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">Confidence</div>
+                      <div className="text-xs text-[#747775] uppercase tracking-wide font-semibold">{t("workbench.label.confidence", "Confidence")}</div>
                       <div className={`inline-block text-sm font-mono mt-0.5 px-2 py-0.5 rounded border ${confidenceBadge(selected.confidence).className}`}>
                         {selected.confidence?.toFixed(3) ?? "—"}
                       </div>
@@ -651,7 +649,7 @@ export default function WorkbenchPage() {
                 <div className="flex flex-wrap gap-2 pt-2">
                   <Button size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" onClick={() => setViewingSourceFactId(selected.fact_id)} title="See exactly where this value was read from on the original page">
                     <Eye className="w-3.5 h-3.5 mr-1.5" />
-                    View Source
+                    {t("workbench.btn.view_source", "View Source")}
                   </Button>
                   <Button
                     size="sm" className="max-lg:h-11 max-lg:px-4" variant="secondary" loading={actionLoading}
@@ -659,7 +657,7 @@ export default function WorkbenchPage() {
                     title={selected.claimed_by_actor_id ? "Release (shortcut: R) — let another operator claim this" : "Claim (shortcut: C) — reserve this for yourself so no one else works on it at the same time"}
                   >
                     {selected.claimed_by_actor_id ? <Unlock className="w-3.5 h-3.5 mr-1.5" /> : <Lock className="w-3.5 h-3.5 mr-1.5" />}
-                    {selected.claimed_by_actor_id ? "Release" : "Claim"}
+                    {selected.claimed_by_actor_id ? t("workbench.btn.release", "Release") : t("workbench.btn.claim", "Claim")}
                   </Button>
                   {category === "stitch_ambiguous" ? (
                     <>
@@ -692,7 +690,7 @@ export default function WorkbenchPage() {
                         title="Confirm (shortcut: Enter/A) — marks this value as human-verified and removes it from the queue"
                       >
                         <CheckCircle2 className="w-3.5 h-3.5 mr-1.5" />
-                        Confirm
+                        {t("workbench.btn.confirm", "Confirm")}
                       </Button>
                       {!selected.is_handwritten && (
                         <Button
@@ -700,7 +698,7 @@ export default function WorkbenchPage() {
                           title="Mark Handwritten (shortcut: H) — flags this as handwritten so it's excluded from threshold-based Bulk Confirm"
                         >
                           <PenLine className="w-3.5 h-3.5 mr-1.5" />
-                          Mark Handwritten
+                          {t("workbench.tab.handwritten", "Mark Handwritten")}
                         </Button>
                       )}
                     </>
@@ -892,16 +890,27 @@ export default function WorkbenchPage() {
       </main>
 
       {viewingSourceFactId && (
-        <div role="presentation" className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs" onClick={() => setViewingSourceFactId(null)}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4">
           <div
-            role="presentation"
-            className="w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-2xl sm:rounded-3xl shadow-2xl text-[#1f1f1f] p-4 sm:p-6"
-            onClick={(e) => e.stopPropagation()}
+            className="fixed inset-0 bg-black/50 backdrop-blur-xs"
+            aria-hidden="true"
+            onClick={() => setViewingSourceFactId(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="source-modal-title"
+            className="relative z-10 w-full max-w-5xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-2xl sm:rounded-3xl shadow-2xl text-[#1f1f1f] p-4 sm:p-6"
           >
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-bold">Source</h3>
-              <button onClick={() => setViewingSourceFactId(null)} className="p-2.5 -m-1 text-[#747775] hover:text-[#1f1f1f] rounded-full hover:bg-[#f0f4f9]">
-                <X className="w-5 h-5" />
+              <h3 id="source-modal-title" className="text-lg font-bold">{t("workbench.btn.view_source", "Source Document Region")}</h3>
+              <button
+                type="button"
+                onClick={() => setViewingSourceFactId(null)}
+                aria-label="Close source view dialog"
+                className="p-2.5 -m-1 text-[#747775] hover:text-[#1f1f1f] rounded-full hover:bg-[#f0f4f9]"
+              >
+                <X className="w-5 h-5" aria-hidden="true" />
               </button>
             </div>
             <RegionHighlightViewer factId={viewingSourceFactId} renderWidth={900} />

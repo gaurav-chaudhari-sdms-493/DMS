@@ -1,6 +1,7 @@
 "use client";
 import React, { useState } from "react";
 import { Search, Sparkles, LayoutGrid, List, X } from "lucide-react";
+import { useI18n } from "@/lib/i18n";
 
 interface DriveHeaderProps {
   onSearch: (query: string, useAi: boolean) => void;
@@ -23,6 +24,7 @@ export function DriveHeader({
   showDetailPanel,
   onToggleDetailPanel,
 }: DriveHeaderProps) {
+  const { t } = useI18n();
   const [query, setQuery] = useState(searchQuery);
   const [aiMode, setAiMode] = useState(isAiSearch);
 
@@ -37,6 +39,9 @@ export function DriveHeader({
     setQuery("");
     onClearSearch();
   };
+
+  const aiPlaceholder = t("drive.search.placeholder_ai", "Ask AI anything about your DMS documents...");
+  const stdPlaceholder = t("drive.search.placeholder_standard", "Search in DMS...");
 
   return (
     <header className="flex items-center justify-between gap-4 py-3 px-2 mb-4 border-b border-borderDark/40">
@@ -53,10 +58,10 @@ export function DriveHeader({
 
           <input
             type="text"
-            aria-label={aiMode ? "Ask AI anything about your DMS documents" : "Search in DMS"}
+            aria-label={aiMode ? aiPlaceholder : stdPlaceholder}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder={aiMode ? "Ask AI anything about your DMS documents..." : "Search in DMS..."}
+            placeholder={aiMode ? aiPlaceholder : stdPlaceholder}
             className={`w-full pl-12 pr-28 py-3 rounded-full bg-surface/90 text-textMain placeholder:text-textMuted text-sm border focus:outline-none transition-all shadow-inner ${
               aiMode
                 ? "border-secondary/50 focus:border-secondary focus:ring-2 focus:ring-secondary/20"
@@ -93,7 +98,7 @@ export function DriveHeader({
               }`}
             >
               <Sparkles className="w-3.5 h-3.5" />
-              <span>AI</span>
+              <span>{t("drive.search.ai_toggle", "AI")}</span>
             </button>
           </div>
         </div>
@@ -104,7 +109,7 @@ export function DriveHeader({
         {/* View Switcher (Grid / List) */}
         <button
           onClick={onToggleViewMode}
-          title={viewMode === "grid" ? "Switch to List view" : "Switch to Grid view"}
+          title={viewMode === "grid" ? t("drive.view.switch_to_list", "Switch to List view") : t("drive.view.switch_to_grid", "Switch to Grid view")}
           className="p-2.5 rounded-full text-textMuted hover:text-textMain hover:bg-surface border border-borderDark/50 transition-colors"
         >
           {viewMode === "grid" ? (

@@ -15,6 +15,7 @@ import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import type { FolderTreeNode } from "@/types";
+import { useI18n } from "@/lib/i18n";
 
 function flattenFolders(nodes: FolderTreeNode[], depth = 0): { id: string; name: string; depth: number }[] {
   const out: { id: string; name: string; depth: number }[] = [];
@@ -63,6 +64,7 @@ function StatBar({ label, value, total, color }: { label: string; value: number;
 }
 
 export default function CompletenessDashboardPage() {
+  const { t } = useI18n();
   const [folderId, setFolderId] = useState("");
   const [data, setData] = useState<Completeness | null>(null);
   const [loading, setLoading] = useState(false);
@@ -125,6 +127,11 @@ export default function CompletenessDashboardPage() {
   }, []);
 
   const openDrill = async (category: string) => {
+    if (drillCategory === category) {
+      setDrillCategory(null);
+      setDrillRows(null);
+      return;
+    }
     setDrillCategory(category);
     setDrillRows(null);
     setDrillLoading(true);
@@ -151,12 +158,12 @@ export default function CompletenessDashboardPage() {
             className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9]"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Drive</span>
+            <span>{t("common.back", "Back to Drive")}</span>
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
             <BarChart3 className="w-5 h-5 text-[#0d2e5c]" />
-            Completeness Dashboard
+            {t("completeness.title", "Completeness Dashboard")}
           </h1>
         </div>
       </header>

@@ -9,11 +9,11 @@ export const getBaseUrl = (): string => {
       return custom.trim().replace(/\/+$/, "");
     }
   }
-  let url = process.env.NEXT_PUBLIC_API_URL || "https://aa0d-103-226-171-223.ngrok-free.app";
+  let url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   if (typeof window !== "undefined") {
-    // If in browser and URL points to internal docker service name 'backend', use default ngrok URL
+    // If in browser and URL points to internal docker service name 'backend', use localhost
     if (url.includes("backend:8000")) {
-      url = "https://aa0d-103-226-171-223.ngrok-free.app";
+      url = "http://localhost:8000";
     }
     // The build bakes in "localhost:8000", which only resolves correctly
     // when the page itself is viewed from the Docker host machine. Viewed

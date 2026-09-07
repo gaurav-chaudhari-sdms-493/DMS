@@ -203,8 +203,9 @@ export async function syncOfflineData(api: any): Promise<{ syncedActions: number
     } catch (e: any) {
       console.error(`Failed to sync offline action ${action.id}:`, e);
       errors.push(`Action ${action.type}: ${e.message || "Failed"}`);
-      // Remove failed action if server says 404 or conflict to prevent deadlock
-      if (e.message?.includes("404") || e.message?.includes("not found")) {
+      // Remove non-retryable failed actions (404 not found, 403 forbidden / unauthorized role, 400, 409) to prevent deadlock
+      const msg = (e.message || "").toLowerCase();
+      if (msg.includes("404") || msg.includes("not found") || msg.includes("403") || msg.includes("forbidden") || msg.includes("requires one of") || msg.includes("400") || msg.includes("409")) {
         offlineStore.removeAction(action.id);
       }
     }
