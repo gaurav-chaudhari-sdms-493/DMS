@@ -7,17 +7,24 @@ Expands sys_dg_translations with full coverage across Workbench,
 Drive sidebar/header, Entity 360, Completeness dashboard,
 document preview / extracted facts, and common action dialogs.
 
-Revision ID: 0047_marathi_translations
-Revises: 0046_restricted_app_role
+Revision ID: 0049_marathi_translations
+Revises: 0048_fact_row_group_id
 Create Date: 2026-09-07 00:00:00.000000
+
+Renumbered from 0047 -> 0049 during a merge with `feature-kunal-DMS`
+(two migrations had both branched from 0046: this one and
+0047_metadata_item_regions, landed independently in a parallel session).
+Content unchanged from the original commit -- only the revision id,
+down_revision, and filename moved to keep the migration chain linear
+instead of introducing a second head.
 
 """
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
 
-revision: str = '0047_marathi_translations'
-down_revision: Union[str, None] = '0046_restricted_app_role'
+revision: str = '0049_marathi_translations'
+down_revision: Union[str, None] = '0048_fact_row_group_id'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
