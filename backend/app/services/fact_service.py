@@ -167,19 +167,31 @@ async def get_table_view_for_document(db: AsyncSession, document_id: UUID, tenan
     because it looks nothing like the source document's table structure a
     reviewer actually recognizes.
 
-    No stored row identifier exists to group facts by (Fact/FactRegion
-    were never designed to carry one) -- rebuilt here from FactRegion's
-    existing (page, y0) instead: fields extracted from the same original
-    row land at (nearly) the same page/vertical position, so clustering
-    on that reconstructs rows without any schema change or re-extraction,
-    and works retroactively on documents already extracted before this
-    function existed. A stitched fact (regions on 2+ pages) is anchored
-    by its EARLIEST region -- the page/row its entry actually started on.
+    Groups by Fact.row_group_id when set -- the real row identity
+    vlm_extraction.py already knows at write time (one merged_row / one
+    result.pairs entry), stored since the row-grouping bug fix below.
+    Only facts with no row_group_id (extracted before that column
+    existed) fall back to the OLD heuristic: clustering by FactRegion's
+    (page, y0) with a fixed tolerance, on the assumption that fields from
+    the same original row land at nearly the same vertical position.
 
-    This is a display heuristic, not a source of truth: _ROW_CLUSTER_Y_TOLERANCE
-    is tuned for this project's real dense multi-column register tables,
-    not guaranteed correct for a wildly different layout. get_facts_for_document
-    remains the authoritative per-fact source (used for editing/confirming).
+    Real bug found live 2026-09-07 (Wardha.pdf): that heuristic has no
+    x0 disambiguation at all, so it breaks badly on any page laid out as
+    side-by-side entry-columns rather than left-to-right rows -- one
+    entry's own fields span nearly the full page height there (shattering
+    into many near-empty "rows"), while unrelated entries' same-named
+    fields land on the same y-band and get wrongly merged into one row,
+    silently overwriting all but one (see `row[fact.field_name] = value`
+    below -- 7 of every 8 real entries lost on the affected page). The
+    heuristic is kept, unchanged, only as a fallback for documents that
+    can never be re-extracted to gain real row_group_id data -- new
+    extractions no longer depend on it. A stitched fact (regions on 2+
+    pages) is anchored by its EARLIEST region either way -- the page/row
+    its entry actually started on.
+
+    get_facts_for_document remains the authoritative per-fact source
+    (used for editing/confirming) regardless of which path a row took
+    here.
     """
     doc = await db.get(Document, document_id)
     if not doc or doc.tenant_id != tenant_id:
@@ -230,16 +242,40 @@ async def get_table_view_for_document(db: AsyncSession, document_id: UUID, tenan
 
     row_items.sort(key=lambda t: (t[1], t[2]))
 
-    clusters: list[dict] = []
+    # Exact groups first: real row identity, no guessing. Facts sharing a
+    # row_group_id always form one row regardless of how far apart their
+    # regions land on the page (see Fact.row_group_id).
+    exact_groups: dict = {}
+    heuristic_items: list[tuple[Fact, int, float]] = []
     for fact, page_number, y0 in row_items:
-        if (
-            clusters
-            and clusters[-1]["page_number"] == page_number
-            and abs(clusters[-1]["anchor_y"] - y0) <= _ROW_CLUSTER_Y_TOLERANCE
-        ):
-            clusters[-1]["facts"].append(fact)
+        if fact.row_group_id is not None:
+            group = exact_groups.get(fact.row_group_id)
+            if group is None:
+                group = {"page_number": page_number, "anchor_y": y0, "facts": []}
+                exact_groups[fact.row_group_id] = group
+            group["facts"].append(fact)
+            if (page_number, y0) < (group["page_number"], group["anchor_y"]):
+                group["page_number"], group["anchor_y"] = page_number, y0
         else:
-            clusters.append({"page_number": page_number, "anchor_y": y0, "facts": [fact]})
+            heuristic_items.append((fact, page_number, y0))
+
+    # Fallback for facts with no stored row identity (extracted before
+    # row_group_id existed) — old (page, y0)-proximity clustering,
+    # unchanged. heuristic_items is still in the (page, y0) sort order
+    # from row_items above, which this loop depends on.
+    heuristic_clusters: list[dict] = []
+    for fact, page_number, y0 in heuristic_items:
+        if (
+            heuristic_clusters
+            and heuristic_clusters[-1]["page_number"] == page_number
+            and abs(heuristic_clusters[-1]["anchor_y"] - y0) <= _ROW_CLUSTER_Y_TOLERANCE
+        ):
+            heuristic_clusters[-1]["facts"].append(fact)
+        else:
+            heuristic_clusters.append({"page_number": page_number, "anchor_y": y0, "facts": [fact]})
+
+    clusters = list(exact_groups.values()) + heuristic_clusters
+    clusters.sort(key=lambda c: (c["page_number"], c["anchor_y"]))
 
     rows_out = []
     for cluster in clusters:

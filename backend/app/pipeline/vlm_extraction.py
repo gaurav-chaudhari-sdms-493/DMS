@@ -43,7 +43,7 @@ import io
 import json
 import logging
 from typing import Any, Dict, List, Optional
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -527,6 +527,8 @@ async def _extract_spread_facts(
             written_left_ids: set = set()
             written_right_ids: set = set()
             for left_raw_row, right_raw_row in result.pairs:
+                # One joined pair = one logical row (see Fact.row_group_id).
+                row_group_id = uuid4()
                 for field_def in field_schema:
                     field_name = field_def["name"]
                     if field_name == serial_field:
@@ -557,6 +559,7 @@ async def _extract_spread_facts(
                         confidence=src_confidence,
                         is_handwritten=src_is_handwritten,
                         status=classify_confidence(field_def, src_confidence, is_handwritten=src_is_handwritten),
+                        row_group_id=row_group_id,
                     )
                     db.add(fact)
                     await db.flush()
@@ -848,6 +851,12 @@ async def extract_facts_for_document(
             if not source_indices:
                 continue
 
+            # Real row identity, known here and nowhere else downstream —
+            # every Fact this merged_row writes shares it, so
+            # get_table_view_for_document can group by it exactly instead
+            # of guessing from FactRegion.y0 (see Fact.row_group_id).
+            row_group_id = uuid4()
+
             # T22 quality gate (see ROW_COVERAGE_REVIEW_THRESHOLD) — how
             # much of this template's row-level schema this merged row
             # actually populated, regardless of per-field confidence.
@@ -931,6 +940,7 @@ async def extract_facts_for_document(
                     confidence=fact_confidence,
                     is_handwritten=field_is_handwritten,
                     status=fact_status,
+                    row_group_id=row_group_id,
                 )
                 db.add(fact)
                 await db.flush()

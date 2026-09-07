@@ -303,3 +303,119 @@ async def test_get_table_view_marks_a_row_stitched_when_any_field_spans_pages():
         finally:
             await db.rollback()
             await db.close()
+
+
+@pytest.mark.asyncio
+async def test_get_table_view_row_group_id_keeps_one_entry_together_despite_huge_y_spread():
+    """Real bug found live 2026-09-07 (Wardha.pdf page 2): a page laid out
+    as side-by-side entry-columns has one entry's own fields spanning
+    nearly the full page height, far past _ROW_CLUSTER_Y_TOLERANCE -- the
+    old y0-only heuristic shattered a single entry into ~14 near-empty
+    rows. row_group_id (set at extraction time) must keep them as one row
+    regardless of how far apart the regions land."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id = uuid.uuid4()
+            tenant = Tenant(id=tenant_id, name=f"RowGroup Tenant {uuid.uuid4().hex[:6]}")
+            db.add(tenant)
+            await db.commit()
+
+            template = Template(
+                id=uuid.uuid4(), form_type=f"Row Group Test Form {uuid.uuid4().hex[:6]}", era_label="test",
+                layout="single_page",
+                field_schema=[
+                    {"name": "sr_no", "type": "string", "role": "serial"},
+                    {"name": "wakf_name", "type": "string"},
+                    {"name": "sect", "type": "string"},
+                ],
+            )
+            db.add(template)
+            await db.flush()
+
+            doc, version = await _make_doc(db, tenant_id)
+            doc.matched_template_id = template.id
+            page1 = DocumentPage(id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_id=version.id, page_number=1, width=800, height=600)
+            db.add(page1)
+            await db.flush()
+
+            row_group_id = uuid.uuid4()
+            # One entry's own fields, stacked top-to-bottom in a single
+            # entry-column -- y0 spans 0.06 to 0.87, nowhere near the same
+            # cluster under the old y0-only tolerance.
+            for field_name, value, y0 in [
+                ("sr_no", "WB-31", 0.058),
+                ("wakf_name", "Anji Masjid, Anji Dist. Wardah", 0.113),
+                ("sect", "SUNNI", 0.87),
+            ]:
+                f = Fact(
+                    id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_id=version.id,
+                    field_name=field_name, value={"v": value}, confidence=0.9, status="machine",
+                    row_group_id=row_group_id,
+                )
+                db.add(f)
+                await db.flush()
+                db.add(FactRegion(id=uuid.uuid4(), tenant_id=tenant_id, fact_id=f.id, page_id=page1.id, x0=0.78, y0=y0, x1=0.85, y1=y0 + 0.02))
+            await db.commit()
+
+            result = await get_table_view_for_document(db, doc.id, tenant_id)
+
+            assert result["row_count"] == 1
+            assert result["rows"][0]["values"] == {
+                "sr_no": "WB-31", "wakf_name": "Anji Masjid, Anji Dist. Wardah", "sect": "SUNNI",
+            }
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_get_table_view_row_group_id_does_not_merge_unrelated_entries_sharing_a_y_band():
+    """The other half of the same real bug: 8 unrelated entries' sr_no
+    fields all sitting at nearly the same y (different x, different
+    entries) used to merge into one row and silently overwrite each
+    other down to a single surviving value. With row_group_id, entries
+    at the same y but different row_group_id must stay as separate rows
+    -- no data loss."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id = uuid.uuid4()
+            tenant = Tenant(id=tenant_id, name=f"RowGroupNoMerge Tenant {uuid.uuid4().hex[:6]}")
+            db.add(tenant)
+            await db.commit()
+
+            template = Template(
+                id=uuid.uuid4(), form_type=f"Row Group No-Merge Test Form {uuid.uuid4().hex[:6]}", era_label="test",
+                layout="single_page",
+                field_schema=[{"name": "sr_no", "type": "string", "role": "serial"}],
+            )
+            db.add(template)
+            await db.flush()
+
+            doc, version = await _make_doc(db, tenant_id)
+            doc.matched_template_id = template.id
+            page1 = DocumentPage(id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_id=version.id, page_number=1, width=800, height=600)
+            db.add(page1)
+            await db.flush()
+
+            # 8 different entries' sr_no, all at (nearly) the same y0,
+            # different x0 -- exactly the real Wardha.pdf page-2 shape.
+            serials = ["WB-23", "WB-27", "WB-121", "WB-131", "WB-111", "WB-89", "WB-120", "WB-31"]
+            for i, sr_no in enumerate(serials):
+                f = Fact(
+                    id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_id=version.id,
+                    field_name="sr_no", value={"v": sr_no}, confidence=0.9, status="machine",
+                    row_group_id=uuid.uuid4(),
+                )
+                db.add(f)
+                await db.flush()
+                x0 = 0.40 + i * 0.06
+                db.add(FactRegion(id=uuid.uuid4(), tenant_id=tenant_id, fact_id=f.id, page_id=page1.id, x0=x0, y0=0.057, x1=x0 + 0.05, y1=0.075))
+            await db.commit()
+
+            result = await get_table_view_for_document(db, doc.id, tenant_id)
+
+            assert result["row_count"] == 8
+            assert sorted(row["values"]["sr_no"] for row in result["rows"]) == sorted(serials)
+        finally:
+            await db.rollback()
+            await db.close()

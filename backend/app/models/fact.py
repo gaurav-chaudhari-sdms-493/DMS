@@ -32,6 +32,20 @@ class Fact(Base):
     field_name: Mapped[str] = mapped_column(Text, nullable=False)
     value: Mapped[Any] = mapped_column(JSONB, nullable=False)
     confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    # T-rowgroup — every field written from the same logical table row (one
+    # merged_row in vlm_extraction.py's main loop, or one result.pairs
+    # entry in _extract_spread_facts) shares this id. Real bug found live
+    # 2026-09-07: with no row identity ever stored, fact_service.py's
+    # table-view endpoint had to *guess* which facts belonged together
+    # from FactRegion.y0 alone — broke badly on any page laid out as
+    # side-by-side entry-columns (Wardha.pdf page 2: one entry's own
+    # fields span nearly the full page height, while unrelated entries'
+    # same-named fields share a y-band), silently overwriting 7 of every
+    # 8 real entries' values. NULL for facts that were never part of a
+    # tabular row (page_header fields, _marginalia, _join_mismatch) and
+    # for anything extracted before this column existed — those still
+    # fall back to the old y0-heuristic in get_table_view_for_document.
+    row_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     # T20/D-5 — 'machine' (auto-committed, confidence cleared its band,
     # never promoted further — permanent, same as tier1/2 entity edges) or
     # 'in_review' (needs a human to reach 'verified', same as tier3/4
