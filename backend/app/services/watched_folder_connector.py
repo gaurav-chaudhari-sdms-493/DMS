@@ -147,7 +147,7 @@ async def poll_source_once(source: WatchSource) -> int:
 
     ingested = 0
     async with AsyncSessionLocal() as db:
-        tenant_id, _ = await get_connector_actor(db)
+        tenant_id, user_id = await get_connector_actor(db)
         folder_cache: dict = {}
 
         for path in stable_paths:
@@ -169,7 +169,7 @@ async def poll_source_once(source: WatchSource) -> int:
             try:
                 folder_id = await get_or_create_folder_path(db, tenant_id, subfolder_segments, folder_cache) \
                     if subfolder_segments else None
-                resp = await ingest_bytes(content, path.name, db, content_type=content_type, folder_id=folder_id)
+                resp = await ingest_bytes(content, path.name, db, tenant_id, user_id, content_type=content_type, folder_id=folder_id)
                 logger.info("Watched folder [%s]: ingested '%s' as document %s", source.name, rel_parts, resp.document_id)
                 dest_processed.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(path), str(dest_processed / path.name))

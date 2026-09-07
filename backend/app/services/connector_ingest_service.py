@@ -106,13 +106,25 @@ async def ingest_bytes(
     content: bytes,
     filename: str,
     db: AsyncSession,
+    tenant_id: UUID,
+    user_id: UUID,
     content_type: str = "application/octet-stream",
     folder_id: Optional[UUID] = None,
-    actor_email: str = DEFAULT_CONNECTOR_EMAIL,
 ) -> DocumentUploadResponse:
-    """Ingest raw bytes from a connector source through the standard upload path."""
-    tenant_id, user_id = await get_connector_actor(db, actor_email)
+    """Ingest raw bytes from a connector source through the standard upload path.
 
+    tenant_id/user_id are required, not resolved here -- every real caller
+    (watched-folder, SFTP, email-in, the inbound webhook) already calls
+    get_connector_actor() once of its own, for its dedup/folder-path checks
+    before this. This function used to *also* call get_connector_actor()
+    internally via a separate actor_email default, so every file was
+    resolving the connector's identity twice per ingest -- redundant, and a
+    real risk: found live while adding test coverage for the watched-folder
+    connector, where patching only the caller's resolution (not this
+    function's own internal one) left ingest_bytes silently resolving
+    through the real DEFAULT_CONNECTOR_EMAIL account instead of the test's
+    throwaway one, writing real documents into a real tenant. One
+    resolution per file now, passed straight through."""
     upload_file = UploadFile(
         file=io.BytesIO(content),
         size=len(content),

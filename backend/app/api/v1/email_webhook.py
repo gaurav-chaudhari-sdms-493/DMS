@@ -106,7 +106,7 @@ async def receive_email_webhook(
         text("SELECT set_config('app.login_lookup_email', :e, false)"),
         {"e": DEFAULT_CONNECTOR_EMAIL},
     )
-    tenant_id, _ = await get_connector_actor(db)
+    tenant_id, user_id = await get_connector_actor(db)
     # D-2 fix — this endpoint is authenticated by a shared webhook secret,
     # not a per-tenant JWT, so get_tenant_db (which needs one) doesn't
     # apply here; set the context explicitly the moment a tenant is known,
@@ -134,7 +134,7 @@ async def receive_email_webhook(
 
         content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
         try:
-            resp = await ingest_bytes(content, filename, db, content_type=content_type)
+            resp = await ingest_bytes(content, filename, db, tenant_id, user_id, content_type=content_type)
             logger.info("Email webhook: successfully ingested '%s' as document %s", filename, resp.document_id)
             ingested_count += 1
             ingested_details.append(
