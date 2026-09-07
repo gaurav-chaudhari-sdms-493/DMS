@@ -5,6 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, text
 from app.config import settings
+from app.database import establish_tenant_context  # noqa: F401 — re-exported; app/api/v1/auth.py imports it from here
 from app.schemas.auth import TokenPayload, SignUpRequest, SignUpResponse
 from app.models.user import User, UserRole
 from app.models.tenant import Tenant
@@ -20,17 +21,6 @@ def verify_password(plain: str, hashed: str) -> bool:
         return bcrypt.checkpw(plain.encode('utf-8'), hashed.encode('utf-8'))
     except Exception:
         return False
-
-async def establish_tenant_context(db: AsyncSession, tenant_id) -> None:
-    """D-2 fix — call the moment a pre-authentication flow (signup, login,
-    forgot-password) first learns which tenant it's now acting for, before
-    the next write on this session. Session-scoped (is_local=false), so it
-    survives an in-request db.commit() — sign_up() below does several — and
-    is cleaned up centrally by database.py's _reset_session_tenant_context
-    before this pooled connection is ever reused by an unrelated request."""
-    await db.execute(
-        text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": str(tenant_id)}
-    )
 
 async def lookup_user_by_email(db: AsyncSession, email: str) -> User | None:
     """D-2 fix — iam_dg_users' tenant_isolation_policy denies by default
@@ -91,6 +81,21 @@ async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
     db.add(user)
     await get_or_create_subscription(db, tenant.id)  # T81 — every tenant starts on a trial
     await db.commit()
+
+    # T96 clean-room finding, 2026-09-07: db.commit() can return this
+    # session's physical connection to the pool and db.refresh() below
+    # then check out a *different* one -- app.current_tenant_id is a
+    # Postgres session-scoped GUC (set on the physical connection, not the
+    # SQLAlchemy Session object), so it doesn't necessarily survive that
+    # swap. Real bug, caught live: sign_up() started 500ing on
+    # db.refresh(user) with "Could not refresh instance" the moment
+    # get_db() (this route's dependency) switched from the superuser
+    # connection to the RLS-enforced dms_app one in f779c5a -- under
+    # dms_app's default-deny policy, a connection with no tenant context
+    # sees zero rows, so the refresh SELECT found nothing. Re-establishing
+    # context here, unconditionally, is the same fix pattern already used
+    # elsewhere in this function for the same underlying reason.
+    await establish_tenant_context(db, tenant.id)
     await db.refresh(user)
 
     acc = create_access_token(user.id, tenant.id, user.role.value)

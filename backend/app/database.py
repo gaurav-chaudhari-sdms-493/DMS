@@ -68,6 +68,39 @@ AppSessionLocal = async_sessionmaker(
 class Base(DeclarativeBase):
     pass
 
+async def establish_tenant_context(session: AsyncSession, tenant_id) -> None:
+    """D-2 fix, relocated here 2026-09-07 (T96 clean-room finding) — was
+    only defined in auth_service.py, but the same re-establish-after-commit
+    need turned out to be systemic, not auth-specific (see below), so this
+    lives next to _reset_session_tenant_context instead of being duplicated
+    or cross-imported from an unrelated service module.
+
+    Call this the moment a request first learns which tenant it's acting
+    for (or again, any time a mid-function `db.commit()` is followed by
+    more tenant-scoped work on the same session) — session-scoped
+    (is_local=false) so it's meant to survive an in-request commit, and
+    _reset_session_tenant_context (called on every get_db()/get_tenant_db()
+    exit path) is what keeps that safe on a pooled connection afterward.
+
+    Real bug found live 2026-09-07: a mid-function `db.commit()` followed
+    by `db.refresh(row)` reproducibly 500'd with "Could not refresh
+    instance" on sign_up() AND document_service.toggle_star_document() —
+    two unrelated functions on two different get_db()/get_tenant_db()
+    sessions, same shape (commit, then a further SELECT under
+    dms_app's default-deny RLS with no tenant context visible to it). Not
+    a hypothetical race: reproduced deterministically, standalone, no
+    concurrent request in flight. Whatever the exact connection-pool
+    mechanism is, re-establishing context immediately after any commit
+    that's followed by more tenant-scoped reads is the safe, no-downside
+    fix — applied here to every function with this shape
+    (document_service.upload_document/update_document/
+    toggle_star_document/toggle_trash_document,
+    folder_service.create_folder/update_folder/toggle_star_folder/
+    toggle_trash_folder, auth_service.sign_up)."""
+    await session.execute(
+        text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": str(tenant_id)}
+    )
+
 async def _reset_session_tenant_context(session: AsyncSession) -> None:
     """D-2 fix — the session-scoped `set_config(..., false)` used below (see
     get_tenant_db, establish_tenant_context, lookup_user_by_email) survives
