@@ -12,6 +12,7 @@ from uuid import UUID
 from ..models.document import Document
 from ..models.document_version import DocumentVersion
 from ..models.folder import Folder
+from ..models.metadata_item import MetadataItem
 from ..schemas.document import (
     DocumentUploadResponse,
     DocumentDetailResponse,
@@ -235,7 +236,7 @@ async def get_document(
         .where(Document.id == document_id, Document.tenant_id == tenant_id)
         .options(
             selectinload(Document.versions),
-            selectinload(Document.metadata_items),
+            selectinload(Document.metadata_items).selectinload(MetadataItem.regions),
         )
     )
     res = await db.execute(stmt)
@@ -270,6 +271,14 @@ async def get_document(
             "value": m.value,
             "source": m.source,
             "confidence_score": m.confidence_score,
+            # T05 — where this value came from on the page, when it could
+            # be verbatim-located (see source_location_service). Empty for
+            # any metadata written before this shipped, or any value the
+            # LLM paraphrased away from the page's actual printed text.
+            "regions": [
+                {"page_number": r.page_number, "x0": r.x0, "y0": r.y0, "x1": r.x1, "y1": r.y1}
+                for r in m.regions
+            ],
         }
         for m in doc.metadata_items
     ]

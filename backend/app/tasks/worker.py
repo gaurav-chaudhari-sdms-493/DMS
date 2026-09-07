@@ -15,12 +15,14 @@ from ..models.chunk import Chunk as DBChunk
 from ..models.document import Document
 from ..models.document_version import DocumentVersion
 from ..models.metadata_item import MetadataItem
+from ..models.metadata_item_region import MetadataItemRegion
 from ..ocr.factory import get_ocr_provider
 from ..pipeline.chunker import TextChunker
 from ..services.storage_service import download_file, upload_file, convert_to_pdfa
 from ..services.config_service import get_int, get_float
 from ..services.extraction_archive_service import get_cached_ocr, record_ocr
 from ..services import duplicate_service
+from ..services.source_location_service import locate_value_in_pages
 from ..config import settings
 
 celery_app = Celery(
@@ -247,6 +249,22 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                             confidence_score=extraction_confidence,
                         )
                         db.add(db_meta)
+
+                        # T05 — attribute this value back to the page + word
+                        # region it came from, using the word_regions the
+                        # extractor already computed for `pages` (not
+                        # discarded, just never consumed until now). No
+                        # region when the value can't be verbatim-located
+                        # (paraphrased/reformatted by the LLM) -- that's the
+                        # honest result, not a bug to work around here.
+                        location = locate_value_in_pages(value, pages)
+                        if location:
+                            db_meta.regions.append(MetadataItemRegion(
+                                tenant_id=tenant_id,
+                                page_number=location["page_number"],
+                                x0=location["x0"], y0=location["y0"],
+                                x1=location["x1"], y1=location["y1"],
+                            ))
 
                     if meta_dict.get("title"):
                         stmt = select(Document).where(Document.id == document_id)

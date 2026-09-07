@@ -1,8 +1,9 @@
 "use client";
 import React, { useEffect, useState } from "react";
-import { X, FileText, Folder as FolderIcon, Download, Sparkles, HardDrive, Info } from "lucide-react";
+import { X, FileText, Folder as FolderIcon, Download, Sparkles, HardDrive, Info, MapPin } from "lucide-react";
 import type { Folder, DocumentListItem, DocumentDetailResponse } from "@/types";
 import { api } from "@/lib/api";
+import MetadataRegionViewer from "@/components/drive/MetadataRegionViewerLoader";
 
 interface DriveDetailPanelProps {
   selectedFolder: Folder | null;
@@ -18,6 +19,10 @@ export function DriveDetailPanel({
   const [docDetail, setDocDetail] = useState<DocumentDetailResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"details" | "versions" | "metadata">("details");
+  // T05 — which metadata item's source region is open in the viewer modal,
+  // by index into docDetail.metadata (index, not key: two items could
+  // theoretically share a key, and the index is all the viewer needs).
+  const [viewingSourceIdx, setViewingSourceIdx] = useState<number | null>(null);
 
   useEffect(() => {
     if (selectedDoc) {
@@ -202,6 +207,7 @@ export function DriveDetailPanel({
                 const rawVal = typeof item === "string" ? item : (item?.value ?? item?.content ?? "");
                 const valStr = typeof rawVal === "object" ? JSON.stringify(rawVal) : String(rawVal);
                 const score = typeof item?.confidence_score === "number" ? Math.round(item.confidence_score * 100) : 95;
+                const hasRegion = Array.isArray(item?.regions) && item.regions.length > 0 && !!docDetail?.current_version?.download_url;
 
                 return (
                   <div key={idx} className="p-3 bg-[#f8f9fa] rounded-xl border border-[#e1e3e1] space-y-1 select-text">
@@ -213,6 +219,15 @@ export function DriveDetailPanel({
                       </span>
                     </div>
                     <p className="text-[#1f1f1f] font-medium break-words text-xs">{valStr}</p>
+                    {hasRegion && (
+                      <button
+                        onClick={() => setViewingSourceIdx(idx)}
+                        className="flex items-center gap-1 text-[10px] font-semibold text-[#0d2e5c] hover:underline pt-0.5"
+                      >
+                        <MapPin className="w-3 h-3" />
+                        View on page {item.regions[0].page_number}
+                      </button>
+                    )}
                   </div>
                 );
               })
@@ -254,6 +269,35 @@ export function DriveDetailPanel({
           </div>
         )}
       </div>
+
+      {viewingSourceIdx !== null && docDetail?.metadata[viewingSourceIdx]?.regions?.[0] && docDetail?.current_version?.download_url && (
+        <div
+          role="presentation"
+          className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4 bg-black/50 backdrop-blur-xs"
+          onClick={() => setViewingSourceIdx(null)}
+        >
+          <div
+            role="presentation"
+            className="w-full max-w-3xl max-h-[90vh] sm:max-h-[85vh] overflow-y-auto bg-white border border-[#e1e3e1] rounded-2xl sm:rounded-3xl shadow-2xl text-[#1f1f1f] p-4 sm:p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-bold capitalize">
+                {String((docDetail.metadata[viewingSourceIdx] as any)?.key || "Metadata")} — source
+              </h3>
+              <button onClick={() => setViewingSourceIdx(null)} className="p-2.5 -m-1 text-[#747775] hover:text-[#1f1f1f] rounded-full hover:bg-[#f0f4f9]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <MetadataRegionViewer
+              downloadUrl={docDetail.current_version.download_url}
+              pageNumber={(docDetail.metadata[viewingSourceIdx] as any).regions[0].page_number}
+              region={(docDetail.metadata[viewingSourceIdx] as any).regions[0]}
+              renderWidth={640}
+            />
+          </div>
+        </div>
+      )}
     </aside>
   );
 }

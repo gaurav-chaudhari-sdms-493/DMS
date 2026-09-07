@@ -72,6 +72,11 @@ export interface DocumentDetailResponse {
     value: string;
     source: string;
     confidence_score: number;
+    // T05 — where this value came from on the page, when it could be
+    // verbatim-located. Empty for metadata written before this shipped,
+    // or for a value the extracting LLM paraphrased away from the page's
+    // actual printed text (no fabricated location in that case).
+    regions?: Array<{ page_number: number; x0: number; y0: number; x1: number; y1: number }>;
   }>;
   versions: Array<{
     id: string;
