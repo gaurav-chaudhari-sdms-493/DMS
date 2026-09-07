@@ -22,7 +22,17 @@ class Settings(BaseSettings):
     
     # Database
     postgres_url: str
-    
+
+    # D-2 security fix — the restricted, non-superuser role every real
+    # FastAPI request connects as (see database.py's AppSessionLocal).
+    # Empty string means "not configured yet": database.py falls back to
+    # postgres_url (the superuser connection) rather than crashing, so an
+    # environment that hasn't rotated to the new role yet (e.g. CI) keeps
+    # working — but Row-Level Security provides no real protection until
+    # this is set. Never silently assume it's fine; database.py logs a
+    # warning on every startup when it's empty.
+    app_postgres_url: str = ''
+
     # Redis
     redis_url: str
     
@@ -72,18 +82,24 @@ class Settings(BaseSettings):
     ai_embed_provider: Literal['openai', 'bgem3', 'gemini', 'cohere'] = 'bgem3'
     ai_embed_fallback_provider: Literal['cohere', 'openai', 'none'] = 'none'
     ai_rerank_provider: Literal['cohere', 'bgem3', 'none'] = 'cohere'
-    ai_ocr_provider: Literal['pdfplumber', 'llamaparse', 'paddleocr'] = 'pdfplumber'
+    ai_ocr_provider: Literal['pdfplumber', 'llamaparse', 'paddleocr', 'chandra'] = 'pdfplumber'
 
     # T22 — VLM extraction path. Gemini (direct) and OpenRouter (proxying any
     # OpenRouter-hosted vision model, openrouter_vlm_model) are wired up.
+    # 'chandra' calls Datalab's real /convert API (see chandra_provider.py
+    # for the real, known limitation: no per-field bbox precision the way
+    # Gemini's prompt-following gives us, only Datalab's own detected
+    # table-cell boxes mapped onto our schema by column order).
     # 'none' disables T22 outright and ingestion falls back to chunk-only
     # indexing, same as before this task.
-    ai_vlm_provider: Literal['gemini', 'openrouter', 'none'] = 'gemini'
+    ai_vlm_provider: Literal['gemini', 'openrouter', 'chandra', 'none'] = 'gemini'
     gemini_vlm_model: str = 'gemini-3.6-flash'
     vlm_max_pages_per_document: int = 25
 
     openrouter_api_key: str = ''
     openrouter_vlm_model: str = 'google/gemini-2.5-flash'
+
+    datalab_api_key: str = ''
 
     openai_api_key: str = ''
     openai_llm_model: str = 'gpt-4o-mini'

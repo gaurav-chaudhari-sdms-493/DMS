@@ -51,6 +51,7 @@ the class of model their comment documents hitting this failure mode on.
 """
 import hashlib
 import json
+import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, FrozenSet, List, Optional, Tuple
 
@@ -242,7 +243,12 @@ def match_rows_by_key(left_rows: List[Dict[str, Any]], right_rows: List[Dict[str
     left_only, right_only)."""
     def _key_value(row: Dict[str, Any]) -> Any:
         v = row.get(key_field)
-        return v.get("value") if isinstance(v, dict) else v
+        v = v.get("value") if isinstance(v, dict) else v
+        # A serial/entry-number field never holds a bare ditto mark or an
+        # unrelated word — treat one as no key at all rather than a real
+        # value, so two placeholder marks on both sides (e.g. both rows
+        # happen to read "..") never get treated as a genuine key match.
+        return v if _looks_like_a_key_value(v) else None
 
     left_by_key: Dict[Any, Dict] = {}
     left_only: List[Dict] = []
@@ -338,13 +344,61 @@ class HorizontalJoinResult:
     reason: str = ""
 
 
+_HAS_DIGIT_RE = re.compile(r"\d")
+
+
+def _looks_like_a_key_value(v: Any) -> bool:
+    """Whether a value is plausibly a real serial/entry-number identifier,
+    not noise. Real bug found live 2026-09-03: a register's right-hand
+    band genuinely has no serial column at all — its first real column is
+    village-name/ditto data — but a column-position-mapped extraction
+    still lands SOME text in the field asked for matching, e.g. ".."
+    (a ditto mark) or "Kanadgaon" (a place name). Neither is remotely a
+    serial number, but both are non-empty strings, so a plain "is there
+    text here" check can't tell them apart from a real one.
+
+    Every serial/entry-number convention actually seen in this system's
+    real documents contains a digit somewhere — plain ("180"), decorated
+    ("180."), or alphanumeric ("B-175", "WB-1") — while a ditto mark is
+    pure punctuation and a place name is pure letters. Requiring a digit
+    is a safe, general test across all of those, without hardcoding any
+    single format (e.g. "must start with a digit" would wrongly reject
+    "B-175")."""
+    if not isinstance(v, str) or not v.strip():
+        return False
+    return bool(_HAS_DIGIT_RE.search(v))
+
+
 def _any_key_value(rows: List[Dict[str, Any]], key_field: str) -> bool:
+    """Whether this side genuinely carries the key field, not just noise.
+
+    Real bug found live 2026-09-03 against an actual spread document: a
+    register whose right-hand band never prints the serial number at all
+    (a real, expected "structural absence" this module already has a
+    fallback for) had exactly ONE row where the VLM had misextracted a
+    village name into the sr_no slot — 14 of 15 rows correctly blank, one
+    stray non-empty value. That single value was enough for the old
+    "any row has something" check to conclude "both sides have real keys,
+    this is a genuine conflict," which skipped the position-based fallback
+    entirely and produced a wrong refusal on a case the fallback was
+    explicitly built to handle. A single noisy extraction on an otherwise-
+    blank side should never look like a side "genuinely carries" the
+    field — require a real majority instead of just one row.
+
+    Extended the same day, still live against the same document: fixing
+    the majority check alone wasn't enough once a different VLM's column-
+    position mapping filled EVERY row on that side with something
+    non-empty (ditto marks, an unrelated place name) — a real majority of
+    noise still isn't evidence the field is real. Both checks now require
+    the value to actually look like a key (_looks_like_a_key_value), not
+    merely be non-empty."""
+    real = 0
     for row in rows:
         v = row.get(key_field)
         v = v.get("value") if isinstance(v, dict) else v
-        if v not in (None, ""):
-            return True
-    return False
+        if _looks_like_a_key_value(v):
+            real += 1
+    return real > len(rows) / 2
 
 
 def join_rows_horizontally(left_rows: List[Dict[str, Any]], right_rows: List[Dict[str, Any]], key_field: str) -> HorizontalJoinResult:
@@ -376,6 +430,21 @@ def join_rows_horizontally(left_rows: List[Dict[str, Any]], right_rows: List[Dic
             )
         groups = pair_leftovers_by_position(left_rows, right_rows)
         if groups is None:
+            # Real case found live 2026-09-03, same document as the fix
+            # above: bbox containment can fail even with clean, genuine
+            # per-row boxes on both sides — a real scanned register's two
+            # facing pages don't always keep perfectly identical row
+            # heights down the page, so position drifts (row 3 landing in
+            # row 2's box, row 17 in row 16's) without either side's boxes
+            # being wrong. When both sides have the SAME row count and
+            # neither has usable keys, equal counts is itself strong
+            # evidence they're the same rows in the same top-to-bottom
+            # order — for two column-bands of one wide table, that's
+            # exactly what "same count" means. Rank order is a more
+            # robust anchor than pixel position for this one case.
+            if len(left_rows) == len(right_rows):
+                pairs = list(zip(left_rows, right_rows))
+                return HorizontalJoinResult(status="ok", pairs=pairs)
             return HorizontalJoinResult(
                 status="needs_review",
                 reason=f"no shared '{key_field}' values between the two fragments and no reliable position data to pair by",

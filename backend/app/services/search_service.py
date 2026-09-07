@@ -80,7 +80,30 @@ def _parse_claims_json(raw: str):
     return data if isinstance(data, dict) else None
 
 
-async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: list):
+def _condense_excerpt_text(content: str) -> str:
+    """Chandra's (and PaddleOCR's) line-based OCR reads a sparse form
+    layout — a label and its value visually a few centimeters apart, like
+    a 7/12 record's "गाव" ... "आपटी" header line — as one text line each,
+    with a blank line per gap of whitespace in between. A wide gap (a
+    label at the page's left edge and its value further right, or a
+    tall gap above/below) can turn into 4-6 blank lines between them.
+
+    Found live 2026-09-04: this is harmless for a human reading the raw
+    OCR text (the words are still in the right reading order), but the
+    grounded-answer LLM (T70) was handed that same excerpt VERBATIM — a
+    label and its value separated by a wall of blank lines reads as much
+    weaker evidence than two adjacent lines, and the model refused to
+    answer ("answerable": false) even though the correct value was right
+    there in the excerpt. Collapsing every run of blank/whitespace-only
+    lines down to nothing — never altering word order or content, purely
+    removing empty lines — puts a label immediately next to its value
+    the way it visually reads on the page, which is what actually let
+    the same excerpt get answered correctly in a live re-test."""
+    lines = [ln.strip() for ln in content.splitlines()]
+    return "\n".join(ln for ln in lines if ln)
+
+
+async def _generate_grounded_answer(query: str, response_lang: str, excerpts: list):
     """T70 — bind every claim in the answer to the excerpt(s) that actually
     support it, and refuse outright when the excerpts don't answer the
     question. This is the product's hard rule (Section 8): a confident,
@@ -89,19 +112,28 @@ async def _generate_grounded_answer(query: str, detected_lang: str, excerpts: li
     dropped, not shown, and an unanswerable question gets no answer at all
     rather than a plausible-sounding guess.
 
+    `response_lang` is the language the user wants the ANSWER in, which
+    is not always the language the query was typed in -- see
+    _expand_trilingual_query's response_lang field (live bug, 2026-09-04:
+    a query like "Explain this document in Marathi" is itself written in
+    English, and the caller used to pass that raw detected/written
+    language straight through here, so an explicit request for a Marathi
+    answer got silently answered in English).
+
     Returns (summary_text_or_None, citations, grounded).
     """
     llm = get_llm_provider()
 
     numbered = "\n\n".join(
-        f"[{i + 1}] Document: {e['document_name']} (Page {e['page_number'] or 1})\n{e['content']}"
+        f"[{i + 1}] Document: {e['document_name']} (Page {e['page_number'] or 1})\n{_condense_excerpt_text(e['content'])}"
         for i, e in enumerate(excerpts)
     )
 
     sys_msg = (
         "You are an enterprise multilingual document intelligence assistant. "
         "Answer strictly and only from the numbered excerpts below — never from outside knowledge.\n"
-        f"Respond in the user's detected query language ({detected_lang}).\n\n"
+        f"Respond in {response_lang} — this is the language the user wants the answer in, which may differ from "
+        "whatever language the excerpts themselves are written in (translate the substance, keep proper nouns as-is).\n\n"
         "The user's query may be a natural-language question (\"what is the salary of X\") OR a short "
         "keyword/name/phrase search (\"Aurangabad-Shia\", a document title, a place or person name). For a "
         "keyword/phrase query, treat it as \"summarize what these excerpts say that is relevant to this topic\" "
@@ -177,8 +209,15 @@ async def _expand_trilingual_query(query: str) -> dict:
         llm = get_llm_provider()
         sys_msg = (
             "You are a multilingual AI query normalization assistant for enterprise document search in India.\n"
-            "Analyze the user query (which could be in English, Hindi, Marathi, or Hinglish) and output a JSON object with 4 keys:\n"
-            '- "detected_lang": detected query language (e.g. "English", "Hindi", "Marathi", "Hinglish")\n'
+            "Analyze the user query (which could be in English, Hindi, Marathi, or Hinglish) and output a JSON object with 5 keys:\n"
+            '- "detected_lang": the language the QUERY TEXT ITSELF is written in (e.g. "English", "Hindi", "Marathi", "Hinglish")\n'
+            '- "response_lang": the language the user wants the ANSWER written in. Almost always the same as '
+            'detected_lang -- EXCEPT when the query explicitly asks for a different output language regardless of '
+            'what language the query itself is written in (e.g. the English sentence "Explain this document in '
+            'Marathi" has detected_lang "English" but response_lang "Marathi"; "मराठीत सांग" has detected_lang '
+            '"Marathi" and response_lang "Marathi" too, since there is no separate request there). Never invent a '
+            "requested language that isn't actually named in the query -- only differs from detected_lang when the "
+            "query explicitly names a target language.\n"
             '- "english": concise normalized search query in English stripping away conversational filler words (e.g. "kunal deshmukh che aadhar card ahe ka aaplya files madhe?" -> "Kunal Deshmukh Aadhar Card")\n'
             '- "hindi": concise search keywords in Hindi (Devanagari script)\n'
             '- "marathi": concise search keywords in Marathi (Devanagari script)\n'
@@ -191,15 +230,17 @@ async def _expand_trilingual_query(query: str) -> dict:
         clean_json = resp.strip().removeprefix("```json").removeprefix("```").removesuffix("```").strip()
         data = json.loads(clean_json)
         logger.info("Tri-lingual query expansion for '%s': %s", query, data)
+        detected_lang = data.get("detected_lang", "English")
         return {
-            "detected_lang": data.get("detected_lang", "English"),
+            "detected_lang": detected_lang,
+            "response_lang": data.get("response_lang") or detected_lang,
             "english": data.get("english", query),
             "hindi": data.get("hindi", query),
             "marathi": data.get("marathi", query),
         }
     except Exception as e:
         logger.warning("Tri-lingual query expansion failed: %s", e)
-        return {"detected_lang": "English", "english": query, "hindi": query, "marathi": query}
+        return {"detected_lang": "English", "response_lang": "English", "english": query, "hindi": query, "marathi": query}
 
 
 async def _generate_trilingual_hyde(query: str, expanded: dict) -> list[str]:
@@ -276,6 +317,7 @@ async def search(
     # 2. Tri-Lingual Query Expansion (English, Hindi, Marathi)
     expanded = await _expand_trilingual_query(query)
     detected_lang = expanded.get("detected_lang", "English")
+    response_lang = expanded.get("response_lang") or detected_lang
     q_en = expanded.get("english", query)
     q_hi = expanded.get("hindi", query)
     q_mr = expanded.get("marathi", query)
@@ -490,20 +532,38 @@ async def search(
         doc_texts = [docs_map[cid].content for cid, _ in merged]
 
         try:
-            reranked_primary = await reranker.rerank(query, doc_texts, top_n=limit * 2)
+            # Real bug found live 2026-09-03: rerank(..., top_n=limit*2) only
+            # returns each call's OWN top slice. A document scoring near-zero
+            # under the raw query but highly relevant under its translation
+            # (exactly the cross-script case this second pass exists for)
+            # isn't IN reranked_primary at all, so "if r_trans.index in
+            # rank_map" silently dropped it instead of adding it — verified
+            # live: a Marathi document scored 0.55 under the translated
+            # rerank (well above the 0.15 threshold) but was discarded here
+            # every time, making cross-script search fail on every query
+            # whose translation-relevant document wasn't already primary-
+            # relevant. top_n=len(doc_texts) scores every candidate under
+            # both queries, and the merge now adds a translated-only hit
+            # instead of requiring it to already exist.
+            reranked_primary = await reranker.rerank(query, doc_texts, top_n=len(doc_texts))
             if q_mr and q_mr != query:
                 try:
-                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=limit * 2)
+                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=len(doc_texts))
                     rank_map = {r.index: r for r in reranked_primary}
                     for r_trans in reranked_trans:
                         if r_trans.index in rank_map:
                             rank_map[r_trans.index].score = max(rank_map[r_trans.index].score, r_trans.score)
+                        else:
+                            rank_map[r_trans.index] = r_trans
                     reranked_primary = list(rank_map.values())
                 except Exception as ex:
                     logger.warning("Secondary translation rerank skipped: %s", ex)
 
             RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
-            relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
+            relevant_ranks = sorted(
+                (r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD),
+                key=lambda r: r.score, reverse=True,
+            )
         except Exception as e:
             logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
             reranked = False
@@ -564,20 +624,27 @@ async def search(
                         doc_texts = [hyde_docs_map[cid].content for cid, _ in hyde_merged]
 
                         try:
-                            reranked_primary = await reranker.rerank(query, doc_texts, top_n=limit * 2)
+                            # Same cross-script merge fix as the direct-search
+                            # pass above — see that comment for the root cause.
+                            reranked_primary = await reranker.rerank(query, doc_texts, top_n=len(doc_texts))
                             if q_mr and q_mr != query:
                                 try:
-                                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=limit * 2)
+                                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=len(doc_texts))
                                     rank_map = {r.index: r for r in reranked_primary}
                                     for r_trans in reranked_trans:
                                         if r_trans.index in rank_map:
                                             rank_map[r_trans.index].score = max(rank_map[r_trans.index].score, r_trans.score)
+                                        else:
+                                            rank_map[r_trans.index] = r_trans
                                     reranked_primary = list(rank_map.values())
                                 except Exception as ex:
                                     logger.warning("Secondary translation HyDE rerank skipped: %s", ex)
 
                             RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
-                            relevant_ranks = [r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD]
+                            relevant_ranks = sorted(
+                                (r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD),
+                                key=lambda r: r.score, reverse=True,
+                            )
                         except Exception as e:
                             logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
                             reranked = False
@@ -657,7 +724,7 @@ async def search(
                         )
                     else:
                         try:
-                            summary, citations, doc_grounded = await _generate_grounded_answer(query, "English", excerpts)
+                            summary, citations, doc_grounded = await _generate_grounded_answer(query, response_lang, excerpts)
                             if summary is None:
                                 summary = "The document does not contain information that answers this question."
                             else:
@@ -799,26 +866,57 @@ async def search(
             meta_map[doc_id][m.key] = val
             
     seen_dedup.clear()
+    seen_excerpt_keys = set()
     for rank_res in relevant_ranks:
         idx = rank_res.index
         cid, _ = merged[idx]
         row = docs_map[cid]
-        
+        is_fact = cid in fact_row_ids
+
+        # Excerpts feed the grounding LLM (T70) — deduped only by literal
+        # chunk/fact identity, never by page, unlike final_results below.
+        # TextChunker's 64/512-token overlap means two chunks sharing a
+        # page are mostly DISTINCT content, not near-duplicates the way
+        # page-level dedup assumes for the results list — collapsing them
+        # here could silently starve the grounding LLM of the one chunk
+        # that actually answers the question. Live bug, 2026-09-04: a
+        # village-record page's two page-1 chunks each carried different
+        # header fields (village in one, district in the other); page
+        # dedup kept only whichever the RRF ranked slightly higher and
+        # fed just that one to the LLM, so a district question got no
+        # answer even though the district chunk was retrieved and ranked.
+        excerpt_key = (row.doc_id, cid)
+        if excerpt_key not in seen_excerpt_keys and len(excerpts) < limit:
+            seen_excerpt_keys.add(excerpt_key)
+            excerpts.append({
+                "document_id": row.doc_id,
+                "document_name": row.title,
+                "page_number": row.page_number,
+                "chunk_id": None if is_fact else row.id,
+                "fact_id": row.id if is_fact else None,
+                "content": row.content,
+            })
+
         # T73 — a fact result never dedupes against a chunk (or another
         # fact) sharing its page: it's a distinct extracted field, not a
         # near-duplicate snippet the way two chunks on the same page are.
-        dedup_key = (row.doc_id, cid) if cid in fact_row_ids else (row.doc_id, row.page_number)
+        # The results LIST (unlike excerpts above) intentionally keeps
+        # page-level dedup for chunks: one representative snippet per
+        # page keeps a small `limit` from being crowded out by a single
+        # page's multiple chunks, preserving diversity across pages/docs.
+        dedup_key = (row.doc_id, cid) if is_fact else (row.doc_id, row.page_number)
         if dedup_key in seen_dedup:
+            if len(final_results) >= limit and len(excerpts) >= limit:
+                break
             continue
         seen_dedup.add(dedup_key)
-        
+
         s3_path = row.s3_path
         url = await generate_presigned_url(s3_path) if s3_path else ""
 
         # T73 — a fact-leg row shares docs_map/RRF with chunk rows (same
         # column shape) but is cited by fact_id, not chunk_id: it points
         # at one extracted field, not a page of running text.
-        is_fact = cid in fact_row_ids
         result_metadata = dict(meta_map.get(row.doc_id, {}))
         if is_fact:
             result_metadata["fact_id"] = cid
@@ -832,16 +930,8 @@ async def search(
             score=rank_res.score,
             metadata=result_metadata
         ))
-        excerpts.append({
-            "document_id": row.doc_id,
-            "document_name": row.title,
-            "page_number": row.page_number,
-            "chunk_id": None if is_fact else row.id,
-            "fact_id": row.id if is_fact else None,
-            "content": row.content,
-        })
 
-        if len(final_results) >= limit:
+        if len(final_results) >= limit and len(excerpts) >= limit:
             break
 
     # T74: also surface any still-processing documents whose title matches —
@@ -860,7 +950,7 @@ async def search(
         )
     else:
         try:
-            summary, citations, grounded = await _generate_grounded_answer(query, detected_lang, excerpts)
+            summary, citations, grounded = await _generate_grounded_answer(query, response_lang, excerpts)
             if summary is None:
                 summary = f"The documents do not contain information that answers '{query}'."
                 refused = True

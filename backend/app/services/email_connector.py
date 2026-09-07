@@ -88,7 +88,7 @@ async def poll_email_once() -> int:
 
     ingested = 0
     async with AsyncSessionLocal() as db:
-        tenant_id, _ = await get_connector_actor(db)
+        tenant_id, user_id = await get_connector_actor(db)
 
         for msg_id, raw in messages:
             attachments = _extract_attachments(raw)
@@ -105,7 +105,7 @@ async def poll_email_once() -> int:
 
                 content_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
                 try:
-                    resp = await ingest_bytes(content, filename, db, content_type=content_type)
+                    resp = await ingest_bytes(content, filename, db, tenant_id, user_id, content_type=content_type)
                     logger.info("Email connector: ingested '%s' from message %s as document %s", filename, msg_id, resp.document_id)
                     ingested += 1
                 except Exception as e:

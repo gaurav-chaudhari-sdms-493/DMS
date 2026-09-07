@@ -3,8 +3,9 @@ import uuid
 from jose import jwt, JWTError
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
 from app.config import settings
+from app.database import establish_tenant_context  # noqa: F401 — re-exported; app/api/v1/auth.py imports it from here
 from app.schemas.auth import TokenPayload, SignUpRequest, SignUpResponse
 from app.models.user import User, UserRole
 from app.models.tenant import Tenant
@@ -21,18 +22,40 @@ def verify_password(plain: str, hashed: str) -> bool:
     except Exception:
         return False
 
+async def lookup_user_by_email(db: AsyncSession, email: str) -> User | None:
+    """D-2 fix — iam_dg_users' tenant_isolation_policy denies by default
+    when no tenant context is set, which is exactly the situation here:
+    login, signup, and forgot/reset-password all need to find a user BEFORE
+    any tenant is known. Migration 0046 adds a second, narrowly-scoped
+    permissive policy that allows exactly one row when this session var
+    names its email — set it, then query normally. Session-scoped, same
+    reasoning and same centralized cleanup as establish_tenant_context."""
+    await db.execute(
+        text("SELECT set_config('app.login_lookup_email', :e, false)"), {"e": email}
+    )
+    res = await db.execute(select(User).where(User.email == email))
+    return res.scalar_one_or_none()
+
 async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
     """Creates a new tenant and its founding user with full tenant-wide
     administrative access."""
-    stmt = select(User).where(User.email == body.email)
-    res = await db.execute(stmt)
-    if res.scalar_one_or_none():
+    if await lookup_user_by_email(db, body.email):
         raise HTTPException(status_code=409, detail="Email already registered")
 
     # Create tenant
     tenant = Tenant(name=f"{body.full_name}'s Organization")
     db.add(tenant)
     await db.flush()
+
+    # D-2 fix — signup runs with no tenant context (there's no tenant to
+    # have context for until the line above creates one), but everything
+    # written from here on genuinely belongs to this brand-new tenant --
+    # this flow is the trusted authority establishing that, the same way
+    # login/forgot-password are for app.login_lookup_email above. Without
+    # this, the User and Subscription inserts below are rejected by RLS's
+    # WITH CHECK (real bug, caught live: a fresh signup 500'd on the
+    # billing_dg_subscription insert the instant that table got a policy).
+    await establish_tenant_context(db, tenant.id)
 
     # Create user
     user = User(
@@ -58,6 +81,21 @@ async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
     db.add(user)
     await get_or_create_subscription(db, tenant.id)  # T81 — every tenant starts on a trial
     await db.commit()
+
+    # T96 clean-room finding, 2026-09-07: db.commit() can return this
+    # session's physical connection to the pool and db.refresh() below
+    # then check out a *different* one -- app.current_tenant_id is a
+    # Postgres session-scoped GUC (set on the physical connection, not the
+    # SQLAlchemy Session object), so it doesn't necessarily survive that
+    # swap. Real bug, caught live: sign_up() started 500ing on
+    # db.refresh(user) with "Could not refresh instance" the moment
+    # get_db() (this route's dependency) switched from the superuser
+    # connection to the RLS-enforced dms_app one in f779c5a -- under
+    # dms_app's default-deny policy, a connection with no tenant context
+    # sees zero rows, so the refresh SELECT found nothing. Re-establishing
+    # context here, unconditionally, is the same fix pattern already used
+    # elsewhere in this function for the same underlying reason.
+    await establish_tenant_context(db, tenant.id)
     await db.refresh(user)
 
     acc = create_access_token(user.id, tenant.id, user.role.value)
@@ -115,9 +153,7 @@ async def reset_password_with_token(email: str, token: str, new_password: str, d
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
-    stmt = select(User).where(User.email == email)
-    res = await db.execute(stmt)
-    user = res.scalar_one_or_none()
+    user = await lookup_user_by_email(db, email)
     if not user:
         raise HTTPException(status_code=444, detail="User not found")
 
@@ -140,6 +176,9 @@ async def change_password(user_id: uuid.UUID, current_password: str, new_passwor
 
     if not verify_password(current_password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Current password is incorrect")
+
+    if new_password == current_password:
+        raise HTTPException(status_code=400, detail="New password must be different from the current password")
 
     user.hashed_password = hash_password(new_password)
     await db.commit()

@@ -263,3 +263,117 @@ async def test_bulk_confirm_edges_and_revert_batch_round_trip():
         finally:
             await db.rollback()
             await db.close()
+
+
+async def _make_second_tenant_fact(db):
+    """A second, independent tenant with its own document + fact — for
+    proving create_edge() can't be used to link across tenants."""
+    tenant_id = uuid.uuid4()
+    actor_id = uuid.uuid4()
+    tenant = Tenant(id=tenant_id, name=f"EntityGraph Other Tenant {uuid.uuid4().hex[:6]}")
+    user = User(id=actor_id, tenant_id=tenant_id, email=f"eg_other_{uuid.uuid4().hex[:6]}@test.com", hashed_password="pw")
+    db.add_all([tenant, user])
+    await db.flush()
+
+    doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="other tenant doc", status="indexed")
+    version = DocumentVersion(
+        id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+        file_hash="deadbeef2", file_size_bytes=1, original_filename="other.pdf",
+    )
+    db.add_all([doc, version])
+    await db.flush()
+    doc.current_version_id = version.id
+    await db.flush()
+
+    fact = Fact(
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_id=version.id,
+        field_name="secret", value={"v": "belongs to the other tenant"}, confidence=0.9, status="machine",
+    )
+    node = EntityNode(id=uuid.uuid4(), tenant_id=tenant_id, entity_type="person", label="Other Tenant Person", attributes={})
+    db.add_all([fact, node])
+    await db.flush()
+
+    return tenant_id, fact.id, node.id
+
+
+@pytest.mark.asyncio
+async def test_create_edge_rejects_a_cross_tenant_target_fact_id():
+    """Real vulnerability found and fixed 2026-09-02 (D-2 security review):
+    create_edge() used to accept target_fact_id/target_node_id/
+    evidence_fact_id straight from client input with no ownership check --
+    a Tenant A user could link their own node to a Tenant B fact ID, then
+    see its real content via GET /entities/{node_id} (entity_360_service
+    had no tenant filter on its own node/fact lookups either, fixed in
+    the same pass)."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, node_id, fact_id = await _make_corpus(db)
+            other_tenant_id, other_fact_id, other_node_id = await _make_second_tenant_fact(db)
+
+            with pytest.raises(HTTPException) as exc_info:
+                await create_edge(
+                    db, tenant_id, "mentioned_in", tier=2, source_node_id=node_id,
+                    target_type="fact", target_fact_id=other_fact_id,
+                    created_by_actor_id=actor_id,
+                )
+            assert exc_info.value.status_code == 404
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_create_edge_rejects_a_cross_tenant_target_node_id():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, node_id, fact_id = await _make_corpus(db)
+            other_tenant_id, other_fact_id, other_node_id = await _make_second_tenant_fact(db)
+
+            with pytest.raises(HTTPException) as exc_info:
+                await create_edge(
+                    db, tenant_id, "related_to", tier=1, source_node_id=node_id,
+                    target_type="entity", target_node_id=other_node_id,
+                    created_by_actor_id=actor_id,
+                )
+            assert exc_info.value.status_code == 404
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_create_edge_rejects_a_cross_tenant_evidence_fact_id():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, node_id, fact_id = await _make_corpus(db)
+            other_tenant_id, other_fact_id, other_node_id = await _make_second_tenant_fact(db)
+
+            with pytest.raises(HTTPException) as exc_info:
+                await create_edge(
+                    db, tenant_id, "mentioned_in", tier=2, source_node_id=node_id,
+                    target_type="fact", target_fact_id=fact_id,
+                    evidence_fact_id=other_fact_id, created_by_actor_id=actor_id,
+                )
+            assert exc_info.value.status_code == 404
+        finally:
+            await db.rollback()
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_create_edge_rejects_a_cross_tenant_source_node_id():
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id, actor_id, folder_id, node_id, fact_id = await _make_corpus(db)
+            other_tenant_id, other_fact_id, other_node_id = await _make_second_tenant_fact(db)
+
+            with pytest.raises(HTTPException) as exc_info:
+                await create_edge(
+                    db, other_tenant_id, "mentioned_in", tier=2, source_node_id=node_id,
+                    target_type="fact", target_fact_id=fact_id,
+                    created_by_actor_id=actor_id,
+                )
+            assert exc_info.value.status_code == 404
+        finally:
+            await db.rollback()
+            await db.close()

@@ -29,8 +29,13 @@ async def record_ocr(db: AsyncSession, content_hash: str, ocr_engine: str, pages
     await db.flush()
 
 
-def compute_vlm_cache_key(file_hash: str, page_number: int, prompt: str) -> str:
-    canonical = f"{file_hash}:{page_number}:{prompt}"
+def compute_vlm_cache_key(file_hash: str, page_number: int, prompt: str, vlm_provider: str) -> str:
+    """vlm_provider is part of the key for the same reason ocr_engine is
+    part of get_cached_ocr's lookup: without it, switching AI_VLM_PROVIDER
+    (e.g. gemini -> chandra) silently keeps serving the OLD provider's
+    cached response for any document already seen under that
+    (file_hash, page_number, prompt) triple, defeating the switch."""
+    canonical = f"{file_hash}:{page_number}:{prompt}:{vlm_provider}"
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 

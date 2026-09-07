@@ -68,19 +68,28 @@ async def get_entity_360_view(db: AsyncSession, tenant_id: UUID, node_id: UUID) 
         if e.target_type == "fact" and e.target_fact_id:
             fact_ids.add(e.target_fact_id)
 
+    # tenant_id filters below are real protection, not redundant caution:
+    # RLS is currently inert (see D-2 review) and create_edge() is the
+    # only write path that used to be able to put a cross-tenant ID here
+    # (fixed 2026-09-02) -- but a node/fact this tenant's own edge points
+    # at must still always be re-verified as this tenant's own on the way
+    # out, both as defense in depth and because edges created before that
+    # fix could still reference another tenant's data.
     other_nodes_by_id = {}
     if other_node_ids:
-        res = await db.execute(select(EntityNode).where(EntityNode.id.in_(other_node_ids)))
+        res = await db.execute(
+            select(EntityNode).where(EntityNode.id.in_(other_node_ids), EntityNode.tenant_id == tenant_id)
+        )
         other_nodes_by_id = {n.id: n for n in res.scalars().all()}
 
     facts_by_id = {}
     docs_by_id = {}
     if fact_ids:
-        res = await db.execute(select(Fact).where(Fact.id.in_(fact_ids)))
+        res = await db.execute(select(Fact).where(Fact.id.in_(fact_ids), Fact.tenant_id == tenant_id))
         facts_by_id = {f.id: f for f in res.scalars().all()}
         doc_ids = {f.document_id for f in facts_by_id.values()}
         if doc_ids:
-            res2 = await db.execute(select(Document).where(Document.id.in_(doc_ids)))
+            res2 = await db.execute(select(Document).where(Document.id.in_(doc_ids), Document.tenant_id == tenant_id))
             docs_by_id = {d.id: d for d in res2.scalars().all()}
 
     linked_entities = []

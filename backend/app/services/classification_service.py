@@ -27,9 +27,58 @@ from app.models.template import Template
 from app.services.audit_service import log_action
 
 
+MATCH_TEMPLATE_ATTEMPTS = 3
+
+
 async def match_template(db: AsyncSession, sample_text: str) -> Optional[Template]:
     """Best-effort LLM match against every registered template. Returns
-    None (not an error) when nothing is registered yet, or nothing matches."""
+    None (not an error) when nothing is registered yet, or nothing matches.
+
+    Live bug, 2026-09-04: max_tokens=512 was sized for a small template
+    list. Confirmed live: with 5 templates registered, Groq's reasoning
+    model (gpt-oss) regularly spends its ENTIRE 512-token budget on hidden
+    <think> reasoning about which of the 5 options fits, leaving zero
+    tokens for the visible one-line answer -- llm.complete() returns "",
+    which this function was silently treating as "no match" (indistinguishable
+    from a genuine non-match). Reproduced 3/3 on a real Wakf gazette cover
+    page that plainly matches one of the registered templates; the LLM
+    answers correctly every time once given real headroom (2000 tokens).
+    This is why classify_document leaves the vast majority of real uploads
+    'unclassified' -- confirmed live against this DB: 1732 of 1753
+    documents (98.8%) are unclassified, and every one of them skips T22
+    (VLM extraction) and TS1 (stitching) entirely, since worker.py only
+    runs that stage when classification succeeds.
+
+    Retries up to MATCH_TEMPLATE_ATTEMPTS times on top of the larger
+    budget: the same resilience pattern already used for
+    table_stitch.adjudicate_structure's reasoning-model calls (see that
+    function's docstring and [[feedback_colleague_project_inspiration_only]])
+    -- a reasoning model can still return an empty or unparseable reply on
+    one attempt and a clean one on the next, so a single try turns
+    ordinary flakiness into a silent, wrong "no template matches" too.
+
+    2026-09-07: the empty-response retry above closed the token-starvation
+    bug, but a second, narrower flakiness remained -- confirmed live by
+    sampling 4 calls against a plainly-matching real document, 1 of the 4
+    confidently answered NONE. That's a *non-empty*, cleanly-parseable
+    response, so the old "retry only on empty resp" loop accepted it as
+    final on attempt 1 every time it happened to land first. Never
+    observed the opposite failure (confidently naming the WRONG template)
+    in any sampling done so far -- the risk here is real documents being
+    silently lost to 'unclassified' (as the 98.8% incident showed), not
+    documents being misfiled under a wrong template. So a positive match
+    is trusted the instant any attempt produces one (unchanged fast path
+    for the common "it matches" case), but a NONE only becomes the final
+    answer once every attempt in the budget agrees on it -- one attempt's
+    NONE no longer ends the loop early. This does mean a genuinely
+    unclassified document (most real uploads -- budgets, memos, anything
+    that isn't a registered form -- see this module's own top docstring)
+    now costs the full MATCH_TEMPLATE_ATTEMPTS calls instead of one, since
+    there's no way to distinguish "confidently no match" from "flakily no
+    match" without asking again. That's the same worst-case call budget
+    the empty-response retry already allowed for, just now typical for
+    negatives too -- accepted as the cost of not silently dropping real
+    matches."""
     res = await db.execute(select(Template))
     templates = list(res.scalars().all())
     if not templates:
@@ -44,19 +93,29 @@ async def match_template(db: AsyncSession, sample_text: str) -> Optional[Templat
         + "\n\nReply with ONLY the exact 'form_type | era_label' string of the best match, "
           "or the single word NONE if it doesn't match any of them."
     )
-    try:
-        llm = get_llm_provider()
-        # max_tokens has headroom beyond the one-line answer: reasoning models
-        # (e.g. Groq's gpt-oss) spend part of the budget on hidden reasoning
-        # tokens before the visible answer, so a tight limit here returns "".
-        resp = (await llm.complete([Message(role="user", content=prompt)], temperature=0.0, max_tokens=512)).strip()
-    except Exception:
-        return None
 
-    resp_last_line = resp.strip().splitlines()[-1].strip().strip('"') if resp.strip() else ""
-    for t, option in zip(templates, options):
-        if resp_last_line == option or option in resp_last_line:
-            return t
+    for _attempt in range(MATCH_TEMPLATE_ATTEMPTS):
+        try:
+            llm = get_llm_provider()
+            # max_tokens has real headroom beyond the one-line answer: a
+            # reasoning model's hidden thinking tokens scale with how many
+            # options it's weighing, not just the answer length -- see the
+            # docstring above for the live-confirmed failure at 512.
+            resp = (await llm.complete([Message(role="user", content=prompt)], temperature=0.0, max_tokens=2000)).strip()
+        except Exception:
+            resp = ""
+        if not resp:
+            continue  # no usable response this attempt -- try again
+
+        resp_last_line = resp.strip().splitlines()[-1].strip().strip('"')
+        for t, option in zip(templates, options):
+            if resp_last_line == option or option in resp_last_line:
+                return t  # a positive match is trusted on the first attempt that finds one
+
+        # Parsed cleanly but named no template (typically "NONE") -- don't
+        # trust a single no-match answer; keep going and only fall through
+        # to `return None` below once every attempt in the budget agrees.
+
     return None
 
 

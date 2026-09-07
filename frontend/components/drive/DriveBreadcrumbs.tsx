@@ -44,9 +44,9 @@ export function DriveBreadcrumbs({
       {/* Root Node */}
       <button
         onClick={onNavigateRoot}
-        className="flex items-center gap-2 hover:bg-[#edf2fc] hover:text-[#0b57d0] px-2 py-1 rounded-lg transition-colors font-semibold text-[#1f1f1f]"
+        className="flex items-center gap-2 hover:bg-[#edf2fc] hover:text-[#0d2e5c] px-2 py-1 rounded-lg transition-colors font-semibold text-[#1f1f1f]"
       >
-        {currentView !== "home" && <HardDrive className="w-4 h-4 text-[#0b57d0]" />}
+        {currentView !== "home" && <HardDrive className="w-4 h-4 text-[#0d2e5c]" />}
         <span>{getViewTitle()}</span>
       </button>
 
@@ -58,7 +58,7 @@ export function DriveBreadcrumbs({
               <ChevronRight className="w-4 h-4 text-[#8e918f] flex-shrink-0" />
               <button
                 onClick={() => onNavigateFolder(f.id)}
-                className={`hover:bg-[#edf2fc] hover:text-[#0b57d0] px-2 py-1 rounded-lg transition-colors truncate max-w-[160px] ${
+                className={`hover:bg-[#edf2fc] hover:text-[#0d2e5c] px-2 py-1 rounded-lg transition-colors truncate max-w-[160px] ${
                   currentFolder?.id === f.id ? "font-bold text-[#1f1f1f]" : "font-medium"
                 }`}
                 title={f.name}

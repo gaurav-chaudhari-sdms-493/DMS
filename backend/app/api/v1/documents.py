@@ -10,8 +10,8 @@ from ...schemas.document import (
     DriveStatsResponse,
 )
 from ...schemas.auth import TokenPayload
-from ...deps import get_db, require_tenant_access, require_role
-from ...services import document_service, classification_service, duplicate_service
+from ...deps import get_tenant_db, require_tenant_access, require_role
+from ...services import document_service, classification_service, duplicate_service, fact_service
 import uuid
 
 router = APIRouter()
@@ -23,7 +23,7 @@ async def upload_document_api(
     folder_id: Optional[uuid.UUID] = Query(None),
     force: bool = Query(False, description="Upload even if an identical file already exists"),
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -35,7 +35,7 @@ async def upload_documents_bulk_api(
     files: List[UploadFile] = File(...),
     folder_id: Optional[uuid.UUID] = Query(None),
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -45,7 +45,7 @@ async def upload_documents_bulk_api(
 @router.get('/drive/stats', response_model=DriveStatsResponse)
 async def get_drive_stats_api(
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await document_service.get_drive_stats(db, tenant_id)
@@ -56,7 +56,7 @@ async def get_fuzzy_duplicates_api(
     document_id: uuid.UUID,
     threshold: Optional[float] = None,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await duplicate_service.find_fuzzy_duplicates(db, tenant_id, document_id, threshold=threshold)
@@ -67,7 +67,7 @@ async def list_unclassified_documents_api(
     limit: int = 50,
     offset: int = 0,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await classification_service.list_unclassified_documents(db, tenant_id, limit=limit, offset=offset)
@@ -78,7 +78,7 @@ async def classify_document_api(
     document_id: uuid.UUID,
     template_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -90,7 +90,7 @@ async def classify_document_api(
 async def dismiss_document_classification_api(
     document_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -105,7 +105,7 @@ async def list_documents_api(
     is_starred: Optional[bool] = Query(None),
     is_trashed: bool = Query(False),
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await document_service.list_documents(
@@ -122,11 +122,31 @@ async def list_documents_api(
 async def get_document_api(
     document_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
     return await document_service.get_document(document_id, tenant_id, db, actor_id=user_id)
+
+
+@router.get('/{document_id}/facts')
+async def get_document_facts_api(
+    document_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await fact_service.get_facts_for_document(db, document_id, tenant_id)
+
+
+@router.get('/{document_id}/facts/table')
+async def get_document_table_view_api(
+    document_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await fact_service.get_table_view_for_document(db, document_id, tenant_id)
 
 
 @router.patch('/{document_id}', response_model=DocumentListItem)
@@ -134,7 +154,7 @@ async def update_document_api(
     document_id: uuid.UUID,
     doc_in: DocumentUpdate,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -145,7 +165,7 @@ async def update_document_api(
 async def toggle_star_document_api(
     document_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -156,7 +176,7 @@ async def toggle_star_document_api(
 async def toggle_trash_document_api(
     document_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -167,7 +187,7 @@ async def toggle_trash_document_api(
 async def cleanup_trashed_items_api(
     retention_days: int = 30,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     # A single tenant's "Empty Bin" must never touch another tenant's
     # trash — always pass the caller's own tenant_id here. Only the
@@ -181,7 +201,7 @@ async def cleanup_trashed_items_api(
 async def delete_document_api(
     document_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_role('records_officer', 'department_head', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)

@@ -2,6 +2,7 @@ import "./globals.css";
 import React from "react";
 import { Noto_Sans_Devanagari } from "next/font/google";
 import { I18nProvider } from "@/lib/i18n";
+import { OnlineStatusProvider } from "@/hooks/useOnlineStatus";
 
 // T95 — loaded unconditionally (Next.js requires next/font calls to be
 // static); applied via the `font-devanagari` class, toggled at runtime
@@ -38,7 +39,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={notoSansDevanagari.variable}>
       <body className="bg-gdriveBg min-h-screen text-gdriveTextMain overflow-hidden select-none">
-        <I18nProvider>{children}</I18nProvider>
+        <I18nProvider>
+          <OnlineStatusProvider>{children}</OnlineStatusProvider>
+        </I18nProvider>
       </body>
     </html>
   );

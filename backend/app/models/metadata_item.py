@@ -3,12 +3,13 @@ from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy import ForeignKey, Float, Text
 from datetime import datetime
 import uuid
-from typing import TYPE_CHECKING, Any, Optional
+from typing import TYPE_CHECKING, Any, List, Optional
 
 from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.document import Document
+    from app.models.metadata_item_region import MetadataItemRegion
 
 
 class MetadataItem(Base):
@@ -33,3 +34,6 @@ class MetadataItem(Base):
     created_at: Mapped[datetime] = mapped_column(default=datetime.utcnow)
 
     document: Mapped["Document"] = relationship("Document", back_populates="metadata_items")
+    regions: Mapped[List["MetadataItemRegion"]] = relationship(
+        "MetadataItemRegion", back_populates="metadata_item", cascade="all, delete-orphan"
+    )

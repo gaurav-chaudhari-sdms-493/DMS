@@ -216,26 +216,26 @@ export function RightSideChatDrawer({
             setDrawerWidth(maxWidth);
           }
         }}
-        className={`absolute left-0 top-0 bottom-0 w-2.5 -ml-1.5 cursor-col-resize z-50 flex items-center justify-center group hover:bg-[#0b57d0]/20 transition-colors ${
-          isResizing ? "bg-[#0b57d0]/30" : ""
+        className={`absolute left-0 top-0 bottom-0 w-2.5 -ml-1.5 cursor-col-resize z-50 flex items-center justify-center group hover:bg-[#0d2e5c]/20 transition-colors ${
+          isResizing ? "bg-[#0d2e5c]/30" : ""
         }`}
         title="Click and drag, or use arrow keys, to resize the chat panel"
       >
-        <div className="w-1 h-10 bg-[#c4c7c5] group-hover:bg-[#0b57d0] rounded-full transition-colors" />
+        <div className="w-1 h-10 bg-[#c4c7c5] group-hover:bg-[#0d2e5c] rounded-full transition-colors" />
       </div>
       {/* eslint-enable jsx-a11y/no-noninteractive-element-interactions, jsx-a11y/no-noninteractive-tabindex */}
 
       {/* Drawer Header */}
       <div className="p-3.5 border-b border-[#e1e3e1] flex items-center justify-between bg-[#f8fafd]">
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0b57d0] flex items-center justify-center border border-blue-100 shadow-xs flex-shrink-0">
+          <div className="w-7 h-7 rounded-lg bg-blue-50 text-[#0d2e5c] flex items-center justify-center border border-blue-100 shadow-xs flex-shrink-0">
             <Sparkles className="w-3.5 h-3.5" />
           </div>
           <div className="min-w-0">
             <h3 className="text-xs font-bold text-[#1f1f1f] truncate">
               {sessionTitle}
             </h3>
-            <div className="flex items-center gap-1 text-[10px] text-[#0b57d0] font-semibold">
+            <div className="flex items-center gap-1 text-[10px] text-[#0d2e5c] font-semibold">
               <CheckCircle2 className="w-3 h-3" />
               <span>Grounded in Loaded Files</span>
             </div>
@@ -246,7 +246,7 @@ export function RightSideChatDrawer({
         <div className="flex items-center gap-1 flex-shrink-0">
           <button
             onClick={onClose}
-            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-[#444746] hover:bg-[#edf2fc] hover:text-[#0b57d0] transition-colors"
+            className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-semibold text-[#444746] hover:bg-[#edf2fc] hover:text-[#0d2e5c] transition-colors"
             title="Hide right sidebar"
           >
             <PanelRightClose className="w-4 h-4" />
@@ -271,12 +271,12 @@ export function RightSideChatDrawer({
             className="w-full px-3.5 py-2 flex items-center justify-between hover:bg-[#f0f4f9] transition-colors text-left"
           >
             <div className="flex items-center gap-2">
-              <FileText className="w-3.5 h-3.5 text-[#0b57d0]" />
+              <FileText className="w-3.5 h-3.5 text-[#0d2e5c]" />
               <span className="text-xs font-bold text-[#1f1f1f]">
                 Loaded Context Documents ({loadedDocs.length})
               </span>
             </div>
-            <div className="flex items-center gap-1 text-[11px] text-[#0b57d0] font-semibold">
+            <div className="flex items-center gap-1 text-[11px] text-[#0d2e5c] font-semibold">
               <span>{isDocsExpanded ? "Hide" : "Show"}</span>
               {isDocsExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
             </div>
@@ -291,11 +291,11 @@ export function RightSideChatDrawer({
                 return (
                   <div
                     key={`${res.document_id}-${idx}`}
-                    className="p-2.5 rounded-xl bg-white border border-[#e1e3e1] hover:border-[#0b57d0]/40 transition-all space-y-2 shadow-2xs"
+                    className="p-2.5 rounded-xl bg-white border border-[#e1e3e1] hover:border-[#0d2e5c]/40 transition-all space-y-2 shadow-2xs"
                   >
                     <div className="flex items-center justify-between gap-2">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <FileText className="w-3.5 h-3.5 text-[#0b57d0] flex-shrink-0" />
+                        <FileText className="w-3.5 h-3.5 text-[#0d2e5c] flex-shrink-0" />
                         <span className="font-semibold text-xs text-[#1f1f1f] truncate">
                           {res.document_name}
                         </span>
@@ -331,7 +331,7 @@ export function RightSideChatDrawer({
                             download_url: res.download_url
                           })
                         }
-                        className="flex items-center gap-1 text-[11px] font-semibold text-[#0b57d0] hover:bg-[#edf2fc] px-2 py-0.5 rounded-lg border border-[#d3d7dc] transition-all cursor-pointer"
+                        className="flex items-center gap-1 text-[11px] font-semibold text-[#0d2e5c] hover:bg-[#edf2fc] px-2 py-0.5 rounded-lg border border-[#d3d7dc] transition-all cursor-pointer"
                         title="Preview document"
                       >
                         <Eye className="w-3 h-3" />
@@ -359,9 +359,9 @@ export function RightSideChatDrawer({
               {loadedDocs.length > 1 && (
                 <div className="p-2.5 mt-2 bg-[#edf2fc]/60 border border-[#c4c7c5]/50 rounded-xl flex items-center justify-between text-[11px] text-[#444746]">
                   <div className="flex items-center gap-1.5 font-medium">
-                    <Sparkles className="w-3.5 h-3.5 text-[#0b57d0]" />
+                    <Sparkles className="w-3.5 h-3.5 text-[#0d2e5c]" />
                     <span>Search Technology:</span>
-                    <span className="font-bold text-[#0b57d0] px-1.5 py-0.5 rounded-md bg-white border border-[#0b57d0]/20 shadow-2xs">
+                    <span className="font-bold text-[#0d2e5c] px-1.5 py-0.5 rounded-md bg-white border border-[#0d2e5c]/20 shadow-2xs">
                       {messages.find((m) => m.role === "assistant" && m.search_mode)?.search_mode === "HyDE"
                         ? "HyDE"
                         : messages.find((m) => m.role === "assistant" && m.search_mode)?.search_mode || "vector+keyword"}
@@ -407,9 +407,9 @@ export function RightSideChatDrawer({
                           {attachedFileNames.map((fileName, idx) => (
                             <div
                               key={idx}
-                              className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0b57d0]/10 border border-[#0b57d0]/20 rounded-xl text-[11px] font-semibold text-[#001d35]"
+                              className="flex items-center gap-1.5 px-2.5 py-1 bg-[#0d2e5c]/10 border border-[#0d2e5c]/20 rounded-xl text-[11px] font-semibold text-[#001d35]"
                             >
-                              <FileText className="w-3.5 h-3.5 text-[#0b57d0]" />
+                              <FileText className="w-3.5 h-3.5 text-[#0d2e5c]" />
                               <span className="truncate max-w-[150px]">{fileName}</span>
                             </div>
                           ))}
@@ -428,7 +428,7 @@ export function RightSideChatDrawer({
 
         {sending && (
           <div className="flex items-center gap-2 p-3 bg-white border border-[#e1e3e1] rounded-xl text-xs text-[#444746] animate-pulse">
-            <Sparkles className="w-3.5 h-3.5 text-[#0b57d0] animate-spin" />
+            <Sparkles className="w-3.5 h-3.5 text-[#0d2e5c] animate-spin" />
             <span>Evaluating prompt against loaded context...</span>
           </div>
         )}
@@ -443,7 +443,7 @@ export function RightSideChatDrawer({
             e.preventDefault();
             handleSendMessage();
           }}
-          className="flex items-center gap-2 bg-[#f0f4f9] rounded-xl p-1.5 pl-3 border border-[#d3d7dc] focus-within:border-[#0b57d0] focus-within:bg-white transition-all"
+          className="flex items-center gap-2 bg-[#f0f4f9] rounded-xl p-1.5 pl-3 border border-[#d3d7dc] focus-within:border-[#0d2e5c] focus-within:bg-white transition-all"
         >
           <input
             type="text"
@@ -457,7 +457,7 @@ export function RightSideChatDrawer({
           <button
             type="submit"
             disabled={!inputQuery.trim() || sending}
-            className="p-2 bg-[#0b57d0] hover:bg-[#0945a5] disabled:opacity-40 text-white rounded-lg transition-all"
+            className="p-2 bg-[#0d2e5c] hover:bg-[#0945a5] disabled:opacity-40 text-white rounded-lg transition-all"
           >
             <Send className="w-3.5 h-3.5" />
           </button>

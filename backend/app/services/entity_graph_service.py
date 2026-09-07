@@ -163,6 +163,35 @@ async def create_edge(
     if created_by_actor_id is None and created_by_policy_version is None:
         raise ValueError("an edge must have a creating actor or policy version")
 
+    # Real cross-tenant vulnerability found and fixed 2026-09-02 (D-2
+    # security review): every ID below came straight from client input
+    # with no ownership check, and entity_360_service's read side had no
+    # tenant filter either -- a Tenant A user could link their own node to
+    # a Tenant B fact/node ID and see its real content via Entity 360.
+    # RLS does not catch this (it's currently inert -- see the review),
+    # so this check is the only real protection.
+    source_node = await db.get(EntityNode, source_node_id)
+    if not source_node or source_node.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Source entity not found")
+
+    if target_type == "entity":
+        if target_node_id is None:
+            raise ValueError("target_node_id is required when target_type is 'entity'")
+        target_node = await db.get(EntityNode, target_node_id)
+        if not target_node or target_node.tenant_id != tenant_id:
+            raise HTTPException(status_code=404, detail="Target entity not found")
+    else:
+        if target_fact_id is None:
+            raise ValueError("target_fact_id is required when target_type is 'fact'")
+        target_fact = await db.get(Fact, target_fact_id)
+        if not target_fact or target_fact.tenant_id != tenant_id:
+            raise HTTPException(status_code=404, detail="Target fact not found")
+
+    if evidence_fact_id is not None:
+        evidence_fact = await db.get(Fact, evidence_fact_id)
+        if not evidence_fact or evidence_fact.tenant_id != tenant_id:
+            raise HTTPException(status_code=404, detail="Evidence fact not found")
+
     status = "machine" if tier in AUTO_COMMIT_TIERS else "held"
 
     edge = EntityEdge(

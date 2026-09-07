@@ -71,3 +71,17 @@ async def is_corpus_calibrated(db: AsyncSession, tenant_id: UUID, corpus_folder_
         )
     )
     return res.scalar_one_or_none() is not None
+
+
+async def get_calibration_status(db: AsyncSession, tenant_id: UUID, corpus_folder_id: UUID) -> Optional[CorpusCalibration]:
+    """Read-only lookup for the workbench UI, so a folder's calibration
+    state (T59, gates bulk_confirm_facts) is visible before a bulk-confirm
+    submit — previously the only way to find out was to submit and get a
+    409 back."""
+    res = await db.execute(
+        select(CorpusCalibration).where(
+            CorpusCalibration.tenant_id == tenant_id,
+            CorpusCalibration.corpus_folder_id == corpus_folder_id,
+        )
+    )
+    return res.scalar_one_or_none()

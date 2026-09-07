@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import type { DriveStats, FolderTreeNode, DocumentListItem } from "@/types";
 import { FolderTreeSidebar } from "./FolderTreeSidebar";
+import { useI18n } from "@/lib/i18n";
 
 interface DriveSidebarProps {
   currentView: "home" | "my-drive" | "recent" | "starred" | "trash" | "shared" | "chat";
@@ -44,6 +45,7 @@ export function DriveSidebar({
   onSelectDoc,
   onPreviewDoc,
 }: DriveSidebarProps) {
+  const { t } = useI18n();
   const [showNewMenu, setShowNewMenu] = useState(false);
   const [expandDriveTree, setExpandDriveTree] = useState(true);
 
@@ -67,7 +69,7 @@ export function DriveSidebar({
             className="flex items-center gap-3 px-4 py-3 bg-white hover:bg-[#f1f3f4] text-[#1f1f1f] rounded-2xl shadow-md border border-[#c4c7c5] hover:shadow-lg transition-all duration-200 group"
           >
             <Plus className="w-6 h-6 text-[#1f1f1f] stroke-[2.5]" />
-            <span className="font-semibold text-sm pr-2">New</span>
+            <span className="font-semibold text-sm pr-2">{t("drive.nav.new", "New")}</span>
           </button>
 
           {showNewMenu && (
@@ -81,8 +83,8 @@ export function DriveSidebar({
                   }}
                   className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[#f0f4f9] font-medium text-left"
                 >
-                  <FolderPlus className="w-4 h-4 text-[#0b57d0]" />
-                  <span>New folder</span>
+                  <FolderPlus className="w-4 h-4 text-[#0d2e5c]" />
+                  <span>{t("drive.nav.new_folder", "New folder")}</span>
                 </button>
 
                 <div className="h-px bg-[#e1e3e1] my-1" />
@@ -95,7 +97,7 @@ export function DriveSidebar({
                   className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[#f0f4f9] font-medium text-left"
                 >
                   <Upload className="w-4 h-4 text-[#00639b]" />
-                  <span>File upload</span>
+                  <span>{t("drive.nav.file_upload", "File upload")}</span>
                 </button>
 
                 <div className="h-px bg-[#e1e3e1] my-1" />
@@ -108,7 +110,7 @@ export function DriveSidebar({
                   className="flex items-center gap-3 w-full px-3 py-2.5 rounded-xl hover:bg-[#f0f4f9] font-medium text-left"
                 >
                   <Server className="w-4 h-4 text-[#34a853]" />
-                  <span>Connect a device</span>
+                  <span>{t("drive.nav.connect_device", "Connect a device")}</span>
                 </button>
               </div>
             </>
@@ -126,7 +128,7 @@ export function DriveSidebar({
               }`}
           >
             <Home className="w-4 h-4" />
-            <span>Home</span>
+            <span>{t("drive.nav.home", "Home")}</span>
           </button>
 
           {/* AI Chat */}
@@ -137,17 +139,12 @@ export function DriveSidebar({
               : "text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
               }`}
           >
-            <Sparkles className="w-4 h-4 text-[#0b57d0]" />
-            <span>AI Chat</span>
+            <Sparkles className="w-4 h-4 text-[#0d2e5c]" />
+            <span>{t("drive.nav.chat", "AI Chat")}</span>
           </button>
-
-
 
           {/* My Drive Node */}
           <div>
-            {/* Two sibling controls, not nested — a <button> inside a
-                role="button" row fails WCAG 4.1.2 (nested interactive
-                controls have ambiguous focus/activation semantics). */}
             <div
               className={`flex items-center justify-between w-full pr-4 py-2 rounded-r-full text-sm font-medium transition-all ${currentView === "my-drive" && !activeFolderId
                 ? "bg-[#c2e7ff] text-[#001d35] font-bold"
@@ -160,7 +157,7 @@ export function DriveSidebar({
                 className="flex items-center gap-4 flex-1 pl-4 py-0 text-left cursor-pointer"
               >
                 <HardDrive className="w-4 h-4" />
-                <span>My Drive</span>
+                <span>{t("drive.nav.my_drive", "My Drive")}</span>
               </button>
               {folderTree.length > 0 && (
                 <button
@@ -202,7 +199,7 @@ export function DriveSidebar({
               }`}
           >
             <Star className="w-4 h-4" />
-            <span>Starred</span>
+            <span>{t("drive.nav.starred", "Starred")}</span>
           </button>
 
           {/* Bin */}
@@ -214,16 +211,16 @@ export function DriveSidebar({
               }`}
           >
             <Trash2 className="w-4 h-4" />
-            <span>Bin</span>
+            <span>{t("drive.nav.trash", "Bin")}</span>
           </button>
         </nav>
       </div>
 
       {/* Bottom Storage Meter */}
       <div className="px-4 py-3 border-t border-[#e1e3e1]/60">
-        <div className="text-xs font-semibold text-[#1f1f1f] mb-1">Storage</div>
+        <div className="text-xs font-semibold text-[#1f1f1f] mb-1">{t("drive.storage.title", "Storage")}</div>
         <div className="text-xs text-[#444746]">
-          {formatSize(usedBytes)} used
+          {formatSize(usedBytes)} {t("drive.storage.used", "used")}
         </div>
       </div>
     </aside>

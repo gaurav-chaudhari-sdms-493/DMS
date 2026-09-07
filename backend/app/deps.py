@@ -1,7 +1,7 @@
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy import text
-from .database import AsyncSessionLocal, get_db  # noqa: F401 — re-exported; 13 API route files import get_db from here, not from .database directly
+from .database import AsyncSessionLocal, AppSessionLocal, get_db, _reset_session_tenant_context  # noqa: F401 — get_db re-exported; 13 API route files import it from here, not from .database directly
 from .services.auth_service import verify_token
 from .schemas.auth import TokenPayload
 
@@ -43,7 +43,16 @@ def require_role(*allowed_roles: str):
 async def get_tenant_db(
     current_user: TokenPayload = Depends(require_tenant_access),
 ):
-    async with AsyncSessionLocal() as session:
+    """D-2 fix — every real authenticated request should go through this,
+    not plain get_db(): it's the restricted, RLS-enforced connection
+    (AppSessionLocal) with app.current_tenant_id actually set from the
+    caller's own verified JWT, not just correctly-written policies sitting
+    disconnected from the request path (D2_tenant_isolation_security_review.md,
+    Finding 2). Session-scoped (is_local=false) so it survives a mid-request
+    db.commit() -- a real pattern in this codebase, not a hypothetical --
+    and _reset_session_tenant_context (called on every exit path) is what
+    keeps that safe on a pooled connection; see its own docstring."""
+    async with AppSessionLocal() as session:
         try:
             await session.execute(
                 text("SELECT set_config('app.current_tenant_id', :t, false)"),
@@ -55,6 +64,7 @@ async def get_tenant_db(
             await session.rollback()
             raise
         finally:
+            await _reset_session_tenant_context(session)
             await session.close()
 
 async def get_request_ip(request: Request) -> str:

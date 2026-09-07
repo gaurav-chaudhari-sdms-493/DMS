@@ -1,6 +1,6 @@
 import { getAccessToken, getUserProfile, setUserProfile, clearTokens } from "./auth";
 import { offlineStore } from "./offlineStore";
-import type { Folder, FolderTreeNode, DocumentListItem, DocumentDetailResponse, DriveStats, SearchResponse, ChatSession, ChatMessage, ChatSessionListItem, TemplateResponse, TemplateCreatePayload } from "@/types";
+import type { Folder, FolderTreeNode, DocumentListItem, DocumentDetailResponse, DocumentFactsResponse, DocumentTableViewResponse, DriveStats, SearchResponse, ChatSession, ChatMessage, ChatSessionListItem, TemplateResponse, TemplateCreatePayload, SysConfigItem } from "@/types";
 
 export const getBaseUrl = (): string => {
   if (typeof window !== "undefined") {
@@ -9,11 +9,11 @@ export const getBaseUrl = (): string => {
       return custom.trim().replace(/\/+$/, "");
     }
   }
-  let url = process.env.NEXT_PUBLIC_API_URL || "https://aa0d-103-226-171-223.ngrok-free.app";
+  let url = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   if (typeof window !== "undefined") {
-    // If in browser and URL points to internal docker service name 'backend', use default ngrok URL
+    // If in browser and URL points to internal docker service name 'backend', use localhost
     if (url.includes("backend:8000")) {
-      url = "https://aa0d-103-226-171-223.ngrok-free.app";
+      url = "http://localhost:8000";
     }
     // The build bakes in "localhost:8000", which only resolves correctly
     // when the page itself is viewed from the Docker host machine. Viewed
@@ -108,7 +108,17 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
       if (path.includes("/auth/me") || path.includes("/users/me") || path.includes("/profile")) {
         return getUserProfile() || { full_name: "Offline User", email: "user@offline.local", role: "user" };
       }
-      if (path.includes("/documents")) {
+      // Exact match on the LIST endpoint only ("/api/v1/documents" or
+      // "/api/v1/documents?..."), never a substring match -- `.includes`
+      // here used to also swallow every documents/{id}/... sub-resource
+      // (facts, star, trash, ...) whenever fetch() threw a network-level
+      // error, silently handing back an unrelated document LIST instead
+      // of a real error or the actual resource. Found live 2026-09-04:
+      // GET /documents/{id}/facts hit this and returned document-list
+      // shaped data, which the Extracted Facts panel then choked
+      // rendering (facts.length on an object with no facts key) --
+      // looked like the panel was just "static"/frozen with no error.
+      if (/^\/api\/v1\/documents(\?|$)/.test(path)) {
         const urlObj = new URL(`http://dummy.local${path}`);
         const folderId = urlObj.searchParams.get("folder_id");
         return offlineStore.getDocuments(folderId);
@@ -173,6 +183,16 @@ async function request(path: string, options: RequestInit = {}): Promise<any> {
       } else if (Array.isArray(detail) && detail.length > 0) {
         // FastAPI validation errors: [{loc, msg, type}, ...]
         errorDetail = detail.map((d: any) => d?.msg || JSON.stringify(d)).join("; ");
+      } else if (detail && typeof detail === "object" && typeof detail.message === "string") {
+        // A structured error with extra context fields (e.g. duplicate-file
+        // detection's {message, existing_document_id, existing_document_title,
+        // existing_uploaded_at}) — real bug found live 2026-09-03: this shape
+        // fell through to the raw JSON.stringify below, so a user saw
+        // '{"detail":{"message":"An identical file already exists...' instead
+        // of a readable sentence. The extra fields are for callers that want
+        // to act on them programmatically, not for display — show the
+        // message text.
+        errorDetail = detail.message;
       } else {
         errorDetail = JSON.stringify(errJson);
       }
@@ -280,9 +300,9 @@ export const api = {
         method: "GET",
       });
     },
-    // T51/T52/T30 — the adjudication queue: 'low_confidence', 'handwritten'
-    // and 'marginalia' are real categories. 'join_mismatch' still 501s on
-    // the backend — blocked on A1/T26, not built, not silently empty.
+    // T51/T52/T30/T26/TS4 — all five queue categories are real and backed
+    // by the same Fact+FactRegion shape: 'low_confidence', 'handwritten',
+    // 'marginalia', 'join_mismatch' (T26), 'stitch_ambiguous' (TS4).
     getQueue: async (category: string = "low_confidence", limit: number = 50, offset: number = 0): Promise<any> => {
       return await request(`/api/v1/facts/queue?category=${encodeURIComponent(category)}&limit=${limit}&offset=${offset}`, {
         method: "GET",
@@ -323,6 +343,17 @@ export const api = {
     revertBulkEdit: async (batchId: string): Promise<any> => {
       return await request(`/api/v1/facts/bulk-edit/revert/${batchId}`, { method: "POST" });
     },
+    // TS4 — answer a "_stitch_ambiguous" queue item: was this page pair
+    // the same table continuing (vertical), a side-by-side spread
+    // (horizontal), or genuinely two unrelated tables. The answer is
+    // cached shape-wide (table_shape_service) and outranks any future LLM
+    // guess for the same page-shape.
+    resolveStitchAmbiguity: async (factId: string, relation: "vertical" | "horizontal" | "unrelated"): Promise<any> => {
+      return await request(`/api/v1/facts/${factId}/resolve-stitch-ambiguity`, {
+        method: "POST",
+        body: JSON.stringify({ relation }),
+      });
+    },
   },
   governance: {
     // T76 — completeness/reconciliation dashboard, gap-scored per corpus (folder).
@@ -331,6 +362,18 @@ export const api = {
     },
     getCompletenessDrill: async (corpusFolderId: string, category: string): Promise<any> => {
       return await request(`/api/v1/governance/completeness/${corpusFolderId}/drill?category=${encodeURIComponent(category)}`, { method: "GET" });
+    },
+    // T59 — read-only calibration check, so the workbench's bulk-confirm
+    // panel can show calibrated/not-calibrated before submit instead of
+    // only ever surfacing it as a 409 after the fact.
+    getCalibrationStatus: async (corpusFolderId: string): Promise<any> => {
+      return await request(`/api/v1/governance/calibrate-corpus/${corpusFolderId}/status`, { method: "GET" });
+    },
+    calibrateCorpus: async (corpusFolderId: string, sampleSize?: number, notes?: string): Promise<any> => {
+      return await request(`/api/v1/governance/calibrate-corpus/${corpusFolderId}`, {
+        method: "POST",
+        body: JSON.stringify({ sample_size: sampleSize ?? null, notes: notes ?? null }),
+      });
     },
   },
   entities: {
@@ -571,6 +614,12 @@ export const api = {
     getStats: async (): Promise<DriveStats> => {
       return await request("/api/v1/documents/drive/stats");
     },
+    getFacts: async (documentId: string): Promise<DocumentFactsResponse> => {
+      return await request(`/api/v1/documents/${documentId}/facts`);
+    },
+    getTableView: async (documentId: string): Promise<DocumentTableViewResponse> => {
+      return await request(`/api/v1/documents/${documentId}/facts/table`);
+    },
   },
   admin: {
     getAnalytics: async (): Promise<any> => {
@@ -578,6 +627,18 @@ export const api = {
     },
     getApiAnalytics: async (): Promise<any> => {
       return await request("/api/v1/admin/api-analytics");
+    },
+    // T03 — sys_dg_config is global (no per-tenant scoping), so this lists
+    // every engineering threshold the pipeline reads via
+    // config_service.get_int/get_float, not just this tenant's own data.
+    getConfig: async (): Promise<SysConfigItem[]> => {
+      return await request("/api/v1/admin/config");
+    },
+    updateConfig: async (key: string, value: number): Promise<SysConfigItem> => {
+      return await request(`/api/v1/admin/config/${encodeURIComponent(key)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ value }),
+      });
     },
   },
   templates: {

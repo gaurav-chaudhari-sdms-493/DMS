@@ -1,0 +1,16 @@
+{{- if .Values.hfCache.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "veritasdocs.fullname" . }}-hf-cache
+  labels:
+    {{- include "veritasdocs.labels" . | nindent 4 }}
+spec:
+  accessModes: ["ReadWriteOnce"]
+  {{- if .Values.global.storageClass }}
+  storageClassName: {{ .Values.global.storageClass | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.hfCache.storageSize }}
+{{- end }}

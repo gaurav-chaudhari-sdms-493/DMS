@@ -72,6 +72,11 @@ export interface DocumentDetailResponse {
     value: string;
     source: string;
     confidence_score: number;
+    // T05 — where this value came from on the page, when it could be
+    // verbatim-located. Empty for metadata written before this shipped,
+    // or for a value the extracting LLM paraphrased away from the page's
+    // actual printed text (no fabricated location in that case).
+    regions?: Array<{ page_number: number; x0: number; y0: number; x1: number; y1: number }>;
   }>;
   versions: Array<{
     id: string;
@@ -97,6 +102,46 @@ export interface DriveStats {
   total_size_bytes?: number;
   total_starred: number;
   total_trashed: number;
+}
+
+export interface DocumentFact {
+  fact_id: string;
+  field_name: string;
+  value: unknown;
+  confidence: number | null;
+  status: "machine" | "in_review" | "verified";
+  is_handwritten: boolean;
+  page_numbers: number[];
+  // True when this field's regions land on more than one physical page —
+  // the only reliable, verifiable signal that TS1 (vertical stitching)
+  // actually merged a continuation row from a later page into this entry,
+  // rather than a heuristic guess re-derived in the UI.
+  stitched: boolean;
+}
+
+export interface DocumentTableRow {
+  page_number: number;
+  stitched: boolean;
+  needs_review: boolean;
+  values: Record<string, unknown>;
+}
+
+export interface DocumentTableViewResponse {
+  document_id: string;
+  classification_status: string;
+  page_header: Record<string, unknown>;
+  columns: string[];
+  rows: DocumentTableRow[];
+  row_count: number;
+}
+
+export interface DocumentFactsResponse {
+  document_id: string;
+  classification_status: string;
+  matched_template_id?: string | null;
+  facts: DocumentFact[];
+  stitched_field_count: number;
+  in_review_count: number;
 }
 
 export interface SearchResult {
@@ -186,5 +231,13 @@ export interface TemplateCreatePayload {
   era_label: string;
   field_schema: TemplateFieldDef[];
   layout: string;
+}
+
+// T03 — one row of sys_dg_config, the global engineering-threshold table.
+export interface SysConfigItem {
+  key: string;
+  value: number;
+  description: string;
+  updated_at: string;
 }
 

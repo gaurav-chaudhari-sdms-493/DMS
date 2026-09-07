@@ -5,6 +5,7 @@ from app.models.document import Document
 from app.models.document_version import DocumentVersion
 from app.models.chunk import Chunk
 from app.models.metadata_item import MetadataItem
+from app.models.metadata_item_region import MetadataItemRegion
 from app.models.audit_log import AuditLog
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
@@ -38,7 +39,7 @@ from app.database import Base
 # "imported but unused" warnings breaking CI's syntax/import check.
 __all__ = [
     "Tenant", "User", "UserRole", "Folder", "Document", "DocumentVersion",
-    "Chunk", "MetadataItem", "AuditLog", "ChatSession", "ChatMessage",
+    "Chunk", "MetadataItem", "MetadataItemRegion", "AuditLog", "ChatSession", "ChatMessage",
     "ApiLog", "SysConfig", "DocumentPage", "Fact", "FactRegion", "Template",
     "EntityNode", "EntityEdge", "Record", "RecordAmendment", "CorpusCalibration",
     "Department", "DepartmentMember", "DepartmentFolder", "RetentionClass",

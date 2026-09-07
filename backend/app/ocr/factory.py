@@ -19,6 +19,10 @@ def get_ocr_provider() -> OCRProvider:
             # real Devanagari/Marathi support. See paddleocr_provider.py.
             from app.ocr.providers.paddleocr_provider import PaddleOCRProvider
             _ocr_provider = PaddleOCRProvider()
+        elif settings.ai_ocr_provider == 'chandra':
+            enforce_local('OCR', 'chandra')
+            from app.ocr.providers.chandra_ocr_provider import ChandraOCRProvider
+            _ocr_provider = ChandraOCRProvider()
         else:
             raise ValueError(f"Unknown OCR provider: {settings.ai_ocr_provider}")
     return _ocr_provider

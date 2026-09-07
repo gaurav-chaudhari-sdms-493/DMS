@@ -24,6 +24,7 @@ import {
   RefreshCw,
   Trash2,
   LayoutTemplate,
+  SlidersHorizontal,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -277,7 +278,7 @@ export default function AdminPage() {
     dmsData?.upload_timeline?.reduce((m, d) => Math.max(m, d.count), 0) || 1;
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-[#1f1f1f]">
+    <div className="h-screen overflow-y-auto bg-[#f8f9fa] text-[#1f1f1f]">
       {/* Header */}
       <header className="h-16 px-6 flex items-center justify-between border-b border-[#e1e3e1]/60 bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-4">
@@ -290,7 +291,7 @@ export default function AdminPage() {
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
-            <BarChart3 className="w-5 h-5 text-[#0b57d0]" />
+            <BarChart3 className="w-5 h-5 text-[#0d2e5c]" />
             Admin Panel
           </h1>
         </div>
@@ -300,6 +301,12 @@ export default function AdminPage() {
             <Button variant="secondary" size="sm">
               <LayoutTemplate className="w-4 h-4 mr-2" />
               <span>Form Templates</span>
+            </Button>
+          </Link>
+          <Link href="/admin/settings">
+            <Button variant="secondary" size="sm">
+              <SlidersHorizontal className="w-4 h-4 mr-2" />
+              <span>Settings</span>
             </Button>
           </Link>
           <Button
@@ -321,7 +328,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("dms")}
             className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
               activeTab === "dms"
-                ? "bg-white text-[#0b57d0] shadow-sm"
+                ? "bg-white text-[#0d2e5c] shadow-sm"
                 : "text-[#444746] hover:text-[#1f1f1f]"
             }`}
           >
@@ -334,7 +341,7 @@ export default function AdminPage() {
             onClick={() => setActiveTab("api")}
             className={`px-5 py-2 rounded-lg text-sm font-semibold transition-all ${
               activeTab === "api"
-                ? "bg-white text-[#0b57d0] shadow-sm"
+                ? "bg-white text-[#0d2e5c] shadow-sm"
                 : "text-[#444746] hover:text-[#1f1f1f]"
             }`}
           >
@@ -348,7 +355,7 @@ export default function AdminPage() {
         {/* Loading / Error */}
         {loading ? (
           <div className="flex flex-col items-center justify-center py-20 gap-3">
-            <Loader2 className="w-8 h-8 text-[#0b57d0] animate-spin" />
+            <Loader2 className="w-8 h-8 text-[#0d2e5c] animate-spin" />
             <p className="text-sm text-[#444746]">Loading admin analytics...</p>
           </div>
         ) : error ? (
@@ -398,7 +405,7 @@ export default function AdminPage() {
                   {/* Document Status Breakdown */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-[#0b57d0]" />
+                      <Activity className="w-4 h-4 text-[#0d2e5c]" />
                       Document Processing Status
                     </h3>
                     {Object.keys(dmsData.documents_by_status).length > 0 ? (
@@ -441,7 +448,7 @@ export default function AdminPage() {
                   {/* File Types Breakdown */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                      <FileText className="w-4 h-4 text-[#0b57d0]" />
+                      <FileText className="w-4 h-4 text-[#0d2e5c]" />
                       File Types Distribution
                     </h3>
                     {dmsData.file_types_breakdown.length > 0 ? (
@@ -498,7 +505,7 @@ export default function AdminPage() {
                 {/* Upload Timeline (Bar Chart) */}
                 <div className="glass rounded-xl p-6 space-y-4">
                   <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                    <TrendingUp className="w-4 h-4 text-[#0b57d0]" />
+                    <TrendingUp className="w-4 h-4 text-[#0d2e5c]" />
                     Upload Timeline (Last 30 Days)
                   </h3>
                   {dmsData.upload_timeline.length > 0 ? (
@@ -519,7 +526,7 @@ export default function AdminPage() {
                               {dateLabel}: {item.count} uploads
                             </div>
                             <div
-                              className="w-full bg-[#0b57d0] rounded-t-sm hover:bg-[#0945a5] transition-all cursor-default"
+                              className="w-full bg-[#0d2e5c] rounded-t-sm hover:bg-[#0945a5] transition-all cursor-default"
                               style={{ height: `${height}%` }}
                             />
                           </div>
@@ -538,7 +545,7 @@ export default function AdminPage() {
                   {/* Top Uploaders */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                      <Users className="w-4 h-4 text-[#0b57d0]" />
+                      <Users className="w-4 h-4 text-[#0d2e5c]" />
                       Top Uploaders
                     </h3>
                     {dmsData.top_uploaders.length > 0 ? (
@@ -558,7 +565,7 @@ export default function AdminPage() {
                                 key={i}
                                 className="border-b border-[#e1e3e1]/50 hover:bg-[#f0f4f9] transition-colors"
                               >
-                                <td className="py-2 px-2 font-bold text-[#0b57d0]">{i + 1}</td>
+                                <td className="py-2 px-2 font-bold text-[#0d2e5c]">{i + 1}</td>
                                 <td className="py-2 px-2">
                                   <p className="font-medium text-[#1f1f1f]">{u.full_name}</p>
                                   <p className="text-[10px] text-[#444746]">{u.email}</p>
@@ -582,7 +589,7 @@ export default function AdminPage() {
                   {/* Storage Per Tenant */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                      <Building2 className="w-4 h-4 text-[#0b57d0]" />
+                      <Building2 className="w-4 h-4 text-[#0d2e5c]" />
                       Storage Per Tenant
                     </h3>
                     {dmsData.storage_per_tenant.length > 0 ? (
@@ -624,7 +631,7 @@ export default function AdminPage() {
                 {/* Recent Activity */}
                 <div className="glass rounded-xl p-6 space-y-4">
                   <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                    <ShieldCheck className="w-4 h-4 text-[#0b57d0]" />
+                    <ShieldCheck className="w-4 h-4 text-[#0d2e5c]" />
                     Recent Audit Activity
                   </h3>
                   {dmsData.recent_activity.length > 0 ? (
@@ -644,7 +651,7 @@ export default function AdminPage() {
                               key={i}
                               className="border-b border-[#e1e3e1]/30 hover:bg-[#f0f4f9] transition-colors"
                             >
-                              <td className="py-1.5 px-2 font-mono text-[#0b57d0]">{a.action}</td>
+                              <td className="py-1.5 px-2 font-mono text-[#0d2e5c]">{a.action}</td>
                               <td className="py-1.5 px-2 capitalize text-[#444746]">
                                 {a.resource_type}
                               </td>
@@ -739,7 +746,7 @@ export default function AdminPage() {
                   {/* Calls by HTTP Method */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                      <Server className="w-4 h-4 text-[#0b57d0]" />
+                      <Server className="w-4 h-4 text-[#0d2e5c]" />
                       Calls by HTTP Method
                     </h3>
                     <div className="space-y-3">
@@ -784,7 +791,7 @@ export default function AdminPage() {
                   {/* Calls by Status Code */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                      <Activity className="w-4 h-4 text-[#0b57d0]" />
+                      <Activity className="w-4 h-4 text-[#0d2e5c]" />
                       Status Code Distribution
                     </h3>
                     <div className="space-y-3">
@@ -831,7 +838,7 @@ export default function AdminPage() {
                 {apiData.api_timeline.length > 0 && (
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                      <TrendingUp className="w-4 h-4 text-[#0b57d0]" />
+                      <TrendingUp className="w-4 h-4 text-[#0d2e5c]" />
                       API Traffic — Last 24 Hours
                     </h3>
                     <div className="flex items-end gap-1 h-32">
@@ -848,7 +855,7 @@ export default function AdminPage() {
                               {item.hour}:00 — {item.count} calls
                             </div>
                             <div
-                              className="w-full bg-[#0b57d0] rounded-t-sm hover:bg-[#0945a5] transition-all cursor-default"
+                              className="w-full bg-[#0d2e5c] rounded-t-sm hover:bg-[#0945a5] transition-all cursor-default"
                               style={{ height: `${height}%` }}
                             />
                           </div>
@@ -869,7 +876,7 @@ export default function AdminPage() {
                   {/* Top Endpoints */}
                   <div className="glass rounded-xl p-6 space-y-4">
                     <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-[#0b57d0]" />
+                      <Zap className="w-4 h-4 text-[#0d2e5c]" />
                       Top Endpoints by Volume
                     </h3>
                     {apiData.top_endpoints.length > 0 ? (
@@ -974,7 +981,7 @@ export default function AdminPage() {
                 {/* Recent API Calls Log */}
                 <div className="glass rounded-xl p-6 space-y-4">
                   <h3 className="text-sm font-bold text-[#1f1f1f] flex items-center gap-2">
-                    <Server className="w-4 h-4 text-[#0b57d0]" />
+                    <Server className="w-4 h-4 text-[#0d2e5c]" />
                     Recent API Calls
                   </h3>
                   {apiData.recent_calls.length > 0 ? (

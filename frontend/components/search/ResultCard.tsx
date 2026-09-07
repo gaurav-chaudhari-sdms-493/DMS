@@ -60,7 +60,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, onPreview, reran
       glow={!isLowFocus} 
       className={`group animate-fadeIn flex flex-col gap-4 relative transition-all duration-300 ${
         isLowFocus 
-          ? "opacity-60 bg-[#f8f9fa]/90 border-dashed border-[#d3d7dc] shadow-none hover:opacity-100 hover:bg-white hover:border-[#0b57d0]/40" 
+          ? "opacity-60 bg-[#f8f9fa]/90 border-dashed border-[#d3d7dc] shadow-none hover:opacity-100 hover:bg-white hover:border-[#0d2e5c]/40" 
           : "hover:border-primary/50"
       }`}
     >
@@ -154,7 +154,7 @@ export const ResultCard: React.FC<ResultCardProps> = ({ result, onPreview, reran
           {onPreview && (
             <button
               onClick={() => onPreview(result)}
-              className="flex items-center gap-1.5 text-xs font-semibold text-[#0b57d0] hover:text-[#0945a5] bg-[#edf2fc] hover:bg-[#c2e7ff] px-3 py-1.5 rounded-lg border border-[#d3d7dc] transition-all cursor-pointer shadow-xs opacity-90 group-hover:opacity-100"
+              className="flex items-center gap-1.5 text-xs font-semibold text-[#0d2e5c] hover:text-[#0945a5] bg-[#edf2fc] hover:bg-[#c2e7ff] px-3 py-1.5 rounded-lg border border-[#d3d7dc] transition-all cursor-pointer shadow-xs opacity-90 group-hover:opacity-100"
               title="Preview document"
             >
               <Eye className="w-3.5 h-3.5" />

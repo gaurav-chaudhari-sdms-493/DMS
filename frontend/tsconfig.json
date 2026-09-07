@@ -24,5 +24,12 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
-  "exclude": ["node_modules"]
+  // T96 — the Playwright a11y suite is a separate toolchain (its own
+  // devDependencies, its own runtime TS transform) from the Next.js app
+  // itself; without this exclusion, `next build`'s project-wide type
+  // check picks up playwright.config.ts/tests/a11y/**, which fails in any
+  // environment (e.g. the production Docker build) that doesn't have
+  // @playwright/test installed — that package has no reason to ship in
+  // the app's own production image.
+  "exclude": ["node_modules", "playwright.config.ts", "tests/**"]
 }

@@ -7,6 +7,7 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 
+from app.database import establish_tenant_context
 from app.models.chat_session import ChatSession
 from app.models.chat_message import ChatMessage
 from app.schemas.search import SearchResult, SearchResponse
@@ -378,6 +379,7 @@ async def send_chat_message(
     session.updated_at = func.now()
 
     await db.commit()
+    await establish_tenant_context(db, tenant_id)  # T96 — see database.py's docstring
     await db.refresh(assistant_msg)
 
     await log_action(

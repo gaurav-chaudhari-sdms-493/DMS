@@ -1,6 +1,6 @@
 import pytest
 import uuid
-from app.services.search_service import search
+from app.services.search_service import search, _condense_excerpt_text, _expand_trilingual_query
 from app.services.chat_service import _extract_score_threshold, _is_explicit_search_intent
 from app.database import AsyncSessionLocal
 from app.models.tenant import Tenant
@@ -21,6 +21,50 @@ def test_extract_score_threshold_edge_cases():
     assert _extract_score_threshold("score > 50") == 0.50
     assert _extract_score_threshold("give me top 5 documents") is None
     assert _extract_score_threshold("random query without score") is None
+
+
+def test_condense_excerpt_text_collapses_blank_lines_without_reordering_words():
+    """Live bug, 2026-09-04: a sparse form's OCR text (Chandra/PaddleOCR,
+    line-based) puts a label and its value several blank lines apart
+    whenever they're visually far apart on the page (e.g. a 7/12 record's
+    "गाव" ... "आपटी" header line) -- the grounded-answer LLM (T70) was
+    handed that excerpt verbatim and refused to answer ("answerable":
+    false) even with the correct value sitting right there, because a
+    label separated from its value by a wall of blank lines reads as far
+    weaker evidence than two adjacent lines. Collapsing blank lines (never
+    touching word order/content) is what turned that live refusal into a
+    correct, cited answer on a re-test."""
+    raw = "गाव\n \n\n \n\nआपटी\n \n\nता.\n \nमावळ\n\n"
+    assert _condense_excerpt_text(raw) == "गाव\nआपटी\nता.\nमावळ"
+
+
+def test_condense_excerpt_text_handles_no_blank_lines():
+    assert _condense_excerpt_text("line one\nline two") == "line one\nline two"
+
+
+@pytest.mark.asyncio
+async def test_expand_trilingual_query_honors_explicit_response_language_request():
+    """Live bug, 2026-09-04: a query like "Explain this document in
+    Marathi" is itself WRITTEN in English, but the user explicitly asked
+    for the ANSWER in Marathi. _generate_grounded_answer used to be
+    handed detected_lang (the query's own written language, "English"
+    here) as the response language, so an explicit Marathi request got
+    silently answered in English. response_lang must track the
+    explicitly-requested output language instead, separate from
+    detected_lang."""
+    expanded = await _expand_trilingual_query("Explain this document in Marathi")
+    assert expanded["detected_lang"].lower() == "english"
+    assert expanded["response_lang"].lower() == "marathi"
+
+
+@pytest.mark.asyncio
+async def test_expand_trilingual_query_response_lang_defaults_to_detected_lang():
+    """No explicit target-language request in the query -- response_lang
+    must just track whatever language the query itself was written in,
+    not silently default to English."""
+    expanded = await _expand_trilingual_query("गावाचे नाव काय आहे?")
+    assert expanded["detected_lang"].lower() in ("marathi", "hindi")
+    assert expanded["response_lang"].lower() == expanded["detected_lang"].lower()
 
 
 def test_explicit_search_intent_detection():
@@ -173,6 +217,71 @@ async def test_search_structured_record_leg_finds_field_absent_from_chunk_text()
             assert len(res.results) >= 1
             assert "structured" in res.search_mode
             assert any(r.metadata.get("fact_id") == str(fact.id) for r in res.results)
+        finally:
+            await db.close()
+
+
+@pytest.mark.asyncio
+async def test_two_chunks_sharing_a_page_both_reach_the_grounding_llm():
+    """Live bug, 2026-09-04: TextChunker splits a long page into
+    consecutive, mostly-DISTINCT chunks (512 tokens, only 64 overlapping)
+    -- not near-duplicates. But search()'s results-list dedup collapses
+    every same-page chunk down to whichever one RRF ranks first, and that
+    same dedup used to gate what got sent to the grounding LLM too. A
+    village-record page whose village name landed in one chunk and whose
+    district name landed in a different chunk (both page 1) meant a
+    district question got "does not contain information" even though the
+    district chunk was genuinely retrieved and ranked -- the OTHER
+    same-page chunk silently evicted it before the LLM ever saw it.
+
+    This reproduces that shape with two page-1 chunks holding distinct,
+    unambiguous marker facts, and asserts BOTH make it into the grounded
+    answer's citations -- not just whichever one the results-list dedup
+    would have kept."""
+    async with AsyncSessionLocal() as db:
+        try:
+            tenant_id = uuid.uuid4()
+            user_id = uuid.uuid4()
+            tenant = Tenant(id=tenant_id, name=f"SamePage Tenant {uuid.uuid4().hex[:6]}")
+            user = User(id=user_id, tenant_id=tenant_id, email=f"samepage_{uuid.uuid4().hex[:6]}@test.com", hashed_password="pw")
+            db.add_all([tenant, user])
+            await db.commit()
+
+            doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="Village Record", status="indexed")
+            version = DocumentVersion(
+                id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+                file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="record.pdf",
+            )
+            db.add_all([doc, version])
+            await db.flush()
+            doc.current_version_id = version.id
+
+            chunk_a = Chunk(
+                id=uuid.uuid4(), document_id=doc.id, version_id=version.id, tenant_id=tenant_id,
+                content="Header line: the ZorbaxVillageMarker village name is Rampur.",
+                embedding=[0.0] * 1024, chunk_metadata={}, page_number=1, chunk_index=0, s3_path="x",
+            )
+            chunk_b = Chunk(
+                id=uuid.uuid4(), document_id=doc.id, version_id=version.id, tenant_id=tenant_id,
+                content="Table continues: the QuindleDistrictMarker district name is Solapur.",
+                embedding=[0.0] * 1024, chunk_metadata={}, page_number=1, chunk_index=1, s3_path="x",
+            )
+            db.add_all([chunk_a, chunk_b])
+            await db.commit()
+
+            res = await search(
+                query="What are the ZorbaxVillageMarker and QuindleDistrictMarker values?",
+                tenant_id=tenant_id,
+                user_id=user_id,
+                limit=10,
+                filters={"document_id": str(doc.id)},
+                db=db,
+                ip_address="127.0.0.1",
+                rerank_provider="bgem3",
+            )
+            cited_chunk_ids = {str(c.chunk_id) for c in res.citations if c.chunk_id}
+            assert str(chunk_a.id) in cited_chunk_ids
+            assert str(chunk_b.id) in cited_chunk_ids
         finally:
             await db.close()
 

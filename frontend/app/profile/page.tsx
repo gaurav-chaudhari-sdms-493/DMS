@@ -82,6 +82,10 @@ export default function ProfilePage() {
       setChangePasswordError("New password and confirmation don't match.");
       return;
     }
+    if (newPassword === currentPassword) {
+      setChangePasswordError("New password must be different from your current password.");
+      return;
+    }
     setChangePasswordLoading(true);
     try {
       await api.auth.changePassword(currentPassword, newPassword);
@@ -144,7 +148,7 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="min-h-screen bg-background text-textMain">
+    <div className="h-screen overflow-y-auto bg-background text-textMain">
       {/* Header Bar */}
       <header className="h-16 px-6 flex items-center justify-between border-b border-borderDark/60 bg-surface/50 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-4">
@@ -195,7 +199,7 @@ export default function ProfilePage() {
 
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                 <div className="flex items-center gap-5">
-                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-orange-600 text-white font-bold text-2xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
+                  <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-primary to-secondary text-white font-bold text-2xl flex items-center justify-center shadow-lg shadow-primary/20 shrink-0">
                     {profile.full_name
                       .split(" ")
                       .map((n) => n[0])

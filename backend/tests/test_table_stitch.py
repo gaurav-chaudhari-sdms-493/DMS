@@ -135,6 +135,64 @@ def test_join_rows_horizontally_needs_review_on_total_disagreement():
     assert "no shared" in result.reason
 
 
+def test_join_rows_horizontally_ditto_marks_and_place_names_are_not_keys():
+    """Real bug found live 2026-09-03 against an actual scanned spread
+    document: the right-hand band genuinely has no serial column at all
+    (real structural absence), but a column-position-mapped extraction
+    still filled EVERY row's key slot with something non-empty — mostly
+    ditto marks ("..") plus one unrelated place name ("Kanadgaon"). A
+    plain majority-non-empty check saw that as "this side has real keys"
+    and wrongly refused instead of falling through to position-based
+    pairing. Neither a ditto mark nor a place name is a plausible serial
+    number (no digit in either), so this must still resolve as a
+    structural absence, same as if the field had been blank."""
+    left = [
+        {"no": _f("180.", bbox=[0.1, 0.10, 0.5, 0.15]), "village": _f("Adgaon")},
+        {"no": _f("181.", bbox=[0.1, 0.20, 0.5, 0.25]), "village": _f("Do.")},
+        {"no": _f("182.", bbox=[0.1, 0.30, 0.5, 0.35]), "village": _f("Do.")},
+    ]
+    right = [
+        {"no": _f("..", bbox=[0.5, 0.10, 0.9, 0.15]), "remarks": _f("East-River.")},
+        {"no": _f("Kanadgaon", bbox=[0.5, 0.20, 0.9, 0.25]), "remarks": _f("Situated in Survey No. 50.")},
+        {"no": _f("..", bbox=[0.5, 0.30, 0.9, 0.35]), "remarks": _f("West-Lane.")},
+    ]
+    result = join_rows_horizontally(left, right, "no")
+    assert result.status == "ok"
+    assert len(result.pairs) == 3
+
+
+def test_join_rows_horizontally_equal_count_falls_back_to_rank_order():
+    """Real bug found live 2026-09-03, same document as the two fixes
+    above: with clean, genuine per-row bboxes on BOTH sides (not the
+    earlier degenerate-bbox bug), pixel-containment still failed on 11 of
+    18 rows — a real scanned register's two facing pages don't keep
+    perfectly identical row heights down the page, so a row can drift
+    into its neighbor's box well before any tolerance margin would help
+    (row 3 landed in row 2's box; by row 17 the drift covered a full row).
+    Equal row counts with no usable key on either side is itself strong
+    evidence these are the same rows in the same top-to-bottom order —
+    verified against the exact real span data that failed positionally:
+    rank order must succeed here even though bbox position doesn't."""
+    # Mirrors the real left/right vertical spans from that live document
+    # closely enough to reproduce the same containment failure pattern
+    # bbox-only matching hit (row 3 lands in row 2's span, not its own).
+    left = [
+        {"no": _f(f"{180+i}.", bbox=[0.1, 0.211 + i * 0.038, 0.5, 0.211 + (i + 1) * 0.038]), "village": _f(f"Village{i}")}
+        for i in range(6)
+    ]
+    right = [
+        {"no": _f("..", bbox=[0.5, 0.182 + i * 0.040, 0.9, 0.182 + (i + 1) * 0.040]), "remarks": _f(f"Remark{i}")}
+        for i in range(6)
+    ]
+    result = join_rows_horizontally(left, right, "no")
+    assert result.status == "ok"
+    assert len(result.pairs) == 6
+    # Rank order, not whatever bbox-position would have mismatched to.
+    for i, (l, r) in enumerate(result.pairs):
+        assert l["village"]["value"] == f"Village{i}"
+        assert r["remarks"]["value"] == f"Remark{i}"
+
+
 def test_join_rows_horizontally_zero_anchor_structural_absence():
     """Real-world case (a printed gazette continuation band that never
     repeats the row-number column at all, e.g. columns 9-19 of a wide
@@ -153,6 +211,31 @@ def test_join_rows_horizontally_zero_anchor_structural_absence():
     result = join_rows_horizontally(left, right, "no")
     assert result.status == "ok"
     assert len(result.pairs) == 2
+
+
+def test_join_rows_horizontally_single_stray_value_is_still_structural_absence():
+    """Real bug found live 2026-09-03 against an actual scanned spread
+    document: a continuation band that structurally never repeats the row
+    key had one row where the VLM had misextracted an unrelated value
+    (a village name) into the key field — 14 of 15 real rows correctly
+    blank, one stray non-empty value. The old "any row has something"
+    check treated that single value as proof this side "genuinely carries"
+    the key, misclassifying an honest structural absence as a real
+    conflict and skipping the position-based fallback entirely. A clear
+    minority of stray values must not flip the verdict."""
+    left = [
+        {"no": _f("180"), "owner": _f("Priya", bbox=[0.1, 0.10, 0.5, 0.15])},
+        {"no": _f("181"), "owner": _f("Ravi", bbox=[0.1, 0.20, 0.5, 0.25])},
+        {"no": _f("182"), "owner": _f("Asha", bbox=[0.1, 0.30, 0.5, 0.35])},
+    ]
+    right = [
+        {"no": _f(""), "valuation": _f("100", bbox=[0.5, 0.10, 0.9, 0.15])},
+        {"no": _f("Kanadgaon"), "valuation": _f("200", bbox=[0.5, 0.20, 0.9, 0.25])},  # stray VLM misextraction
+        {"no": _f(""), "valuation": _f("300", bbox=[0.5, 0.30, 0.9, 0.35])},
+    ]
+    result = join_rows_horizontally(left, right, "no")
+    assert result.status == "ok"
+    assert len(result.pairs) == 3
 
 
 def test_join_rows_horizontally_explicit_conflict_never_overridden_by_position():

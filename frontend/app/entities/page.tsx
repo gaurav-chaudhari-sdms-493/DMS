@@ -19,6 +19,7 @@ import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
 import { Button } from "@/components/ui/Button";
 import RegionHighlightViewer from "@/components/drive/RegionHighlightViewer";
+import { useI18n } from "@/lib/i18n";
 
 interface FieldProvenance {
   kind: "base" | "amendment";
@@ -134,6 +135,7 @@ function TierBadge({ tier }: { tier: number }) {
 }
 
 export default function Entity360Page() {
+  const { t } = useI18n();
   const [nodeId, setNodeId] = useState("");
   const [data, setData] = useState<Entity360 | null>(null);
   const [loading, setLoading] = useState(false);
@@ -246,7 +248,7 @@ export default function Entity360Page() {
   };
 
   return (
-    <div className="min-h-screen bg-[#f8f9fa] text-[#1f1f1f]">
+    <div className="h-screen overflow-y-auto bg-[#f8f9fa] text-[#1f1f1f]">
       <header className="h-16 px-6 flex items-center justify-between border-b border-[#e1e3e1]/60 bg-white/80 backdrop-blur-md sticky top-0 z-20">
         <div className="flex items-center gap-4">
           <Link
@@ -254,17 +256,17 @@ export default function Entity360Page() {
             className="flex items-center gap-2 text-sm text-[#444746] hover:text-[#1f1f1f] transition-colors px-3 py-1.5 rounded-lg hover:bg-[#f0f4f9]"
           >
             <ArrowLeft className="w-4 h-4" />
-            <span>Back to Drive</span>
+            <span>{t("common.back", "Back to Drive")}</span>
           </Link>
           <div className="h-5 w-px bg-[#e1e3e1]" />
           <h1 className="text-lg font-bold text-[#1f1f1f] flex items-center gap-2">
-            <Network className="w-5 h-5 text-[#0b57d0]" />
-            Entity 360
+            <Network className="w-5 h-5 text-[#0d2e5c]" />
+            {t("entities.title", "Entity 360")}
           </h1>
           {navHistory.length > 0 && (
             <button
               onClick={goBack}
-              className="flex items-center gap-1.5 text-sm text-[#0b57d0] hover:underline px-2 py-1"
+              className="flex items-center gap-1.5 text-sm text-[#0d2e5c] hover:underline px-2 py-1"
             >
               <ArrowLeft className="w-3.5 h-3.5" />
               Back to {navHistory[navHistory.length - 1].label}
@@ -294,7 +296,7 @@ export default function Entity360Page() {
               value={nameQuery}
               onChange={(e) => setNameQuery(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && searchByName()}
-              className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0b57d0]/40"
+              className="flex-1 text-sm px-3 py-2 rounded-lg border border-[#e1e3e1] focus:outline-none focus:ring-2 focus:ring-[#0d2e5c]/40"
             />
             <Button size="sm" loading={searching} onClick={searchByName}>
               Search
@@ -326,7 +328,7 @@ export default function Entity360Page() {
 
         {loading && (
           <div className="flex justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-[#0b57d0]" />
+            <Loader2 className="w-6 h-6 animate-spin text-[#0d2e5c]" />
           </div>
         )}
 
@@ -364,7 +366,7 @@ export default function Entity360Page() {
                       </div>
                       <button
                         onClick={() => openHistory(r.record_id)}
-                        className="flex items-center gap-1 text-xs font-bold text-[#0b57d0] hover:underline"
+                        className="flex items-center gap-1 text-xs font-bold text-[#0d2e5c] hover:underline"
                       >
                         <History className="w-3.5 h-3.5" /> View history
                       </button>
@@ -381,7 +383,7 @@ export default function Entity360Page() {
                                 {prov?.evidence_fact_id && (
                                   <button
                                     onClick={() => setViewingFactId(prov.evidence_fact_id!)}
-                                    className="text-[10px] font-bold text-[#0b57d0] hover:underline flex items-center gap-1 ml-auto"
+                                    className="text-[10px] font-bold text-[#0d2e5c] hover:underline flex items-center gap-1 ml-auto"
                                   >
                                     <FileText className="w-3 h-3" /> source
                                   </button>
@@ -399,7 +401,7 @@ export default function Entity360Page() {
 
             <Card className="bg-white border border-[#e1e3e1]">
               <h3 className="text-sm font-bold mb-1">Linked entities ({data.linked_entities.length})</h3>
-              <p className="text-[10px] text-[#9aa0a6] mb-3">Other people, properties, or institutions connected to this one.</p>
+              <p className="text-[10px] text-[#444746] mb-3">Other people, properties, or institutions connected to this one.</p>
               {data.linked_entities.length === 0 && <p className="text-sm text-[#747775]">No linked entities.</p>}
               <div className="flex flex-col gap-2">
                 {data.linked_entities.map((e) => (
@@ -438,7 +440,7 @@ export default function Entity360Page() {
                           Revert
                         </button>
                       )}
-                      <button onClick={() => load(e.other_node.id)} className="font-bold text-[#0b57d0] hover:underline">
+                      <button onClick={() => load(e.other_node.id)} className="font-bold text-[#0d2e5c] hover:underline">
                         View
                       </button>
                     </div>
@@ -449,7 +451,7 @@ export default function Entity360Page() {
 
             <Card className="bg-white border border-[#e1e3e1]">
               <h3 className="text-sm font-bold mb-1">Linked facts ({data.linked_facts.length})</h3>
-              <p className="text-[10px] text-[#9aa0a6] mb-3">Extracted document fields tied to this entity.</p>
+              <p className="text-[10px] text-[#444746] mb-3">Extracted document fields tied to this entity.</p>
               {data.linked_facts.length === 0 && <p className="text-sm text-[#747775]">No linked facts.</p>}
               <div className="flex flex-col gap-2">
                 {data.linked_facts.map((e) => (
@@ -490,7 +492,7 @@ export default function Entity360Page() {
                       )}
                       <button
                         onClick={() => setViewingFactId(e.fact.fact_id)}
-                        className="flex items-center gap-1 font-bold text-[#0b57d0] hover:underline"
+                        className="flex items-center gap-1 font-bold text-[#0d2e5c] hover:underline"
                       >
                         <FileText className="w-3 h-3" /> source
                       </button>
@@ -517,7 +519,7 @@ export default function Entity360Page() {
               </div>
               <div className="px-6 pb-6">
                 {historyLoading ? (
-                  <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#0b57d0]" /></div>
+                  <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-[#0d2e5c]" /></div>
                 ) : history ? (
                   <div className="flex flex-col gap-4">
                     <div className="border border-[#e1e3e1] rounded-xl p-4">
@@ -538,7 +540,7 @@ export default function Entity360Page() {
                       {history.base.evidence_fact_id && (
                         <button
                           onClick={() => setViewingFactId(history.base.evidence_fact_id!)}
-                          className="mt-2 text-[10px] font-bold text-[#0b57d0] hover:underline flex items-center gap-1"
+                          className="mt-2 text-[10px] font-bold text-[#0d2e5c] hover:underline flex items-center gap-1"
                         >
                           <FileText className="w-3 h-3" /> source
                         </button>
@@ -567,7 +569,7 @@ export default function Entity360Page() {
                         {a.legal_status && <p className="text-xs mt-2">legal status → <span className="font-bold">{a.legal_status}</span></p>}
                         <button
                           onClick={() => setViewingFactId(a.evidence_fact_id)}
-                          className="mt-2 text-[10px] font-bold text-[#0b57d0] hover:underline flex items-center gap-1"
+                          className="mt-2 text-[10px] font-bold text-[#0d2e5c] hover:underline flex items-center gap-1"
                         >
                           <FileText className="w-3 h-3" /> source
                         </button>

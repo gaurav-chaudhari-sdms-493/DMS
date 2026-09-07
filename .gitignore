@@ -170,3 +170,10 @@ CLAUDE.md
 
 # Local connector test/runtime data — not source, drop-zone contents only
 connector_inbox/
+
+# T96 — Playwright a11y suite artifacts: a real access token lives in
+# .auth/user.json (per-run, from global.setup.ts's real signup), never
+# something to commit.
+/frontend/tests/a11y/.auth/
+/frontend/test-results/
+/frontend/playwright-report/
