@@ -3,7 +3,7 @@ import uuid
 from jose import jwt, JWTError
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, text
 from app.config import settings
 from app.schemas.auth import TokenPayload, SignUpRequest, SignUpResponse
 from app.models.user import User, UserRole
@@ -21,18 +21,51 @@ def verify_password(plain: str, hashed: str) -> bool:
     except Exception:
         return False
 
+async def establish_tenant_context(db: AsyncSession, tenant_id) -> None:
+    """D-2 fix — call the moment a pre-authentication flow (signup, login,
+    forgot-password) first learns which tenant it's now acting for, before
+    the next write on this session. Session-scoped (is_local=false), so it
+    survives an in-request db.commit() — sign_up() below does several — and
+    is cleaned up centrally by database.py's _reset_session_tenant_context
+    before this pooled connection is ever reused by an unrelated request."""
+    await db.execute(
+        text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": str(tenant_id)}
+    )
+
+async def lookup_user_by_email(db: AsyncSession, email: str) -> User | None:
+    """D-2 fix — iam_dg_users' tenant_isolation_policy denies by default
+    when no tenant context is set, which is exactly the situation here:
+    login, signup, and forgot/reset-password all need to find a user BEFORE
+    any tenant is known. Migration 0046 adds a second, narrowly-scoped
+    permissive policy that allows exactly one row when this session var
+    names its email — set it, then query normally. Session-scoped, same
+    reasoning and same centralized cleanup as establish_tenant_context."""
+    await db.execute(
+        text("SELECT set_config('app.login_lookup_email', :e, false)"), {"e": email}
+    )
+    res = await db.execute(select(User).where(User.email == email))
+    return res.scalar_one_or_none()
+
 async def sign_up(body: SignUpRequest, db: AsyncSession) -> SignUpResponse:
     """Creates a new tenant and its founding user with full tenant-wide
     administrative access."""
-    stmt = select(User).where(User.email == body.email)
-    res = await db.execute(stmt)
-    if res.scalar_one_or_none():
+    if await lookup_user_by_email(db, body.email):
         raise HTTPException(status_code=409, detail="Email already registered")
 
     # Create tenant
     tenant = Tenant(name=f"{body.full_name}'s Organization")
     db.add(tenant)
     await db.flush()
+
+    # D-2 fix — signup runs with no tenant context (there's no tenant to
+    # have context for until the line above creates one), but everything
+    # written from here on genuinely belongs to this brand-new tenant --
+    # this flow is the trusted authority establishing that, the same way
+    # login/forgot-password are for app.login_lookup_email above. Without
+    # this, the User and Subscription inserts below are rejected by RLS's
+    # WITH CHECK (real bug, caught live: a fresh signup 500'd on the
+    # billing_dg_subscription insert the instant that table got a policy).
+    await establish_tenant_context(db, tenant.id)
 
     # Create user
     user = User(
@@ -115,9 +148,7 @@ async def reset_password_with_token(email: str, token: str, new_password: str, d
     except JWTError:
         raise HTTPException(status_code=400, detail="Invalid or expired reset token")
 
-    stmt = select(User).where(User.email == email)
-    res = await db.execute(stmt)
-    user = res.scalar_one_or_none()
+    user = await lookup_user_by_email(db, email)
     if not user:
         raise HTTPException(status_code=444, detail="User not found")
 

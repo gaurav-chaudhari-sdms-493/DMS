@@ -98,6 +98,12 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           APP_ENV: test
           JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
+          # D-2 fix, migration 0046 — creates the restricted `dms_app` role
+          # (NOSUPERUSER NOBYPASSRLS) RLS actually needs to enforce against;
+          # read from env at migration time so no password is ever
+          # hardcoded in a migration file. Throwaway value for this
+          # ephemeral CI Postgres instance, same as POSTGRES_PASSWORD above.
+          APP_DB_PASSWORD: ci_dms_app_password_not_secret
         run: |
           cd backend
           alembic upgrade head
@@ -108,6 +114,12 @@ jobs:
           REDIS_URL: redis://localhost:6379/0
           APP_ENV: test
           JWT_SECRET_KEY: testsecretkey12345678901234567890123456789012
+          # D-2 fix — same restricted role the migration step above created;
+          # without this, AppSessionLocal falls back to the superuser
+          # connection (database.py's own documented fallback) and
+          # test_rls_enforcement.py would be testing a connection real
+          # production traffic doesn't actually use.
+          APP_POSTGRES_URL: postgresql+asyncpg://dms_app:ci_dms_app_password_not_secret@localhost:5432/docsearch_db
           # test_cohere_reranker.py::test_cohere_reranker_execution makes a
           # real, unmocked call to Cohere's rerank API -- inert (empty
           # string, same failure as before) until a COHERE_API_KEY repo

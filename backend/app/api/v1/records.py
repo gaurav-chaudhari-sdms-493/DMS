@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ...schemas.auth import TokenPayload
-from ...deps import get_db, require_tenant_access, require_role
+from ...deps import get_tenant_db, require_tenant_access, require_role
 from ...services import records_service
 from ...models.record_amendment import VALID_LEGAL_STATUSES
 
@@ -23,7 +23,7 @@ class RecordCreate(BaseModel):
 async def create_record_api(
     record_in: RecordCreate,
     current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     user_id = uuid.UUID(current_user.sub)
@@ -44,7 +44,7 @@ async def create_record_api(
 async def list_records_by_status_api(
     legal_status: str,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     if legal_status not in VALID_LEGAL_STATUSES:
         raise HTTPException(status_code=422, detail=f"legal_status must be one of {VALID_LEGAL_STATUSES}")
@@ -55,7 +55,7 @@ async def list_records_by_status_api(
 @router.get("/status-summary")
 async def get_legal_status_summary_api(
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     return await records_service.get_legal_status_summary(db, tenant_id)
@@ -65,7 +65,7 @@ async def get_legal_status_summary_api(
 async def get_record_history_api(
     record_id: uuid.UUID,
     current_user: TokenPayload = Depends(require_tenant_access),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     """T60/T62 — the base entry plus every amendment, in order: the
     'versions' view the entity 360 page's history panel reads from."""

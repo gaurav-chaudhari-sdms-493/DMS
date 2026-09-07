@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ...deps import get_db, require_role
+from ...deps import get_tenant_db, require_role
 from ...schemas.auth import TokenPayload
 from ...services import department_service
 
@@ -26,7 +26,7 @@ class DepartmentFolderGrant(BaseModel):
 async def create_department_api(
     body: DepartmentCreate,
     current_user: TokenPayload = Depends(require_role("it_admin")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     actor_id = uuid.UUID(current_user.sub)
@@ -39,7 +39,7 @@ async def add_department_member_api(
     department_id: uuid.UUID,
     body: DepartmentMemberAdd,
     current_user: TokenPayload = Depends(require_role("it_admin")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     actor_id = uuid.UUID(current_user.sub)
@@ -52,7 +52,7 @@ async def grant_department_folder_api(
     department_id: uuid.UUID,
     body: DepartmentFolderGrant,
     current_user: TokenPayload = Depends(require_role("it_admin")),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
 ):
     tenant_id = uuid.UUID(current_user.tenant_id)
     actor_id = uuid.UUID(current_user.sub)

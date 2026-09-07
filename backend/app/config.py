@@ -22,7 +22,17 @@ class Settings(BaseSettings):
     
     # Database
     postgres_url: str
-    
+
+    # D-2 security fix — the restricted, non-superuser role every real
+    # FastAPI request connects as (see database.py's AppSessionLocal).
+    # Empty string means "not configured yet": database.py falls back to
+    # postgres_url (the superuser connection) rather than crashing, so an
+    # environment that hasn't rotated to the new role yet (e.g. CI) keeps
+    # working — but Row-Level Security provides no real protection until
+    # this is set. Never silently assume it's fine; database.py logs a
+    # warning on every startup when it's empty.
+    app_postgres_url: str = ''
+
     # Redis
     redis_url: str
     
