@@ -228,3 +228,11 @@ export interface TemplateCreatePayload {
   layout: string;
 }
 
+// T03 — one row of sys_dg_config, the global engineering-threshold table.
+export interface SysConfigItem {
+  key: string;
+  value: number;
+  description: string;
+  updated_at: string;
+}
+

@@ -24,6 +24,7 @@ import {
   RefreshCw,
   Trash2,
   LayoutTemplate,
+  SlidersHorizontal,
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { Card } from "@/components/ui/Card";
@@ -300,6 +301,12 @@ export default function AdminPage() {
             <Button variant="secondary" size="sm">
               <LayoutTemplate className="w-4 h-4 mr-2" />
               <span>Form Templates</span>
+            </Button>
+          </Link>
+          <Link href="/admin/settings">
+            <Button variant="secondary" size="sm">
+              <SlidersHorizontal className="w-4 h-4 mr-2" />
+              <span>Settings</span>
             </Button>
           </Link>
           <Button

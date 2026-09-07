@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, case, extract, cast, Numeric
 from datetime import datetime, timedelta
@@ -15,8 +16,13 @@ from ...models.folder import Folder
 from ...models.chat_session import ChatSession
 from ...models.audit_log import AuditLog
 from ...models.api_log import ApiLog
+from ...services import config_service
 
 router = APIRouter()
+
+
+class ConfigUpdateRequest(BaseModel):
+    value: float
 
 
 @router.get('/analytics')
@@ -366,3 +372,28 @@ async def get_api_analytics(
         "api_timeline": api_timeline,
         "recent_calls": recent_calls,
     }
+
+
+@router.get('/config')
+async def list_config_api(
+    current_user: TokenPayload = Depends(require_role('it_admin')),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    """T03 — sys_dg_config is global (no tenant_id column, see D2's own
+    audit), so this genuinely lists every tenant's shared engineering
+    thresholds. Read access still gated to it_admin, matching how the
+    write side has to be — reading which thresholds are live is itself
+    operational information, not something to expose to every role."""
+    return await config_service.list_all_config(db)
+
+
+@router.patch('/config/{key}')
+async def update_config_api(
+    key: str,
+    body: ConfigUpdateRequest,
+    current_user: TokenPayload = Depends(require_role('it_admin')),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    actor_id = uuid.UUID(current_user.sub)
+    return await config_service.set_config(db, key, body.value, actor_id, tenant_id)

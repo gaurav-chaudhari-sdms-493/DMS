@@ -1,6 +1,6 @@
 import { getAccessToken, getUserProfile, setUserProfile, clearTokens } from "./auth";
 import { offlineStore } from "./offlineStore";
-import type { Folder, FolderTreeNode, DocumentListItem, DocumentDetailResponse, DocumentFactsResponse, DocumentTableViewResponse, DriveStats, SearchResponse, ChatSession, ChatMessage, ChatSessionListItem, TemplateResponse, TemplateCreatePayload } from "@/types";
+import type { Folder, FolderTreeNode, DocumentListItem, DocumentDetailResponse, DocumentFactsResponse, DocumentTableViewResponse, DriveStats, SearchResponse, ChatSession, ChatMessage, ChatSessionListItem, TemplateResponse, TemplateCreatePayload, SysConfigItem } from "@/types";
 
 export const getBaseUrl = (): string => {
   if (typeof window !== "undefined") {
@@ -627,6 +627,18 @@ export const api = {
     },
     getApiAnalytics: async (): Promise<any> => {
       return await request("/api/v1/admin/api-analytics");
+    },
+    // T03 — sys_dg_config is global (no per-tenant scoping), so this lists
+    // every engineering threshold the pipeline reads via
+    // config_service.get_int/get_float, not just this tenant's own data.
+    getConfig: async (): Promise<SysConfigItem[]> => {
+      return await request("/api/v1/admin/config");
+    },
+    updateConfig: async (key: string, value: number): Promise<SysConfigItem> => {
+      return await request(`/api/v1/admin/config/${encodeURIComponent(key)}`, {
+        method: "PATCH",
+        body: JSON.stringify({ value }),
+      });
     },
   },
   templates: {
