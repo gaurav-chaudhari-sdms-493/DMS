@@ -2,9 +2,14 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
 import { getUserProfile, isAuthenticated } from "./auth";
+import { SUPPORTED_LOCALES, LOCALE_COOKIE_KEY, type Locale } from "./locale";
 
-export const SUPPORTED_LOCALES = ["en", "mr"] as const;
-export type Locale = (typeof SUPPORTED_LOCALES)[number];
+// Re-exported for existing "@/lib/i18n" imports. Server components (e.g.
+// app/layout.tsx) must import these two directly from "@/lib/locale"
+// instead — a "use client" module's exports, re-exports included, become
+// client-reference proxies when read from the server, and calling
+// .includes() on one throws at request time.
+export { SUPPORTED_LOCALES, LOCALE_COOKIE_KEY, type Locale };
 
 const LOCALE_STORAGE_KEY = "dms_locale";
 const CACHE_KEY_PREFIX = "dms_i18n_cache_";
@@ -378,6 +383,11 @@ export const STATIC_TRANSLATIONS: Record<Locale, Record<string, string>> = {
   },
 };
 
+function writeCookieLocale(locale: Locale): void {
+  if (typeof document === "undefined") return;
+  document.cookie = `${LOCALE_COOKIE_KEY}=${locale}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
 function readCachedTranslations(locale: Locale): Record<string, string> | null {
   if (typeof window === "undefined") return null;
   try {
@@ -406,6 +416,11 @@ function readInitialLocale(): Locale {
   const stored = localStorage.getItem(LOCALE_STORAGE_KEY);
   if (stored && (SUPPORTED_LOCALES as readonly string[]).includes(stored)) {
     return stored as Locale;
+  }
+  const cookieMatch = document.cookie.match(/(?:^|; )dms_locale=([^;]*)/);
+  const cookieValue = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null;
+  if (cookieValue && (SUPPORTED_LOCALES as readonly string[]).includes(cookieValue)) {
+    return cookieValue as Locale;
   }
   return "en";
 }
@@ -466,6 +481,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
     if (typeof document !== "undefined") {
       document.documentElement.lang = locale;
       document.documentElement.classList.toggle("font-devanagari", locale === "mr");
+      writeCookieLocale(locale);
     }
 
     return () => {
