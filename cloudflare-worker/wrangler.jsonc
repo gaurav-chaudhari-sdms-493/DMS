@@ -4,6 +4,6 @@
   "main": "src/index.js",
   "compatibility_date": "2024-09-23",
   "vars": {
-    "BACKEND_URL": "https://dms.yourdomain.com"
+    "BACKEND_URL": "https://disagree-penknife-getaway.ngrok-free.dev"
   }
 }

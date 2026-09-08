@@ -46,7 +46,7 @@ async def _make_doc_with_chunks(db, page_words, chunk_content):
 
     doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="register.pdf", status="indexed")
     version = DocumentVersion(
-        id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
         file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="register.pdf",
     )
     db.add_all([doc, version])
@@ -110,7 +110,7 @@ async def test_backfill_writes_a_real_region_for_an_existing_metadata_item():
     ]
     async with AsyncSessionLocal() as db:
         tenant_id, doc_id = await _make_doc_with_chunks(db, words, "Serial WB-88 recorded")
-        item = MetadataItem(document_id=doc_id, key="serial_number", value={"v": "WB-88"}, source="llm", confidence_score=0.9)
+        item = MetadataItem(tenant_id=tenant_id, document_id=doc_id, key="serial_number", value={"v": "WB-88"}, source="llm", confidence_score=0.9)
         db.add(item)
         await db.commit()
         item_id = item.id
@@ -134,7 +134,7 @@ async def test_backfill_dry_run_writes_nothing():
     words = [{"text": "WB-99", "x0": 0.2, "y0": 0.1, "x1": 0.3, "y1": 0.12}]
     async with AsyncSessionLocal() as db:
         tenant_id, doc_id = await _make_doc_with_chunks(db, words, "Serial WB-99 recorded")
-        item = MetadataItem(document_id=doc_id, key="serial_number", value={"v": "WB-99"}, source="llm", confidence_score=0.9)
+        item = MetadataItem(tenant_id=tenant_id, document_id=doc_id, key="serial_number", value={"v": "WB-99"}, source="llm", confidence_score=0.9)
         db.add(item)
         await db.commit()
         item_id = item.id
@@ -156,7 +156,7 @@ async def test_backfill_never_overwrites_an_existing_region():
     words = [{"text": "WB-11", "x0": 0.2, "y0": 0.1, "x1": 0.3, "y1": 0.12}]
     async with AsyncSessionLocal() as db:
         tenant_id, doc_id = await _make_doc_with_chunks(db, words, "Serial WB-11 recorded")
-        item = MetadataItem(document_id=doc_id, key="serial_number", value={"v": "WB-11"}, source="llm", confidence_score=0.9)
+        item = MetadataItem(tenant_id=tenant_id, document_id=doc_id, key="serial_number", value={"v": "WB-11"}, source="llm", confidence_score=0.9)
         db.add(item)
         await db.flush()
         db.add(MetadataItemRegion(

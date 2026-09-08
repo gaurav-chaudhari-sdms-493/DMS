@@ -30,7 +30,7 @@ from ..schemas.document import DocumentUploadResponse
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_CONNECTOR_EMAIL = "biznesskd07@gmail.com"
+DEFAULT_CONNECTOR_EMAIL = "teamworklax@gmail.com"
 
 _actor_cache: dict[str, tuple[UUID, UUID]] = {}
 

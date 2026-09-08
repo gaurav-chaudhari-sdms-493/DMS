@@ -33,7 +33,7 @@ async def test_generate_certificate_includes_hash_algorithm_and_signatures():
             await db.flush()
 
             version = DocumentVersion(
-                id=version_id, document_id=document_id, s3_path="s3://bucket/key",
+                id=version_id, tenant_id=tenant_id, document_id=document_id, s3_path="s3://bucket/key",
                 version_number=1, file_hash="a" * 64, file_size_bytes=1024,
                 original_filename="test_register.pdf", uploaded_by=user_id,
             )

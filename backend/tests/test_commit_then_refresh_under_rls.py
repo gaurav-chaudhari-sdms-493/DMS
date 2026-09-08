@@ -48,7 +48,7 @@ async def _make_tenant_user_doc(db):
     ))
     doc = Document(id=doc_id, tenant_id=tenant_id, title="rls_regression.pdf", status="indexed")
     version = DocumentVersion(
-        id=version_id, document_id=doc_id, version_number=1, s3_path="x",
+        id=version_id, tenant_id=tenant_id, document_id=doc_id, version_number=1, s3_path="x",
         file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="rls_regression.pdf",
     )
     db.add_all([doc, version])

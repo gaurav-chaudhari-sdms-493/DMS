@@ -14,6 +14,7 @@ class DocumentVersion(Base):
     __tablename__ = "doc_dg_document_versions"
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("iam_dg_tenants.id"), index=True, nullable=False)
     document_id: Mapped[uuid.UUID] = mapped_column(ForeignKey("doc_dg_documents.id"), index=True)
     s3_path: Mapped[str] = mapped_column()
     # T41 — PDF/A-2b rendition, stored alongside the original (never

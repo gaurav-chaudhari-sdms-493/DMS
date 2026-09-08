@@ -1,29 +1,22 @@
+import type { Metadata } from "next";
 import "./globals.css";
-import React from "react";
 import { Noto_Sans_Devanagari } from "next/font/google";
 import { I18nProvider } from "@/lib/i18n";
 import { OnlineStatusProvider } from "@/hooks/useOnlineStatus";
 
-// T95 — loaded unconditionally (Next.js requires next/font calls to be
-// static); applied via the `font-devanagari` class, toggled at runtime
-// by I18nProvider based on the user's selected locale.
 const notoSansDevanagari = Noto_Sans_Devanagari({
-  subsets: ["devanagari"],
+  subsets: ["devanagari", "latin"],
   weight: ["400", "500", "600", "700"],
-  variable: "--font-devanagari",
-  display: "swap",
+  variable: "--font-noto-devanagari",
 });
 
-export const metadata = {
-  title: "DMS - DocSearch AI",
-  description: "AI Powered Document Management System (DMS)",
-  viewport: "width=device-width, initial-scale=1",
+export const metadata: Metadata = {
+  title: "DMS Ai",
+  description: "DMS Ai verification system",
   icons: {
     icon: [
-      { url: "/stark-dms-app-logo.svg", type: "image/svg+xml" },
       { url: "/favicon.ico" },
-      { url: "/stark-icon-32.png", sizes: "32x32", type: "image/png" },
-      { url: "/stark-icon-16.png", sizes: "16x16", type: "image/png" },
+      { url: "/icon.png", type: "image/png", sizes: "32x32" },
     ],
     apple: [
       { url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },

@@ -68,7 +68,7 @@ async def test_get_full_history_returns_base_and_amendments_in_order():
 
             doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="7/12 extract", status="indexed")
             version = DocumentVersion(
-                id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+                id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
                 file_hash="deadbeef", file_size_bytes=1, original_filename="712.pdf",
             )
             db.add_all([doc, version])

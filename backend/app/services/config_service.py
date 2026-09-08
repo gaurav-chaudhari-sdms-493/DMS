@@ -64,6 +64,10 @@ async def get_float(key: str, default: float) -> float:
     return float(await get_config(key, default))
 
 
+async def get_str(key: str, default: str) -> str:
+    return str(await get_config(key, default))
+
+
 # T03 — the admin settings screen. Reads/writes through the caller's own
 # request-scoped `db` (get_tenant_db), not this module's own NullPool
 # _ConfigSession -- that one exists solely for the read-path's cross-loop

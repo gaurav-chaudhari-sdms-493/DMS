@@ -110,6 +110,7 @@ async def upload_document(
 
     version = DocumentVersion(
         id=version_id,
+        tenant_id=tenant_id,
         document_id=doc_id,
         s3_path=s3_key,
         version_number=1,
@@ -177,6 +178,8 @@ async def upload_documents_bulk(
     )
 
 
+from ..models.metadata_item import MetadataItem
+
 async def list_documents(
     db: AsyncSession,
     tenant_id: UUID,
@@ -188,7 +191,10 @@ async def list_documents(
     stmt = (
         select(Document)
         .where(Document.tenant_id == tenant_id, Document.is_trashed == is_trashed)
-        .options(selectinload(Document.versions))
+        .options(
+            selectinload(Document.versions),
+            selectinload(Document.metadata_items.and_(MetadataItem.key.in_(["quality_flag", "quality_report"]))),
+        )
     )
 
     if is_starred is not None:
@@ -209,6 +215,17 @@ async def list_documents(
         s3_path = curr_v.s3_path if curr_v else None
         url = await generate_presigned_url(s3_path) if s3_path else None
 
+        q_flag = None
+        q_warnings = []
+        for m in doc.metadata_items:
+            if m.key == "quality_flag" and isinstance(m.value, dict):
+                q_flag = m.value.get("flag")
+                if not q_warnings:
+                    q_warnings = m.value.get("warnings", [])
+            elif m.key == "quality_report" and isinstance(m.value, dict):
+                if not q_warnings:
+                    q_warnings = m.value.get("warnings", [])
+
         items.append(
             DocumentListItem(
                 id=doc.id,
@@ -224,6 +241,8 @@ async def list_documents(
                 current_version_id=doc.current_version_id,
                 s3_path=s3_path,
                 download_url=url,
+                quality_flag=q_flag,
+                quality_warnings=q_warnings,
             )
         )
     return items
@@ -270,23 +289,27 @@ async def get_document(
         versions[-1] if versions else None,
     )
 
-    meta = [
-        {
+    q_flag = None
+    q_warnings = []
+    meta = []
+    for m in doc.metadata_items:
+        meta.append({
             "key": m.key,
             "value": m.value,
             "source": m.source,
             "confidence_score": m.confidence_score,
-            # T05 — where this value came from on the page, when it could
-            # be verbatim-located (see source_location_service). Empty for
-            # any metadata written before this shipped, or any value the
-            # LLM paraphrased away from the page's actual printed text.
             "regions": [
                 {"page_number": r.page_number, "x0": r.x0, "y0": r.y0, "x1": r.x1, "y1": r.y1}
                 for r in m.regions
             ],
-        }
-        for m in doc.metadata_items
-    ]
+        })
+        if m.key == "quality_flag" and isinstance(m.value, dict):
+            q_flag = m.value.get("flag")
+            if not q_warnings:
+                q_warnings = m.value.get("warnings", [])
+        elif m.key == "quality_report" and isinstance(m.value, dict):
+            if not q_warnings:
+                q_warnings = m.value.get("warnings", [])
 
     await log_action(db, actor_id, tenant_id, "document.view", resource_type="document", resource_id=doc.id)
 
@@ -303,6 +326,8 @@ async def get_document(
         current_version=curr_version,
         metadata=meta,
         versions=versions,
+        quality_flag=q_flag,
+        quality_warnings=q_warnings,
         possible_duplicate_candidates=doc.possible_duplicate_candidates,
     )
 
@@ -547,7 +572,7 @@ async def get_drive_stats(db: AsyncSession, tenant_id: UUID) -> DriveStatsRespon
     v_res = await db.execute(
         select(func.sum(DocumentVersion.file_size_bytes))
         .join(Document, Document.current_version_id == DocumentVersion.id)
-        .where(Document.tenant_id == tenant_id)
+        .where(Document.tenant_id == tenant_id, Document.is_trashed == False)
     )
     total_bytes = v_res.scalar() or 0
 
@@ -625,13 +650,16 @@ async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 
     pending_documents = []  # (title, retention_class, days_remaining) — has a finite period, just not up yet
     for d_id, t_id, retention_class, trashed_at, title in candidate_docs:
         class_days = class_periods.get(retention_class)
-        if class_days is None:
-            protected_documents.append({"title": title, "retention_class": retention_class})
-            continue  # permanent class, or an unrecognized one — fail safe, never purge
-        if now - trashed_at < timedelta(days=class_days):
-            days_remaining = class_days - (now - trashed_at).days
-            pending_documents.append({"title": title, "retention_class": retention_class, "days_remaining": max(days_remaining, 0)})
-            continue
+        
+        if retention_days > 0:
+            if class_days is None:
+                protected_documents.append({"title": title, "retention_class": retention_class})
+                continue  # permanent class, or an unrecognized one — fail safe, never purge
+            if now - trashed_at < timedelta(days=class_days):
+                days_remaining = class_days - (now - trashed_at).days
+                pending_documents.append({"title": title, "retention_class": retention_class, "days_remaining": max(days_remaining, 0)})
+                continue
+                
         actor_id = await _resolve_policy_actor(db, t_id, actor_cache)
         if actor_id is None:
             logger.warning(f"Skipping purge of document {d_id}: tenant {t_id} has no user to attribute the deletion to")

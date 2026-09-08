@@ -119,7 +119,7 @@ async def test_search_fuzzy_leg_catches_misspelled_proper_noun():
 
             doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="Deshmukh bio", status="indexed")
             version = DocumentVersion(
-                id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+                id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
                 file_hash="deadbeef", file_size_bytes=1, original_filename="deshmukh.txt",
             )
             db.add_all([doc, version])
@@ -155,7 +155,7 @@ async def _make_doc_with_fact(db, tenant_id, field_name, value, chunk_content):
     value verbatim — the only way to find it is the structured-record leg."""
     doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="Property Register", status="indexed")
     version = DocumentVersion(
-        id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
         file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="reg.pdf",
     )
     db.add_all([doc, version])
@@ -249,7 +249,7 @@ async def test_two_chunks_sharing_a_page_both_reach_the_grounding_llm():
 
             doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="Village Record", status="indexed")
             version = DocumentVersion(
-                id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+                id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
                 file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="record.pdf",
             )
             db.add_all([doc, version])

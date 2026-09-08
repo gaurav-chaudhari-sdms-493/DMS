@@ -596,7 +596,7 @@ export default function WorkbenchPage() {
           </Card>
         </div>
 
-        <div className="space-y-6 min-w-0">
+        <div className="space-y-6 lg:sticky lg:top-24 lg:h-[calc(100vh-7rem)] lg:overflow-y-auto pr-2 pb-6 min-w-0">
           <Card ref={selectedCardRef} className="bg-white border border-[#e1e3e1] scroll-mt-20">
             <h2 className="text-sm font-bold text-[#1f1f1f] mb-3">{t("workbench.label.status", "Selected fact")}</h2>
             {!selected ? (

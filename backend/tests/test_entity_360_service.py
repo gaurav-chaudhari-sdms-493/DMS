@@ -33,7 +33,7 @@ async def _make_tenant_with_fact_and_node(db, secret_value):
 
     doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="e360 doc", status="indexed")
     version = DocumentVersion(
-        id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
         file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="e360.pdf",
     )
     db.add_all([doc, version])

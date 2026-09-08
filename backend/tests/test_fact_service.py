@@ -3,6 +3,7 @@ the endpoint it backs (found live 2026-09-04 while checking why nothing
 in the UI ever showed whether a document's extraction actually stitched
 anything: there was no endpoint to ask that question at all)."""
 import uuid
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -15,13 +16,49 @@ from app.models.page import DocumentPage
 from app.models.fact import Fact
 from app.models.fact_region import FactRegion
 from app.models.template import Template
-from app.services.fact_service import get_facts_for_document, get_table_view_for_document
+from app.services.fact_service import create_fact_with_regions, get_facts_for_document, get_table_view_for_document
+
+
+@pytest.mark.asyncio
+async def test_no_region_no_save_rule_raises_value_error():
+    """Artifact Section 2 / T04: If a fact has no region, refuse to save it."""
+    # A plain MagicMock, not AsyncMock: both cases below raise before
+    # create_fact_with_regions ever reaches its own `await db.flush()`,
+    # so nothing here needs to support being awaited.
+    mock_db = MagicMock()
+    tenant_id = uuid.uuid4()
+    doc_id = uuid.uuid4()
+    version_id = uuid.uuid4()
+
+    # Empty regions list
+    with pytest.raises(ValueError, match="no region, no save"):
+        await create_fact_with_regions(
+            db=mock_db,
+            tenant_id=tenant_id,
+            document_id=doc_id,
+            version_id=version_id,
+            field_name="survey_number",
+            value="121",
+            regions=[]
+        )
+
+    # Invalid regions list (no page_id or invalid bbox)
+    with pytest.raises(ValueError, match="no region, no save"):
+        await create_fact_with_regions(
+            db=mock_db,
+            tenant_id=tenant_id,
+            document_id=doc_id,
+            version_id=version_id,
+            field_name="survey_number",
+            value="121",
+            regions=[{"x0": None, "y0": None, "x1": None, "y1": None}]
+        )
 
 
 async def _make_doc(db, tenant_id):
     doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="Test Register", status="indexed")
     version = DocumentVersion(
-        id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
         file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="reg.pdf",
     )
     db.add_all([doc, version])

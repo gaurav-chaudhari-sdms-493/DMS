@@ -30,3 +30,16 @@ def test_token_payload_schema():
     )
     assert payload.type == "access"
     assert payload.role == UserRole.admin
+
+
+def test_rls_models_have_tenant_id():
+    from app.models.metadata_item import MetadataItem
+    from app.models.document_version import DocumentVersion
+    from app.models.template import Template
+    from app.models.retention_class import RetentionClass
+
+    assert hasattr(MetadataItem, "tenant_id")
+    assert hasattr(DocumentVersion, "tenant_id")
+    assert hasattr(Template, "tenant_id")
+    assert hasattr(RetentionClass, "tenant_id")
+

@@ -3,6 +3,7 @@ import hashlib
 import json
 import logging
 import os
+import uuid
 from uuid import UUID
 
 from celery import Celery
@@ -209,18 +210,32 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
             if batch_start + EMBED_BATCH_SIZE < len(chunk_texts):
                 await asyncio.sleep(EMBED_BATCH_DELAY)
 
-        # 5. Extract metadata
+        # 5. Extract metadata & scan quality assessment
         full_text = " ".join([p.get("text", "") for p in pages])
         meta_dict = await extract_metadata(full_text)
+
+        quality_report = None
+        ext = os.path.splitext(filename)[1].lower()
+        if ext in [".jpg", ".jpeg", ".png", ".tiff", ".tif", ".bmp", ".webp"] or (len(file_bytes) > 4 and file_bytes[:4] in [b"\xff\xd8\xff\xe0", b"\xff\xd8\xff\xe1", b"\x89PNG"]):
+            try:
+                from app.services.scanner_connector import assess_scan_quality
+                quality_report = assess_scan_quality(file_bytes)
+            except Exception as q_err:
+                logger.warning(f"Scan quality check failed during worker ingestion: {q_err}")
 
         # 6. ATOMIC DATABASE TRANSACTION (All-or-Nothing Commit)
         # All database writes (chunks, metadata, document status) occur inside a single atomic transaction.
         async with TaskSession() as db:
             async with db.begin():
                 await db.execute(text("SELECT set_config('app.current_tenant_id', :t, false)"), {"t": tenant_id_str})
-                # Purge any pre-existing partial chunks or metadata for this version/document
+                # Purge pre-existing chunks and non-quality metadata for this version/document
                 await db.execute(delete(DBChunk).where(DBChunk.version_id == version_id))
-                await db.execute(delete(MetadataItem).where(MetadataItem.document_id == document_id))
+                await db.execute(
+                    delete(MetadataItem).where(
+                        MetadataItem.document_id == document_id,
+                        MetadataItem.key.not_in(["quality_flag", "quality_report"]),
+                    )
+                )
 
                 # Insert chunks
                 for idx, chunk in enumerate(chunks):
@@ -237,11 +252,37 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                     )
                     db.add(db_chunk)
 
+                # Insert quality metadata items if quality check failed
+                if quality_report and not quality_report.get("passed", True):
+                    db.add(
+                        MetadataItem(
+                            id=uuid.uuid4(),
+                            tenant_id=tenant_id,
+                            document_id=document_id,
+                            key="quality_flag",
+                            value={"flag": "needs_review", "warnings": quality_report.get("warnings", [])},
+                            source="scanner_connector",
+                            confidence_score=0.9,
+                        )
+                    )
+                    db.add(
+                        MetadataItem(
+                            id=uuid.uuid4(),
+                            tenant_id=tenant_id,
+                            document_id=document_id,
+                            key="quality_report",
+                            value=quality_report,
+                            source="scanner_connector",
+                            confidence_score=1.0,
+                        )
+                    )
+
                 # Insert metadata items
                 if meta_dict:
                     extraction_confidence = await get_float("default_extraction_confidence", 0.9)
                     for key, value in meta_dict.items():
                         db_meta = MetadataItem(
+                            tenant_id=tenant_id,
                             document_id=document_id,
                             key=key,
                             value=value if isinstance(value, (dict, list)) else {"v": value},
@@ -294,7 +335,8 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 # Best-effort and non-blocking: a savepoint isolates it so a failure
                 # here never aborts the chunk/metadata commit above (search must
                 # never wait on this, Section 3.5).
-                if template:
+                is_scanned_image = filename.lower().rsplit(".", 1)[-1] in {"jpg", "jpeg", "png", "tiff", "bmp", "webp"}
+                if template or is_scanned_image or ext == ".pdf":
                     try:
                         from app.pipeline.vlm_extraction import extract_facts_for_document
                         async with db.begin_nested():
@@ -303,10 +345,10 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                                 file_bytes, filename, pages, template,
                             )
                         if facts_count:
+                            tmpl_name = f"{template.form_type}/{template.era_label}" if template else "unclassified_scanned_image"
                             logger.info(
                                 f"T22 VLM extraction wrote {facts_count} facts for "
-                                f"document {document_id} against template "
-                                f"{template.form_type}/{template.era_label}"
+                                f"document {document_id} against template {tmpl_name}"
                             )
                     except Exception as vlm_err:
                         logger.warning(f"T22 VLM extraction skipped for document {document_id}: {vlm_err}")

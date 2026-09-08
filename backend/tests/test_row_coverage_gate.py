@@ -66,7 +66,7 @@ async def _make_doc(db):
     await db.flush()
     doc = Document(id=uuid.uuid4(), tenant_id=tenant_id, title="cover.pdf", status="indexed")
     version = DocumentVersion(
-        id=uuid.uuid4(), document_id=doc.id, version_number=1, s3_path="x",
+        id=uuid.uuid4(), tenant_id=tenant_id, document_id=doc.id, version_number=1, s3_path="x",
         file_hash=uuid.uuid4().hex, file_size_bytes=1, original_filename="cover.pdf",
     )
     db.add_all([doc, version])

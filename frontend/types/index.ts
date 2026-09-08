@@ -47,6 +47,8 @@ export interface DocumentListItem {
   current_version_id?: string | null;
   s3_path?: string | null;
   download_url?: string | null;
+  quality_flag?: string | null;
+  quality_warnings?: string[];
 }
 
 export interface DocumentDetailResponse {
