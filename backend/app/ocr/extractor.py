@@ -55,6 +55,74 @@ def _paddle_ocr_image(pil_img) -> str:
     return "\n".join(lines)
 
 
+def _tesseract_word_boxes(pil_img, lang: str) -> List[Dict[str, Any]]:
+    """T05 (scanned-corpus coverage) — real per-word bounding boxes from
+    Tesseract's own layout analysis, normalised to 0-1 image fractions per
+    T06's coordinate contract (top-left origin). Deliberately a second,
+    separate OCR pass from the plain-text image_to_string call already used
+    for chunking/indexing elsewhere in this file, rather than reconstructing
+    text from image_to_data's word list — that reconstruction doesn't
+    reliably match image_to_string's spacing/line-join behaviour, and this
+    module must never silently change the text that's actually indexed.
+    The cost is one extra Tesseract pass per scanned page.
+    """
+    from pytesseract import Output
+    import pytesseract as _pt
+
+    w, h = pil_img.size
+    if w <= 0 or h <= 0:
+        return []
+    data = _pt.image_to_data(pil_img, lang=lang, output_type=Output.DICT)
+    words: List[Dict[str, Any]] = []
+    for i in range(len(data.get("text", []))):
+        if data["level"][i] != 5:  # 5 == word level in Tesseract's block/par/line/word hierarchy
+            continue
+        text = (data["text"][i] or "").strip()
+        if not text:
+            continue
+        left, top = data["left"][i], data["top"][i]
+        width, height = data["width"][i], data["height"][i]
+        words.append({
+            "text": text,
+            "x0": max(0.0, min(1.0, left / w)),
+            "y0": max(0.0, min(1.0, top / h)),
+            "x1": max(0.0, min(1.0, (left + width) / w)),
+            "y1": max(0.0, min(1.0, (top + height) / h)),
+        })
+    return words
+
+
+def _paddle_word_boxes(pil_img) -> List[Dict[str, Any]]:
+    """T05 (scanned-corpus coverage) — PaddleOCR's return_word_box=True
+    exposes real per-word pixel boxes (text_word/text_word_boxes, one
+    array per detected text line) instead of only the line-level text
+    _paddle_ocr_image reads. Skips the whitespace tokens PaddleOCR inserts
+    between words in text_word.
+    """
+    import numpy as np
+
+    ocr = _get_paddle_ocr()
+    w, h = pil_img.size
+    if w <= 0 or h <= 0:
+        return []
+    arr = np.array(pil_img.convert("RGB"))
+    words: List[Dict[str, Any]] = []
+    for res in ocr.predict(arr, return_word_box=True):
+        for line_tokens, line_boxes in zip(res.get("text_word") or [], res.get("text_word_boxes") or []):
+            for token, box in zip(line_tokens, line_boxes):
+                if not token or not token.strip():
+                    continue
+                x0, y0, x1, y1 = (float(v) for v in box[:4])
+                words.append({
+                    "text": token,
+                    "x0": max(0.0, min(1.0, x0 / w)),
+                    "y0": max(0.0, min(1.0, y0 / h)),
+                    "x1": max(0.0, min(1.0, x1 / w)),
+                    "y1": max(0.0, min(1.0, y1 / h)),
+                })
+    return words
+
+
 class _ChandraFullTextHTMLParser:
     """Strips Chandra's HTML output to plain reading-order text. Unlike
     ChandraVLMProvider's _TableHTMLParser (chandra_provider.py — table
@@ -182,16 +250,25 @@ def extract_pages_from_file(file_bytes: bytes, filename: str, ocr_engine: str = 
 
 def _extract_image(file_bytes: bytes, filename: str, ocr_engine: str = "tesseract") -> List[Dict[str, Any]]:
     text = ""
+    words: List[Dict[str, Any]] = []
+    img_size = None
     try:
         from PIL import Image
         img = Image.open(io.BytesIO(file_bytes))
+        img_size = img.size
         if ocr_engine == "paddle":
             text = _paddle_ocr_image(img) or ""
+            words = _paddle_word_boxes(img)
         elif ocr_engine == "chandra":
             text = _chandra_ocr_image(img) or ""
+            # T05 — Chandra's /convert endpoint (used here in plain-text
+            # mode) returns no per-word coordinates, so a chandra-OCR'd
+            # image still falls back to page-level regions, same as
+            # before this fix. Documented gap, not a bug.
         else:
             import pytesseract
             text = pytesseract.image_to_string(img, lang=TESSERACT_LANG) or ""
+            words = _tesseract_word_boxes(img, TESSERACT_LANG)
         logger.info(f"Image OCR ({ocr_engine}) extracted {len(text)} chars from {filename}")
     except Exception as e:
         logger.warning(f"Failed to perform {ocr_engine} OCR on image file {filename}: {e}")
@@ -216,8 +293,8 @@ def _extract_image(file_bytes: bytes, filename: str, ocr_engine: str = "tesserac
     return [{
         "page_number": 1,
         "text": text.strip(),
-        "words": [],
-        "bbox": {},
+        "words": [] if failed else words,
+        "bbox": {"width": float(img_size[0]), "height": float(img_size[1])} if img_size else {},
         "extraction_failed": failed
     }]
 
@@ -270,6 +347,20 @@ def _extract_pdf(file_bytes: bytes, filename: str = "", ocr_engine: str = "tesse
                         if ocr_text.strip():
                             text = ocr_text
                             logger.info(f"{ocr_engine} OCR extracted {len(text)} chars from page {i+1} of {filename}")
+                            # T05 (scanned-corpus coverage) — pdfplumber's
+                            # own extract_words() above found nothing on
+                            # this page (no text layer, which is exactly
+                            # why we're in this OCR fallback), so `words`
+                            # is still []. Replace it with real per-word
+                            # boxes from the OCR engine that actually read
+                            # this page, instead of leaving non-VLM facts
+                            # on scanned documents stuck at page-level
+                            # regions — chandra has no per-word coordinates
+                            # in the mode used here, so it's left at [].
+                            if ocr_engine == "paddle":
+                                words = _paddle_word_boxes(pil_img)
+                            elif ocr_engine != "chandra":
+                                words = _tesseract_word_boxes(pil_img, TESSERACT_LANG)
                     except Exception as ocr_err:
                         logger.warning(f"OCR fallback ({ocr_engine}) failed for page {i+1} of {filename}: {ocr_err}")
 

@@ -104,8 +104,10 @@ def test_matching_is_case_and_whitespace_insensitive():
 
 
 def test_page_with_no_words_is_skipped_even_if_text_matches():
-    """A page's `text` came through fine but `words` is empty (e.g. an
-    OCR-fallback page that never ran through pdfplumber's extract_words) --
-    must not crash, just find no region on that page."""
+    """A page's `text` came through fine but `words` is empty (e.g. a
+    chandra-engine OCR page -- that provider's /convert response has no
+    per-word coordinates, unlike the tesseract/paddle OCR fallback paths in
+    extractor.py, which now do populate real words for scanned pages too)
+    -- must not crash, just find no region on that page."""
     pages = [_page(1, "Serial WB-99 recorded", [])]
     assert locate_value_in_pages("WB-99", pages) is None
