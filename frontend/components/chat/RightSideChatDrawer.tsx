@@ -16,6 +16,7 @@ import {
 import { api } from "@/lib/api";
 import type { ChatMessage, SearchResult, DocumentListItem } from "@/types";
 import { MarkdownViewer } from "./MarkdownViewer";
+import { CitationModal, CitationModalCitation } from "@/components/search/CitationModal";
 
 interface RightSideChatDrawerProps {
   isOpen: boolean;
@@ -50,6 +51,20 @@ export function RightSideChatDrawer({
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
+
+  // T71 — same [N] citation click-through AISummary uses, wired up for
+  // chat replies too: chat_service now asks the model for [N] markers
+  // matching each message's stored `results` ordering.
+  const [activeCitation, setActiveCitation] = useState<CitationModalCitation | null>(null);
+
+  const citationsForMessage = (m: ChatMessage): CitationModalCitation[] =>
+    (m.results || []).map((r, idx) => ({
+      number: idx + 1,
+      document_name: r.document_name,
+      page_number: r.page_number,
+      download_url: r.download_url,
+      fact_id: null,
+    }));
 
   useEffect(() => {
     scrollToBottom();
@@ -420,7 +435,14 @@ export function RightSideChatDrawer({
                   );
                 })()
               ) : (
-                <MarkdownViewer content={m.content} />
+                <MarkdownViewer
+                  content={m.content}
+                  onCitationClick={
+                    m.results && m.results.length > 0
+                      ? (n) => setActiveCitation(citationsForMessage(m).find((c) => c.number === n) ?? null)
+                      : undefined
+                  }
+                />
               )}
             </div>
           </div>
@@ -467,6 +489,8 @@ export function RightSideChatDrawer({
           Stark AI can make mistakes. Verify important info.
         </p>
       </div>
+
+      <CitationModal citation={activeCitation} onClose={() => setActiveCitation(null)} />
     </aside>
   );
 }

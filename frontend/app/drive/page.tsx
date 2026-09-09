@@ -541,13 +541,15 @@ export default function DrivePage() {
           await api.documents.deletePermanent(dId).catch(() => {});
         }
       }
-    } else {
+    } else if (confirm(`Move ${count} selected item${count === 1 ? "" : "s"} to Bin?`)) {
       for (const fId of Array.from(selectedFolderIds)) {
         await api.folders.toggleTrash(fId).catch(() => {});
       }
       for (const dId of Array.from(selectedDocIds)) {
         await api.documents.toggleTrash(dId).catch(() => {});
       }
+    } else {
+      return;
     }
     setSelectedFolderIds(new Set());
     setSelectedDocIds(new Set());
@@ -1335,6 +1337,7 @@ export default function DrivePage() {
                 onRename={(d) => setItemToRename({ type: "doc", item: d })}
                 onMove={(d) => setItemToMove({ type: "doc", item: d })}
                 onTrash={async (d) => {
+                  if (!confirm(`Move "${d.title}" to Bin?`)) return;
                   if (isUUID(d.id)) {
                     await api.documents.toggleTrash(d.id).catch(() => {});
                   }
@@ -1361,6 +1364,7 @@ export default function DrivePage() {
                 onRename={(f) => setItemToRename({ type: "folder", item: f })}
                 onMove={(f) => setItemToMove({ type: "folder", item: f })}
                 onTrash={async (f) => {
+                  if (!confirm(`Move "${f.name}" to Bin?`)) return;
                   if (isUUID(f.id)) {
                     await api.folders.toggleTrash(f.id).catch(() => {});
                   }
@@ -1387,6 +1391,7 @@ export default function DrivePage() {
                 onRename={(d) => setItemToRename({ type: "doc", item: d })}
                 onMove={(d) => setItemToMove({ type: "doc", item: d })}
                 onTrash={async (d) => {
+                  if (!confirm(`Move "${d.title}" to Bin?`)) return;
                   if (isUUID(d.id)) {
                     await api.documents.toggleTrash(d.id).catch(() => {});
                   }
@@ -1660,6 +1665,11 @@ export default function DrivePage() {
                     if (currentView === "trash") {
                       handlePermanentDelete(itemContextMenu.type, itemContextMenu.item.id);
                     } else {
+                      const itemName =
+                        itemContextMenu.type === "folder"
+                          ? (itemContextMenu.item as Folder).name
+                          : (itemContextMenu.item as DocumentListItem).title;
+                      if (!confirm(`Move "${itemName}" to Bin?`)) return;
                       if (itemContextMenu.type === "folder") {
                         await api.folders.toggleTrash(itemContextMenu.item.id).catch(() => {});
                       } else {

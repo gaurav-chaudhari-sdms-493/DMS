@@ -11,6 +11,7 @@ from app.models.user import User
 from app.models.document import Document
 from app.models.document_version import DocumentVersion
 from app.models.fact import Fact
+from app.models.fact_region import FactRegion
 from app.pipeline.vlm_extraction import _extract_spread_facts
 from sqlalchemy import select
 
@@ -128,6 +129,18 @@ async def test_spread_extraction_writes_join_mismatch_fact_on_serial_disagreemen
             # TS1 — join_rows_horizontally()'s reason no longer names the specific
             # serials (see test_table_stitch.py for that), just that nothing anchored.
             assert "no shared" in mismatch.value["reason"]
+
+            # Regression test for a real bug: this fact used to only ever get
+            # left_page's region, never right_page's -- so the Workbench's
+            # Join Mismatches queue had nothing to show for the right-hand
+            # page, and a reviewer couldn't actually compare the two halves
+            # to see why they didn't join (the entire point of that queue).
+            regions = (await db.execute(
+                select(FactRegion).where(FactRegion.fact_id == mismatch.id)
+            )).scalars().all()
+            assert len(regions) == 2
+            pages_covered = {r.page_id for r in regions}
+            assert len(pages_covered) == 2
         finally:
             await db.rollback()
             await db.close()

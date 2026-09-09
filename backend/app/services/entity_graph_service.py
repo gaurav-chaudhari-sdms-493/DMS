@@ -221,6 +221,54 @@ async def create_edge(
     return edge
 
 
+async def delete_node(db: AsyncSession, tenant_id: UUID, node_id: UUID, actor_id: UUID) -> None:
+    """Real gap found live 2026-09-09: create_node/create_edge were both
+    exposed, but nothing ever let a caller remove a node created by
+    mistake (a duplicate, a test fixture, ...) -- confirmed live: two
+    verification-testing nodes had no way to be cleaned up via the API at
+    all. Cascades to every edge referencing this node as source or target
+    (entity_dg_edges.source_node_id / target_node_id are both
+    ondelete='CASCADE') -- deliberate: an edge can't meaningfully survive
+    the node it points at disappearing.
+    """
+    if actor_id is None:
+        raise ValueError("deleting a node requires an actor")
+
+    node = await db.get(EntityNode, node_id)
+    if not node or node.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    await log_action(
+        db, actor_id, tenant_id, "entity_node.delete",
+        resource_type="entity_node", resource_id=node.id,
+        details={"entity_type": node.entity_type, "label": node.label},
+    )
+
+    await db.delete(node)
+    await db.flush()
+
+
+async def delete_edge(db: AsyncSession, tenant_id: UUID, edge_id: UUID, actor_id: UUID) -> None:
+    """Same gap as delete_node, for a single edge -- e.g. a machine edge
+    created from a bad match, without needing to delete either endpoint
+    node just to remove it."""
+    if actor_id is None:
+        raise ValueError("deleting an edge requires an actor")
+
+    edge = await db.get(EntityEdge, edge_id)
+    if not edge or edge.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Edge not found")
+
+    await log_action(
+        db, actor_id, tenant_id, "entity_edge.delete",
+        resource_type="entity_edge", resource_id=edge.id,
+        details={"edge_type": edge.edge_type, "tier": edge.tier, "status": edge.status},
+    )
+
+    await db.delete(edge)
+    await db.flush()
+
+
 async def confirm_edge(db: AsyncSession, tenant_id: UUID, edge_id: UUID, actor_id: UUID) -> EntityEdge:
     """T56 — the single-edge human confirmation action: held -> verified.
 

@@ -43,7 +43,22 @@ async def test_match_template_live_on_a_real_wakf_gazette_cover_page():
         "Sub-section 3 of Section 4 of Central Wakf Act, 1995 has forwarded list of "
         "Wakfs properties to The Maharashtra State Board of Wakfs, Aurangabad for "
         "publication after scrutiny.\n"
-        "List of Wakf properities District Washim enclosed.\n"
+        # Real bug found live 2026-09-09: this used to say "District Washim"
+        # -- a district no registered template actually covers (only
+        # Aurangabad/1973/spread, Wardha/2004/Form B, and Marathwada-region
+        # 1973-74 exist) -- and asserted a match should happen anyway "by
+        # name, act, and year" alone. That's the exact false-positive
+        # pattern (matching on the issuing office's name/act while ignoring
+        # a real district mismatch) that silently misclassified a real
+        # document (Pune, 2004) against the Aurangabad/1973/spread template
+        # and corrupted its extraction. match_template's prompt was fixed
+        # to require the document's own district to agree with a
+        # candidate's era_label -- so this fixture now names a district
+        # (Wardha) that a real registered template actually covers, keeping
+        # this test's real purpose (guard the token-starvation regression)
+        # intact without depending on the same false-positive behavior the
+        # other fix just removed.
+        "List of Wakf properities District Wardha enclosed.\n"
         "M. Y. PATEL, Additional Collector and Chief Executive Officer, "
         "Maharashtra State Board of Wakfs, Aurangabad."
     )

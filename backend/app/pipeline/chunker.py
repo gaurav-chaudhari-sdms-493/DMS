@@ -2,6 +2,8 @@ from dataclasses import dataclass, field
 from typing import List, Optional
 import tiktoken
 
+from app.utils.text import collapse_blank_lines
+
 @dataclass
 class Chunk:
     content: str
@@ -35,7 +37,21 @@ class TextChunker:
             text = page.get("text", "")
             if not text or not text.strip():
                 continue
-                
+
+            # Real bug found live 2026-09-09: a sparse form layout's OCR
+            # text (see collapse_blank_lines) can spend most of a page's
+            # token budget on blank-line padding between labels and their
+            # values -- on a real 280-page register, this meant a page's
+            # table header alone (with all its vertical gaps) filled an
+            # entire 512-token chunk before a single data row was
+            # included, so a huge fraction of the document's chunks held
+            # almost no retrievable content. Collapsing before chunking
+            # (not just at answer-grounding display time, which already
+            # happened elsewhere) lets far more real content fit per
+            # chunk instead of chunk boundaries landing on repeated
+            # boilerplate.
+            text = collapse_blank_lines(text)
+
             tokens = self.tokenizer.encode(text)
             
             start = 0

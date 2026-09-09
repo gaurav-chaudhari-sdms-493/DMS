@@ -149,6 +149,16 @@ async def get_document_table_view_api(
     return await fact_service.get_table_view_for_document(db, document_id, tenant_id)
 
 
+@router.get('/{document_id}/chunks')
+async def get_document_chunks_api(
+    document_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_tenant_access),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    return await document_service.get_chunks_for_document(db, document_id, tenant_id)
+
+
 @router.patch('/{document_id}', response_model=DocumentListItem)
 async def update_document_api(
     document_id: uuid.UUID,

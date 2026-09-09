@@ -1,5 +1,8 @@
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from starlette.middleware.base import BaseHTTPMiddleware
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from contextlib import asynccontextmanager
@@ -38,6 +41,39 @@ async def lifespan(app: FastAPI):
     for task in connector_tasks:
         task.cancel()
 
+
+class _UnhandledExceptionMiddleware(BaseHTTPMiddleware):
+    """Real bug found live 2026-09-09: an unhandled exception (any 500 not
+    raised as a FastAPI/Starlette HTTPException) never got CORS headers,
+    even though 404s/422s/other HTTPExceptions always did -- confirmed live,
+    reproduced a bare 500 with zero Access-Control-* headers on it.
+
+    Root cause is structural, not a missing handler: Starlette's
+    build_middleware_stack() special-cases a handler registered for the
+    bare Exception class (or status 500) to run in ServerErrorMiddleware,
+    which it places OUTSIDE every middleware added via add_middleware() --
+    CORSMiddleware included -- specifically so an error page can still
+    render even if a broken middleware itself is what's crashing. That
+    means @app.exception_handler(Exception) can never fix this: it's
+    wired to the one place a response can't flow back out through CORS.
+
+    The only way to get a caught exception's response through CORS is to
+    catch it INSIDE a real middleware positioned inside CORSMiddleware's
+    wrap -- turning it into a normal Response before it ever reaches
+    ServerErrorMiddleware. This class must be added to the app BEFORE
+    CORSMiddleware (see create_app) so CORSMiddleware ends up wrapping it,
+    not the other way around."""
+
+    async def dispatch(self, request, call_next):
+        try:
+            return await call_next(request)
+        except Exception:
+            logging.getLogger(__name__).exception(
+                f"Unhandled exception on {request.method} {request.url.path}"
+            )
+            return JSONResponse(status_code=500, content={"detail": "Internal server error"})
+
+
 def create_app() -> FastAPI:
     app = FastAPI(
         title='Document Search Engine',
@@ -48,6 +84,12 @@ def create_app() -> FastAPI:
         redoc_url='/api/redoc',
     )
     
+    # Added before CORSMiddleware so it ends up wrapped BY it (Starlette
+    # inserts each later add_middleware() call at the outer edge) -- see
+    # _UnhandledExceptionMiddleware's own docstring for why that ordering
+    # is what actually makes CORS headers reach a 500 response.
+    app.add_middleware(_UnhandledExceptionMiddleware)
+
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
@@ -55,13 +97,13 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
-    
+
     # API call logging middleware (runs after CORS)
     app.add_middleware(ApiLoggingMiddleware)
-    
+
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    
+
     app.include_router(api_router)
     
     # Attach Celery app to the FastAPI app instance

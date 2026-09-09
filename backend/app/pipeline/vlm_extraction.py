@@ -502,6 +502,12 @@ async def _extract_spread_facts(
             result = table_stitch.join_rows_horizontally(left_rows, right_rows, serial_field)
 
             left_page = await _get_or_create_page(db, tenant_id, document_id, version_id, left_page_number, left_w, left_h, left_rot)
+            # Fetched here, before the needs_review branch below, so a
+            # join-mismatch fact can carry both pages' regions — a reviewer
+            # in the Workbench's Join Mismatches queue needs to see left
+            # AND right to pair the halves, the same reason
+            # _write_stitch_ambiguous_fact writes both of its pages' regions.
+            right_page = await _get_or_create_page(db, tenant_id, document_id, version_id, right_page_number, right_w, right_h, right_rot)
 
             if result.status == "needs_review":
                 fact = Fact(
@@ -513,10 +519,9 @@ async def _extract_spread_facts(
                 db.add(fact)
                 await db.flush()
                 db.add(FactRegion(tenant_id=tenant_id, fact_id=fact.id, page_id=left_page.id, x0=0.0, y0=0.0, x1=1.0, y1=1.0))
+                db.add(FactRegion(tenant_id=tenant_id, fact_id=fact.id, page_id=right_page.id, x0=0.0, y0=0.0, x1=1.0, y1=1.0))
                 facts_written += 1
                 continue
-
-            right_page = await _get_or_create_page(db, tenant_id, document_id, version_id, right_page_number, right_w, right_h, right_rot)
 
             # A leftover row on one side can be positionally grouped under a
             # single row on the other (e.g. one waqf entry spanning two

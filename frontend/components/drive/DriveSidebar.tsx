@@ -1,5 +1,6 @@
 "use client";
 import React, { useState } from "react";
+import Link from "next/link";
 import {
   Plus,
   Home,
@@ -15,6 +16,7 @@ import {
   Server,
   Camera,
   AlertTriangle,
+  ShieldCheck,
 } from "lucide-react";
 import type { DriveStats, FolderTreeNode, DocumentListItem } from "@/types";
 import { FolderTreeSidebar } from "./FolderTreeSidebar";
@@ -234,6 +236,21 @@ export function DriveSidebar({
             <AlertTriangle className="w-4 h-4 text-amber-500" />
             <span>Needs Review</span>
           </button>
+
+          {/* Workbench — real gap found live 2026-09-09: this page
+              (app/workbench/page.tsx) was fully built, including the
+              Join Mismatches tab, but was never linked from anywhere in
+              the nav, so it was unreachable from the UI despite the
+              underlying data (the fact-level adjudication queue) being
+              real and live. A separate route, not an internal drive
+              view, so it navigates via Link rather than onSelectView. */}
+          <Link
+            href="/workbench"
+            className="flex items-center gap-4 w-full px-4 py-2 rounded-r-full text-sm font-medium transition-all text-[#444746] hover:bg-[#edf2fc] hover:text-[#1f1f1f]"
+          >
+            <ShieldCheck className="w-4 h-4" />
+            <span>{t("drive.nav.workbench", "Workbench")}</span>
+          </Link>
 
           {/* Bin */}
           <button

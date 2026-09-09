@@ -19,11 +19,67 @@ from app.services.search_glossary_service import expand_query_terms
 logger = logging.getLogger(__name__)
 
 
+def _select_relevant_ranks(reranked_primary: list, relevance_threshold: float, fallback_ratio: float) -> list:
+    """Real bug found live (verification report, 2026-09-09): a
+    near-identical follow-up query returned "no matching documents" even
+    though the same-topic query moments earlier returned 9 results — a
+    hard cutoff right at relevance_threshold means ordinary reranker score
+    sensitivity to minor wording differences can flip a genuinely relevant
+    result from "found" to "nothing" between two questions a person would
+    consider the same search.
+
+    Extracted as its own pure function (rather than lowering
+    relevance_threshold globally, which would raise false-positive risk
+    for every query, not just borderline ones) so the exact boundary
+    behavior is unit-testable without depending on a real reranker's
+    scores: only the EMPTY case gets a second, narrower look — the single
+    best candidate, if it's still within relevance_threshold *
+    fallback_ratio, not just any low score. A candidate that misses by a
+    wide margin still correctly returns nothing."""
+    relevant = sorted(
+        (r for r in reranked_primary if r.score >= relevance_threshold),
+        key=lambda r: r.score, reverse=True,
+    )
+    if relevant or not reranked_primary:
+        return relevant
+
+    fallback_threshold = relevance_threshold * fallback_ratio
+    best = max(reranked_primary, key=lambda r: r.score)
+    if best.score >= fallback_threshold:
+        logger.info(
+            "Relevance fallback: best candidate scored %.3f, below primary threshold %.3f "
+            "but within the %.3f fallback margin — returning it instead of 'no matches'.",
+            best.score, relevance_threshold, fallback_threshold,
+        )
+        return [best]
+    return []
+
+
 def _make_snippet(content: str, max_chars: int = 400) -> str:
     """Truncate result snippet around boundary to keep payload light."""
     if not content or len(content) <= max_chars:
         return content or ""
     return content[:max_chars].rsplit(" ", 1)[0] + "…"
+
+
+_FACT_ID_TOKEN_RE = re.compile(r"\b[A-Za-z]{1,6}-\d{1,6}\b")
+
+
+def _extract_fact_id_tokens(query: str) -> list[str]:
+    """A natural-language question ('what is the value of movable property
+    for WB-100...') never contains a fact's field_name/value as a literal
+    full-string substring, so the structured-fact search leg's plain
+    %query% ILIKE (below) only ever fired for a short keyword search, not
+    a real question -- silently starving the grounded-answer LLM of the
+    one source (structured Facts, with real field_name labels) that could
+    have kept it from mixing up which number belongs to which column when
+    it fell back to jumbled raw OCR table text instead (real bug: asking
+    for WB-100's movable property returned its gross_income figure,
+    because both numbers sit in the same undifferentiated table-row chunk
+    text). ID-shaped tokens (WB-100, CTS-452, ...) ARE carried verbatim
+    in a natural-language question even when the rest of the sentence
+    isn't a literal match for anything."""
+    return list(dict.fromkeys(_FACT_ID_TOKEN_RE.findall(query)))
 
 
 async def _find_pending_title_matches(
@@ -66,6 +122,22 @@ async def _find_pending_title_matches(
     return matches
 
 
+_NUMBER_RE = re.compile(r"\d[\d,]*\.?\d*")
+
+
+def _numbers_in_text(text_: str) -> set:
+    """Digit sequences with commas/trailing punctuation stripped, so
+    'Rs.30,119/-' and '30119' both normalise to '30119' -- a cheap,
+    currency/format-agnostic way to check a numeric claim actually
+    appears in the excerpt(s) it cites, rather than trusting the model's
+    self-reported citation at face value (real bug: it cited a real
+    excerpt containing several distinct figures, but stated a number from
+    the WRONG column as the answer -- a valid excerpt index alone doesn't
+    mean the specific number claimed is actually the one that excerpt
+    supports)."""
+    return {n.replace(",", "").rstrip(".") for n in _NUMBER_RE.findall(text_) if n.replace(",", "").rstrip(".")}
+
+
 def _parse_claims_json(raw: str):
     """Best-effort parse of the LLM's structured claim response — tolerates
     ```json fences the model adds despite being told not to."""
@@ -81,26 +153,17 @@ def _parse_claims_json(raw: str):
 
 
 def _condense_excerpt_text(content: str) -> str:
-    """Chandra's (and PaddleOCR's) line-based OCR reads a sparse form
-    layout — a label and its value visually a few centimeters apart, like
-    a 7/12 record's "गाव" ... "आपटी" header line — as one text line each,
-    with a blank line per gap of whitespace in between. A wide gap (a
-    label at the page's left edge and its value further right, or a
-    tall gap above/below) can turn into 4-6 blank lines between them.
-
-    Found live 2026-09-04: this is harmless for a human reading the raw
-    OCR text (the words are still in the right reading order), but the
-    grounded-answer LLM (T70) was handed that same excerpt VERBATIM — a
-    label and its value separated by a wall of blank lines reads as much
-    weaker evidence than two adjacent lines, and the model refused to
-    answer ("answerable": false) even though the correct value was right
-    there in the excerpt. Collapsing every run of blank/whitespace-only
-    lines down to nothing — never altering word order or content, purely
-    removing empty lines — puts a label immediately next to its value
-    the way it visually reads on the page, which is what actually let
-    the same excerpt get answered correctly in a live re-test."""
-    lines = [ln.strip() for ln in content.splitlines()]
-    return "\n".join(ln for ln in lines if ln)
+    """Found live 2026-09-04: a sparse form layout's OCR text (see
+    collapse_blank_lines) handed VERBATIM to the grounded-answer LLM (T70)
+    reads as much weaker evidence than the same label/value adjacent —
+    the model refused to answer ("answerable": false) even though the
+    correct value was right there in the excerpt, walled off by blank
+    lines. Collapsing them is what let the same excerpt get answered
+    correctly in a live re-test. See also collapse_blank_lines's own
+    docstring and chunker.py, which now applies the same collapsing
+    before chunk boundaries are decided, not just here at display time."""
+    from app.utils.text import collapse_blank_lines
+    return collapse_blank_lines(content)
 
 
 async def _generate_grounded_answer(query: str, response_lang: str, excerpts: list):
@@ -146,6 +209,21 @@ async def _generate_grounded_answer(query: str, response_lang: str, excerpts: li
         '- Respond with {"answerable": false, "claims": []} ONLY if the excerpts are unrelated to the query '
         "topic — not merely because the query isn't phrased as a question. Do not answer from outside knowledge "
         "and do not guess — this is a hard rule, not a style preference.\n"
+        "- Never compute a sum, count, average, or other aggregate across multiple excerpts or entries — state "
+        "only figures that appear verbatim in a single excerpt. If the query asks for a total/count/average "
+        "across many entries and no excerpt already states that aggregate directly, treat it as unanswerable.\n"
+        "- A row from a table can list several distinct numbers (value, income, tax, ...). Double-check which "
+        "specific number the query is actually asking for before stating it — do not answer with a different "
+        "field's figure from the same row.\n"
+        "- Never name or assume which specific document a claim comes from in your claim text (e.g. do not write "
+        "\"According to X.pdf...\") — the numbered citation markers are the only authoritative source identity, "
+        "and a claim's own \"sources\" list is what actually determines which document(s) it displays as coming "
+        "from. Real bug found live: the corpus can contain several near-duplicate scans of the same underlying "
+        "document, and a query that names one specific document by title can still retrieve a chunk from a "
+        "different, near-identical scan — if your claim text separately asserts a document name (e.g. echoing "
+        "the one the user's own question mentioned) while its citation marker points at a different excerpt's "
+        "document, the two disagree and the answer reads as self-contradictory even though each half is doing "
+        "its own job correctly. Describe what the excerpts say; let the citation numbers carry the source.\n"
         "- Keep claim text natural and complete; bold key numbers/names/dates with **markdown** where useful."
     )
     user_msg = f"User query: {query}\n\nNumbered excerpts:\n{numbered}"
@@ -175,15 +253,30 @@ async def _generate_grounded_answer(query: str, response_lang: str, excerpts: li
             # The model cited nothing real for this claim — drop the claim
             # rather than show an unbound statement.
             continue
-        claim_numbers = []
+
+        # Grounding check: every number the claim states must actually
+        # appear in the excerpt text it cites. A valid excerpt index alone
+        # doesn't guarantee the specific figure claimed is the one that
+        # excerpt supports — a dense table-row excerpt can carry several
+        # distinct numbers, and the model can grab the wrong one (real bug:
+        # asked for a movable-property value, answered with that same
+        # row's gross income instead). Also catches outright invention,
+        # like a computed total that appears nowhere in any excerpt.
+        claim_numbers = _numbers_in_text(claim_text)
+        if claim_numbers:
+            cited_text = " ".join(_condense_excerpt_text(excerpts[s - 1]["content"]) for s in valid_sources)
+            if not claim_numbers.issubset(_numbers_in_text(cited_text)):
+                continue
+
+        cited_markers = []
         for s in valid_sources:
             ex = excerpts[s - 1]
             key = (ex["document_id"], ex["page_number"])
             if key not in source_number_by_key:
                 source_number_by_key[key] = len(source_number_by_key) + 1
             n = source_number_by_key[key]
-            if n not in claim_numbers:
-                claim_numbers.append(n)
+            if n not in cited_markers:
+                cited_markers.append(n)
             citations.append(Citation(
                 number=n,
                 claim=claim_text,
@@ -194,7 +287,7 @@ async def _generate_grounded_answer(query: str, response_lang: str, excerpts: li
                 fact_id=ex.get("fact_id"),
             ))
 
-        markers = "".join(f" [{n}]" for n in sorted(claim_numbers))
+        markers = "".join(f" [{n}]" for n in sorted(cited_markers))
         summary_lines.append(f"- {claim_text}{markers}")
 
     if not summary_lines:
@@ -476,6 +569,56 @@ async def search(
     # like a survey number or an ID is exactly the kind of literal text a
     # paraphrase shouldn't be allowed to alter before matching it.
     fact_pattern = f"%{query}%"
+    fact_id_tokens = _extract_fact_id_tokens(query)
+    fact_params = {**params, "fact_pattern": fact_pattern}
+
+    id_clauses = []
+    for i, tok in enumerate(fact_id_tokens):
+        id_clauses.append(f"COALESCE(f.value->>'v', f.value::text) ILIKE :fact_id_{i}")
+        fact_params[f"fact_id_{i}"] = f"%{tok}%"
+
+    # Every clause that can directly match ONE fact by itself -- listed once
+    # so the row-group-sibling pull below can reuse the identical condition
+    # against f2 instead of drifting out of sync with fact_match_clause.
+    direct_clauses = [
+        "f.field_name ILIKE :fact_pattern",
+        "COALESCE(f.value->>'v', f.value::text) ILIKE :fact_pattern",
+        *id_clauses,
+    ]
+    direct_match_sql = " OR ".join(direct_clauses)
+
+    # T28 -- a direct hit only ever matches the ONE fact whose own value
+    # happens to contain it (e.g. the wakf_name field's "Chilla Madar Saheb
+    # Naigalli") -- not the sibling fields (valuation, gross_income, ...)
+    # from the same table row the user actually asked about. Pull in every
+    # fact sharing that row's row_group_id too, so the LLM sees the whole
+    # entry as separate, cleanly field-labeled excerpts instead of falling
+    # back to a raw OCR chunk that can itself omit the field (cut at a
+    # chunk boundary) even though the fact exists cleanly two rows away.
+    #
+    # Real bug found live 2026-09-09: this sibling pull used to fire ONLY
+    # when the query contained an ID-shaped token ("WB-100") -- a plain
+    # keyword/name search (e.g. searching just "Chilla Madar Saheb
+    # Naigalli", the field's own value, with no ID token in it) matched
+    # that ONE field via the plain fact_pattern clause below but never
+    # pulled in its row's other fields. Reproduced against a real chat
+    # groundedness failure: asked about that entry's valuation, got "no
+    # valuation figure is shown" back, because the grounding LLM was never
+    # shown the sibling valuation Fact at all -- only the wakf_name one
+    # that matched, plus whatever raw chunk text vector/keyword search
+    # separately turned up. Gating this on ID-shaped tokens specifically
+    # was too narrow a condition for what the sibling pull actually exists
+    # to fix: any direct fact match, not just ones shaped like an ID.
+    row_group_sibling_clause = f"""
+        OR f.row_group_id IN (
+            SELECT f2.row_group_id FROM doc_dg_facts f2
+            WHERE f2.tenant_id = CAST(:tenant_id AS uuid)
+              AND f2.row_group_id IS NOT NULL
+              AND ({direct_match_sql.replace("f.value", "f2.value").replace("f.field_name", "f2.field_name")})
+        )
+    """
+    fact_match_clause = f"({direct_match_sql} {row_group_sibling_clause})"
+
     fact_sql = text(f"""
         SELECT f.id, (f.field_name || ': ' || COALESCE(f.value->>'v', f.value::text)) as content,
                fact_page.page_number as page_number, 0 as chunk_index,
@@ -491,12 +634,12 @@ async def search(
         ) fact_page ON true
         WHERE f.tenant_id = CAST(:tenant_id AS uuid) AND d.status = 'indexed' AND d.is_trashed = false
           AND f.field_name != '_marginalia'
-          AND (f.field_name ILIKE :fact_pattern OR COALESCE(f.value->>'v', f.value::text) ILIKE :fact_pattern)
+          AND {fact_match_clause}
           {filter_str}
         ORDER BY f.confidence DESC NULLS LAST
-        LIMIT {candidate_limit}
+        LIMIT {candidate_limit * 4}
     """)
-    fact_res = await db.execute(fact_sql, {**params, "fact_pattern": fact_pattern})
+    fact_res = await db.execute(fact_sql, fact_params)
     fact_rows = fact_res.fetchall()
     fact_row_ids = {str(r.id) for r in fact_rows}
 
@@ -560,10 +703,8 @@ async def search(
                     logger.warning("Secondary translation rerank skipped: %s", ex)
 
             RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
-            relevant_ranks = sorted(
-                (r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD),
-                key=lambda r: r.score, reverse=True,
-            )
+            fallback_ratio = await get_float("search_relevance_fallback_ratio", 0.5)
+            relevant_ranks = _select_relevant_ranks(reranked_primary, RELEVANCE_THRESHOLD, fallback_ratio)
         except Exception as e:
             logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
             reranked = False
@@ -641,10 +782,13 @@ async def search(
                                     logger.warning("Secondary translation HyDE rerank skipped: %s", ex)
 
                             RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
-                            relevant_ranks = sorted(
-                                (r for r in reranked_primary if r.score >= RELEVANCE_THRESHOLD),
-                                key=lambda r: r.score, reverse=True,
-                            )
+                            fallback_ratio = await get_float("search_relevance_fallback_ratio", 0.5)
+                            # Same near-miss fallback as the direct-search pass above (see
+                            # _select_relevant_ranks) -- this is HyDE's own rerank, already a
+                            # fallback path itself, so a near-miss here is just as worth
+                            # surfacing as one on the primary pass rather than exhausting
+                            # every fallback and still landing on "no matches".
+                            relevant_ranks = _select_relevant_ranks(reranked_primary, RELEVANCE_THRESHOLD, fallback_ratio)
                         except Exception as e:
                             logger.error("Reranker unavailable (%s) — falling back to unranked RRF order: %s", reranker.__class__.__name__, e)
                             reranked = False

@@ -94,7 +94,19 @@ class Settings(BaseSettings):
     # indexing, same as before this task.
     ai_vlm_provider: Literal['gemini', 'openrouter', 'chandra', 'none'] = 'gemini'
     gemini_vlm_model: str = 'gemini-3.6-flash'
-    vlm_max_pages_per_document: int = 25
+    # Real bug found live 2026-09-09: a 280-page register (a completely
+    # ordinary document size for this product's real corpus -- district
+    # Wakf-property gazettes routinely run this long) only ever got
+    # structured facts for its first 25 pages under the old default. Pages
+    # 26-280 still got real OCR/chunk-text and were fully searchable, but
+    # had zero extracted facts -- silently degrading every field-specific
+    # question about the other 91% of the document to ambiguous raw-text
+    # grounding instead of the clean, properly-labelled Fact rows the rest
+    # of the document got. Raised, not removed: still a real, named ceiling
+    # (each page beyond it is a real VLM API call/cost) against a genuinely
+    # pathological upload, just one that no longer silently truncates a
+    # normal document for this product's own domain.
+    vlm_max_pages_per_document: int = 500
 
     openrouter_api_key: str = ''
     openrouter_vlm_model: str = 'google/gemini-2.5-flash'

@@ -87,10 +87,24 @@ async def match_template(db: AsyncSession, sample_text: str) -> Optional[Templat
     options = [f"{t.form_type} | {t.era_label}" for t in templates]
     prompt = (
         "A scanned government document starts with this text:\n\n"
-        f"{sample_text[:1500]}\n\n"
+        # 4000, not the old 1500: the caller now concatenates the first few
+        # pages (worker.py), not just page 1, because the form-identifying
+        # content (e.g. a "Form B" header + its column names) routinely
+        # doesn't appear until page 2+ of a multi-page gazette whose page 1
+        # is shared boilerplate. A budget sized for one page silently
+        # truncated that content back out even after the caller fetched it.
+        f"{sample_text[:4000]}\n\n"
         "Which of these registered form templates, if any, does it match?\n"
         + "\n".join(f"- {o}" for o in options)
-        + "\n\nReply with ONLY the exact 'form_type | era_label' string of the best match, "
+        + "\n\nMatch on what the document itself IS — its own form designation "
+          "(e.g. \"Form B\"), the district/date printed in ITS header or table, and "
+          "its column layout — never on the name or city of the office that issued "
+          "or published it. A publishing office's name is often repeated many times "
+          "as boilerplate and can cover documents about many other districts/years/"
+          "forms; it is not evidence of a match by itself. If the document's own "
+          "form designation, district or year conflicts with a candidate's era_label, "
+          "that candidate is NOT a match even if the issuing office's name lines up.\n\n"
+          "Reply with ONLY the exact 'form_type | era_label' string of the best match, "
           "or the single word NONE if it doesn't match any of them."
     )
 

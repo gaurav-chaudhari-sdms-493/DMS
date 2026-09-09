@@ -41,6 +41,16 @@ function fieldLabel(fieldName: string): string {
   return SENTINEL_LABELS[fieldName] || fieldName;
 }
 
+// A fact's source document isn't always a PDF — a standalone scanned image
+// upload (jpg/png/...) goes through the exact same region-highlight path
+// (Workbench, Entity 360) but has no PDF stream at all for pdf.js to
+// parse, which made this crash outright before. Same URL-based check
+// CitationPageViewerImpl and RegionViewerImpl use elsewhere in this
+// codebase.
+function isPdfUrl(url: string): boolean {
+  return url.split("?")[0].toLowerCase().endsWith(".pdf");
+}
+
 interface FactDetail {
   fact_id: string;
   field_name: string;
@@ -76,6 +86,7 @@ function PageRegionView({
   const pageAspect = region.page_height > 0 && region.page_width > 0 ? region.page_height / region.page_width : 1.414;
   const height = width * pageAspect;
   const hasSkew = region.skew !== 0 && !isNaN(region.skew);
+  const isPdf = isPdfUrl(downloadUrl);
 
   // Canvas post-processing: apply affine 2D transform to deskew the page bitmap
   const onRenderSuccess = useCallback(() => {
@@ -125,16 +136,34 @@ function PageRegionView({
       className="relative overflow-hidden bg-white shadow-sm border border-[#e1e3e1] rounded-lg"
       style={{ width, height }}
     >
-      <Document file={downloadUrl} loading={<div className="p-4 text-xs text-[#747775]">Rendering page…</div>}>
-        <Page
-          pageNumber={region.page_number}
+      {isPdf ? (
+        <Document file={downloadUrl} loading={<div className="p-4 text-xs text-[#747775]">Rendering page…</div>}>
+          <Page
+            pageNumber={region.page_number}
+            width={width}
+            rotate={region.rotation}
+            onRenderSuccess={onRenderSuccess}
+            renderAnnotationLayer={false}
+            renderTextLayer={false}
+          />
+        </Document>
+      ) : (
+        // eslint-disable-next-line @next/next/no-img-element -- external
+        // presigned S3 URL, not a local/optimizable asset
+        <img
+          src={downloadUrl}
+          alt="Source scan"
           width={width}
-          rotate={region.rotation}
-          onRenderSuccess={onRenderSuccess}
-          renderAnnotationLayer={false}
-          renderTextLayer={false}
+          height={height}
+          className="block"
+          style={{ width, height, objectFit: "contain" }}
         />
-      </Document>
+        // No canvas-based deskew for a plain image (that needs the canvas
+        // react-pdf renders a PDF page onto, which a raw <img> doesn't
+        // have) -- the highlight box below still honours the stored skew
+        // via its own rotate transform, same as the PDF path's "raw scan"
+        // (non-deskewed) mode.
+      )}
 
       {/* SVG Affine Highlight Overlay */}
       <svg
@@ -149,7 +178,7 @@ function PageRegionView({
           height={boxH}
           rx={3}
           transform={
-            !deskewEnabled && hasSkew
+            (!isPdf || !deskewEnabled) && hasSkew
               ? `rotate(${region.skew}, ${centerX}, ${centerY})`
               : undefined
           }
@@ -237,6 +266,10 @@ export default function RegionHighlightViewer({
   // Check if any visible region has detected skew
   const currentSkew = activeRegion.skew ?? 0;
   const hasSkew = currentSkew !== 0 && !isNaN(currentSkew);
+  // The deskew toggle counter-rotates a canvas pdf.js renders a PDF page
+  // onto -- there's no equivalent for a plain image, so don't offer a
+  // control that would do nothing.
+  const canDeskew = hasSkew && isPdfUrl(fact.download_url);
 
   const columns = Math.min(fact.regions.length, 2);
   const gapPx = 12;
@@ -268,7 +301,7 @@ export default function RegionHighlightViewer({
 
         <div className="flex items-center gap-2">
           {/* T53: Operator Deskew / Straighten Toggle */}
-          {hasSkew && (
+          {canDeskew && (
             <button
               type="button"
               onClick={() => setDeskewEnabled((v) => !v)}

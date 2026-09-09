@@ -1,6 +1,7 @@
 import pytest
 import uuid
-from app.services.search_service import search, _condense_excerpt_text, _expand_trilingual_query
+from app.ai.base import RankedResult
+from app.services.search_service import search, _condense_excerpt_text, _expand_trilingual_query, _select_relevant_ranks
 from app.services.chat_service import _extract_score_threshold, _is_explicit_search_intent
 from app.database import AsyncSessionLocal
 from app.models.tenant import Tenant
@@ -325,3 +326,35 @@ async def test_search_filter_matches_structured_fact_field():
             assert str(other_doc.id) not in result_doc_ids
         finally:
             await db.close()
+
+
+def test_select_relevant_ranks_normal_case_unaffected():
+    """A query with a real above-threshold match behaves exactly as
+    before -- the fallback path never engages when it isn't needed."""
+    ranks = [RankedResult(index=0, score=0.42, text="x"), RankedResult(index=1, score=0.05, text="y")]
+    result = _select_relevant_ranks(ranks, relevance_threshold=0.15, fallback_ratio=0.5)
+    assert [r.index for r in result] == [0]
+
+
+def test_select_relevant_ranks_falls_back_to_near_miss_best_candidate():
+    """Real bug found live (verification report, 2026-09-09): a
+    near-identical follow-up query returned 'no matching documents' even
+    though a moments-earlier query on the same topic returned 9 results.
+    A candidate within the fallback margin (>= threshold * ratio) must be
+    returned instead of an empty list."""
+    ranks = [RankedResult(index=0, score=0.09, text="x"), RankedResult(index=1, score=0.02, text="y")]
+    result = _select_relevant_ranks(ranks, relevance_threshold=0.15, fallback_ratio=0.5)
+    assert [r.index for r in result] == [0]  # 0.09 >= 0.15 * 0.5
+
+
+def test_select_relevant_ranks_still_empty_when_nothing_is_even_plausible():
+    """A candidate that misses by a wide margin must still correctly
+    return nothing -- the fallback is a narrow near-miss net, not a
+    blanket 'always return the best of whatever exists'."""
+    ranks = [RankedResult(index=0, score=0.01, text="x")]
+    result = _select_relevant_ranks(ranks, relevance_threshold=0.15, fallback_ratio=0.5)
+    assert result == []
+
+
+def test_select_relevant_ranks_empty_input_stays_empty():
+    assert _select_relevant_ranks([], relevance_threshold=0.15, fallback_ratio=0.5) == []

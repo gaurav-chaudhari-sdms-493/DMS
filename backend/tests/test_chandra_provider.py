@@ -1,6 +1,8 @@
 import json
 
 from app.ai.providers.chandra_provider import (
+    _bbox_center_in_any,
+    _collect_handwriting_bboxes,
     _extract_field_names,
     _normalize_bbox,
     _parse_bbox,
@@ -128,3 +130,50 @@ def test_table_html_parser_keeps_mixed_row_even_with_one_header_cell():
     parser.feed(html)
     assert len(parser.rows) == 1
     assert parser.rows[0][0]["text"] == "180"
+
+
+def test_collect_handwriting_bboxes_matches_by_substring_case_insensitive():
+    """Real gap found live 2026-09-09: is_handwritten was hardcoded False
+    for every cell, unconditionally -- Datalab's docs confirm the
+    "new_block_types" extra enables handwriting/signature detection, but
+    don't publish the exact block_type spelling, so this matches by
+    substring rather than one hardcoded exact string."""
+    tree = {
+        "children": [
+            {"block_type": "Page", "bbox": [0, 0, 1000, 1000], "children": [
+                {"block_type": "Text", "bbox": [10, 10, 50, 50]},
+                {"block_type": "HandwrittenText", "bbox": [100, 100, 200, 200]},
+                {"block_type": "Signature", "bbox": [300, 300, 400, 400]},
+            ]},
+        ]
+    }
+    boxes = _collect_handwriting_bboxes(tree)
+    assert [100, 100, 200, 200] in boxes
+    assert [300, 300, 400, 400] in boxes
+    assert [10, 10, 50, 50] not in boxes
+
+
+def test_collect_handwriting_bboxes_empty_on_unrecognized_tree():
+    """Best-effort enrichment, not a required field -- an unexpected tree
+    shape (e.g. Datalab genuinely returns nothing recognizable, or a
+    malformed response) degrades to zero regions, never raises."""
+    assert _collect_handwriting_bboxes({}) == []
+    assert _collect_handwriting_bboxes({"children": "not a list"}) == []
+    assert _collect_handwriting_bboxes({"children": [{"block_type": "Text", "bbox": [1, 2, 3, 4]}]}) == []
+
+
+def test_bbox_center_in_any_true_when_cell_center_falls_inside_a_region():
+    cell_bbox = [100.0, 100.0, 140.0, 140.0]  # center (120, 120)
+    regions = [[50.0, 50.0, 150.0, 150.0]]
+    assert _bbox_center_in_any(cell_bbox, regions) is True
+
+
+def test_bbox_center_in_any_false_when_no_region_contains_the_center():
+    cell_bbox = [100.0, 100.0, 140.0, 140.0]  # center (120, 120)
+    regions = [[0.0, 0.0, 10.0, 10.0]]
+    assert _bbox_center_in_any(cell_bbox, regions) is False
+
+
+def test_bbox_center_in_any_false_without_bbox_or_regions():
+    assert _bbox_center_in_any(None, [[0, 0, 1, 1]]) is False
+    assert _bbox_center_in_any([0, 0, 1, 1], []) is False

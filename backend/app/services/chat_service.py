@@ -30,6 +30,12 @@ async def create_chat_session(
     )
     db.add(session)
     await db.commit()
+    # D-2 commit-then-refresh regression (see database.py's
+    # establish_tenant_context docstring) -- this call site was missed by
+    # the original sweep. Without it the SELECT below runs under RLS with
+    # no app.current_tenant_id set, silently returns zero rows, and the
+    # 200 OK response ends up serializing None -> a 500 ResponseValidationError.
+    await establish_tenant_context(db, tenant_id)
 
     stmt = (
         select(ChatSession)
@@ -111,6 +117,8 @@ async def update_chat_session_title(
         return None
     session.title = title.strip()
     await db.commit()
+    # Same D-2 commit-then-refresh regression as create_chat_session above.
+    await establish_tenant_context(db, tenant_id)
     return await get_chat_session(session_id, tenant_id, user_id, db)
 
 
@@ -145,25 +153,55 @@ def _is_explicit_search_intent(query: str) -> bool:
     triggers = ["search for ", "find ", "look for ", "search ", "load documents for ", "fetch documents "]
     return any(q.startswith(t) or f" {t}" in q for t in triggers)
 
+_ATTACHED_FILES_RE = re.compile(r"\[Attached Context Files:\s*(.*?)\]")
+
+
 def _extract_attached_filenames(query: str) -> List[str]:
-    m = re.search(r"\[Attached Context Files:\s*(.*?)\]", query)
+    m = _ATTACHED_FILES_RE.search(query)
     if m:
         names = [n.strip() for n in m.group(1).split(",") if n.strip()]
         return names
     return []
 
+
+def _strip_attached_files_marker(query: str) -> str:
+    """The [Attached Context Files: ...] marker is UI bookkeeping, not part
+    of the actual question -- strip it before using the query text to
+    search, so it can't skew retrieval."""
+    return _ATTACHED_FILES_RE.sub("", query).strip()
+
+
 async def _fetch_attached_documents_results(
     filenames: List[str],
+    query: str,
     tenant_id: UUID,
-    db: AsyncSession
+    user_id: UUID,
+    db: AsyncSession,
+    ip_address: Optional[str] = None,
 ) -> List[SearchResult]:
+    """Real bug, found live 2026-09-09: this used to just grab a document's
+    first ~10 chunks in page order, regardless of what was asked -- so a
+    question about anything past roughly a document's first page silently
+    failed no matter how well the pipeline had actually indexed the rest
+    of it (confirmed live against a real 280-page document: every one of
+    15 test questions failed through this path, while the exact same
+    questions answered correctly through the real /search endpoint).
+
+    Now runs the same real, ranked retrieval search() already uses --
+    vector + keyword + trigram + structured-fact legs, reranked --
+    scoped to just this document via the existing document_id filter, so
+    an "attached file" question actually searches the file instead of
+    only ever seeing its opening page. generate_summary=False: chat
+    builds its own grounded answer afterward from these results, a
+    second AI summary here would be wasted work.
+    """
     if not filenames:
         return []
 
-    import asyncio
-    from sqlalchemy import select, text
+    from sqlalchemy import select
     from app.models.document import Document
-    from app.services.storage_service import generate_presigned_url
+
+    clean_query = _strip_attached_files_marker(query)
 
     results: List[SearchResult] = []
     for name in filenames:
@@ -177,52 +215,26 @@ async def _fetch_attached_documents_results(
         if not doc:
             continue
 
-        chunk_sql = text("""
-            SELECT c.id, c.content, c.page_number, c.chunk_index, d.title, d.id as doc_id, v.s3_path
-            FROM doc_dg_chunks c
-            JOIN doc_dg_documents d ON c.document_id = d.id
-            LEFT JOIN doc_dg_document_versions v ON v.id = d.current_version_id
-            WHERE d.id = :doc_id AND d.tenant_id = :tenant_id AND d.is_trashed = false
-            ORDER BY c.page_number ASC, c.chunk_index ASC
-            LIMIT 10
-        """)
-
-        rows = []
-        for attempt in range(4):
-            chunk_res = await db.execute(chunk_sql, {"doc_id": str(doc.id), "tenant_id": str(tenant_id)})
-            rows = chunk_res.fetchall()
-            if rows:
-                break
-            await asyncio.sleep(1.5)
-
-        download_url = ""
-        if rows and rows[0].s3_path:
-            download_url = await generate_presigned_url(rows[0].s3_path)
-
-        if rows:
-            snippets = [r.content for r in rows[:4]]
-            combined_snippet = "\n\n".join(snippets)
-            if len(combined_snippet) > 1200:
-                combined_snippet = combined_snippet[:1200] + "..."
-
-            results.append(SearchResult(
-                document_id=str(doc.id),
-                document_name=doc.title,
-                download_url=download_url,
-                page_number=rows[0].page_number or 1,
-                snippet=combined_snippet,
-                score=1.0,
-                tags=["attached"],
-                metadata={"status": doc.status, "attached": True}
-            ))
+        response = await do_search(
+            query=clean_query,
+            tenant_id=tenant_id,
+            user_id=user_id,
+            limit=6,
+            filters={"document_id": str(doc.id)},
+            db=db,
+            ip_address=ip_address or "",
+            generate_summary=False,
+        )
+        if response.results:
+            results.extend(response.results)
         else:
             results.append(SearchResult(
                 document_id=str(doc.id),
                 document_name=doc.title,
                 download_url="",
                 page_number=1,
-                snippet=f"[Note: Extracted text for {doc.title} is currently being processed. Please ask again in a moment.]",
-                score=1.0,
+                snippet=f"[Note: no content in {doc.title} matched your question. It may still be processing, or may not contain that information.]",
+                score=0.0,
                 tags=["attached"],
                 metadata={"status": doc.status, "attached": True}
             ))
@@ -274,7 +286,9 @@ async def send_chat_message(
     attached_filenames = _extract_attached_filenames(query)
     attached_results: List[SearchResult] = []
     if attached_filenames:
-        attached_results = await _fetch_attached_documents_results(attached_filenames, tenant_id, db)
+        attached_results = await _fetch_attached_documents_results(
+            attached_filenames, query, tenant_id, user_id, db, ip_address
+        )
 
     # 2. Determine processing mode
     score_threshold = _extract_score_threshold(query)
@@ -342,7 +356,9 @@ async def send_chat_message(
                 "You are an enterprise document intelligence assistant for a persistent chat thread.\n"
                 "CRITICAL RULE: Answer the user's question accurately using ONLY the listed document excerpts below.\n"
                 "- Do NOT invent details outside these listed documents.\n"
-                "- Clearly reference document names, pages, scores, or metadata where relevant.\n"
+                "- Every claim drawn from a document must end with a citation marker matching that "
+                "document's number in 'Listed Documents Context' below, e.g. a claim from Document #1 "
+                "ends with [1]. Use the same marker again if you cite that document more than once.\n"
                 "- Organize your answer with clear headers, bold text, or bullet points.\n"
                 "- Respond in the language of the user's CURRENT message below, even if earlier turns in "
                 "this conversation were in a different language — do not carry a prior turn's language forward."

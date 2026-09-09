@@ -156,6 +156,44 @@ def _normalize_bbox(bbox: Optional[List[float]], page_w: Optional[float], page_h
     return [x0 / page_w, y0 / page_h, x1 / page_w, y1 / page_h]
 
 
+_HANDWRITING_BLOCK_RE = re.compile(r"handwrit|signature", re.IGNORECASE)
+
+
+def _collect_handwriting_bboxes(json_tree: Dict[str, Any]) -> List[List[float]]:
+    """Walks the full response tree (not just the root "Page" block used
+    for the table HTML) collecting the raw pixel bbox of every block whose
+    block_type looks handwriting/signature-related. Recursive and
+    tolerant: an unexpected tree shape yields fewer/no boxes rather than
+    raising, since this is a best-effort enrichment, not a required field
+    (T22's existing contract — a VLM/OCR signal that fails just degrades
+    to the old is_handwritten=False, never fails ingestion)."""
+    found: List[List[float]] = []
+
+    def _walk(block: Any) -> None:
+        if not isinstance(block, dict):
+            return
+        block_type = block.get("block_type")
+        bbox = block.get("bbox")
+        if isinstance(block_type, str) and _HANDWRITING_BLOCK_RE.search(block_type) and isinstance(bbox, list) and len(bbox) == 4:
+            found.append([float(v) for v in bbox])
+        for child in block.get("children") or []:
+            _walk(child)
+
+    _walk(json_tree)
+    return found
+
+
+def _bbox_center_in_any(cell_bbox: Optional[List[float]], regions: List[List[float]]) -> bool:
+    if not cell_bbox or not regions:
+        return False
+    cx = (cell_bbox[0] + cell_bbox[2]) / 2
+    cy = (cell_bbox[1] + cell_bbox[3]) / 2
+    for x0, y0, x1, y1 in regions:
+        if x0 <= cx <= x1 and y0 <= cy <= y1:
+            return True
+    return False
+
+
 def _parse_confidence(raw: Optional[str]) -> Optional[float]:
     if not raw:
         return None
@@ -190,7 +228,16 @@ class ChandraVLMProvider(VLMProvider):
                 # [0,0,width,height] bbox — the only place that number is
                 # available — which is what every cell coordinate below
                 # needs to be divided by to land in our 0-1 fraction space.
-                data={"output_format": "json", "mode": "accurate", "extras": "table_cell_bboxes"},
+                # Real bug found live 2026-09-09: is_handwritten was
+                # hardcoded False for every cell below, unconditionally --
+                # not a documented Chandra limitation the way per-field
+                # confidence is (see this module's own docstring), just a
+                # capability we never actually requested. Datalab's
+                # documented `extras` list includes "new_block_types",
+                # which its docs describe as enabling handwriting/signature
+                # detection -- adding it here is a prerequisite for
+                # detecting handwriting at all through this endpoint.
+                data={"output_format": "json", "mode": "accurate", "extras": "table_cell_bboxes,new_block_types"},
             )
             if submit.status_code != 200:
                 raise Exception(f"Chandra convert request failed with status {submit.status_code}: {submit.text}")
@@ -221,6 +268,22 @@ class ChandraVLMProvider(VLMProvider):
         page_bbox = page_block.get("bbox")
         page_w, page_h = (float(page_bbox[2]), float(page_bbox[3])) if isinstance(page_bbox, list) and len(page_bbox) == 4 else (None, None)
 
+        # Best-effort handwriting detection (T22, real gap closed 2026-09-09
+        # — see the `extras` comment above). Datalab's public docs confirm
+        # `new_block_types` exists and enables handwriting/signature
+        # detection, but don't publish the exact block_type name(s) it
+        # uses, and this hasn't been checked against a real API response
+        # yet (no VLM credits available the day this was written) — so
+        # this matches block_type BY SUBSTRING against every plausible
+        # spelling rather than one hardcoded exact string, and is written
+        # to degrade to the old all-False behavior (never crash, never
+        # false-positive) if the extra returns nothing recognizable. A
+        # cell counts as handwritten when its own bbox center falls inside
+        # a detected handwriting/signature block's bbox — simpler and
+        # cheaper than true IoU, and sufficient for a point-in-region
+        # question like this one.
+        handwriting_bboxes = _collect_handwriting_bboxes(result.get("json") or {})
+
         parser = _TableHTMLParser()
         parser.feed(html)
 
@@ -236,7 +299,7 @@ class ChandraVLMProvider(VLMProvider):
                     "value": cell["text"],
                     "bbox": _normalize_bbox(cell["bbox"], page_w, page_h),
                     "confidence": cell["confidence"] if cell["confidence"] is not None else 0.5,
-                    "is_handwritten": False,
+                    "is_handwritten": _bbox_center_in_any(cell["bbox"], handwriting_bboxes),
                 }
             if row:
                 rows_out.append(row)

@@ -697,3 +697,46 @@ async def cleanup_expired_trashed_items(db: AsyncSession, retention_days: int = 
         "protected_documents": protected_documents,
         "pending_documents": pending_documents,
     }
+
+
+async def get_chunks_for_document(db: AsyncSession, document_id: UUID, tenant_id: UUID) -> dict:
+    """List every chunk indexed for one document — real gap found live
+    2026-09-09 (verification report): no endpoint exposed chunk-level data
+    at all, so a citation whose `chunk_id` came back from search/chat
+    could never be inspected directly (what text/page/chunk_metadata it
+    actually carries) without a raw DB query. Order by chunk_index so the
+    response reads in the same top-to-bottom order TextChunker produced
+    it in, matching how a person would actually want to page through it.
+
+    Deliberately excludes the embedding vector (1024 floats serialized as
+    JSON would dwarf the actual useful content of the response for zero
+    debugging value) — chunk_metadata, page_number and content are the
+    fields a citation-debugging session actually needs."""
+    from app.models.chunk import Chunk
+
+    doc = await db.get(Document, document_id)
+    if not doc or doc.tenant_id != tenant_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    stmt = (
+        select(Chunk)
+        .where(Chunk.document_id == document_id, Chunk.tenant_id == tenant_id)
+        .order_by(Chunk.chunk_index)
+    )
+    res = await db.execute(stmt)
+    chunks = res.scalars().all()
+
+    return {
+        "document_id": str(document_id),
+        "chunk_count": len(chunks),
+        "chunks": [
+            {
+                "chunk_id": str(c.id),
+                "page_number": c.page_number,
+                "chunk_index": c.chunk_index,
+                "content": c.content,
+                "chunk_metadata": c.chunk_metadata,
+            }
+            for c in chunks
+        ],
+    }

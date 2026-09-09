@@ -340,8 +340,25 @@ export function DocumentPreviewModal({
 
       const searchRes = await api.search.query(textToSend, 5, filters);
 
+      // Real bug found live 2026-09-09: when the grounding LLM call fails
+      // (search_service.py's _generate_grounded_answer throwing, e.g. a
+      // large document pushing too many excerpts into one prompt),
+      // ai_summary gets set to a placeholder string that literally says
+      // "the excerpts below are unedited source text" -- but this branch
+      // treated ANY non-empty ai_summary as good content and showed that
+      // placeholder verbatim, with no excerpts actually following it, so
+      // the user saw a promise with nothing behind it. Real results
+      // (searchRes.results) were sitting right there in the same response,
+      // unused, the whole time.
+      const summaryUnavailable =
+        !searchRes?.ai_summary ||
+        searchRes.refused ||
+        searchRes.ai_summary.includes("No matching documents were found in your drive") ||
+        searchRes.ai_summary.includes("AI summary is temporarily unavailable") ||
+        searchRes.ai_summary.includes("AI summary generation is disabled");
+
       let aiResponseText = "";
-      if (searchRes && searchRes.ai_summary && !searchRes.ai_summary.includes("No matching documents were found in your drive")) {
+      if (searchRes && searchRes.ai_summary && !summaryUnavailable) {
         aiResponseText = searchRes.ai_summary;
       } else if (searchRes && searchRes.results && searchRes.results.length > 0) {
         const topSnippet = searchRes.results[0].snippet;
@@ -349,7 +366,11 @@ export function DocumentPreviewModal({
       } else if (extractedText) {
         aiResponseText = `Based on the text contents of **${doc.title}**:\n\n` + extractedText.slice(0, 400) + "...";
       } else {
-        aiResponseText = `Analysis of **${doc.title}**:\n\nThis file contains key operational details. All parameters in **${doc.title}** are extracted and indexed.`;
+        // Was: fabricated, ungrounded "analysis" text claiming the file's
+        // "parameters are extracted and indexed" regardless of whether
+        // anything was actually found -- this product refuses rather than
+        // guesses everywhere else (T70); this one spot didn't.
+        aiResponseText = `I couldn't find an answer for that in **${doc.title}**. Try rephrasing, or use the search bar for a specific term.`;
       }
 
       const aiMsg: ChatMessage = {
@@ -361,10 +382,13 @@ export function DocumentPreviewModal({
 
       setChatMessages((prev) => [...prev, aiMsg]);
     } catch (err) {
+      // Was: fabricated "analysis" text shown even though the request
+      // itself failed -- same issue as the ai_summary fallback above,
+      // just for the network/exception path instead of the API-error path.
       const fallbackMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: "ai",
-        text: `Analysis of **${doc.title}**:\n\nThis file contains key information regarding your query. You can view the contents in the preview window on the left.`,
+        text: `I couldn't reach the AI service to analyze **${doc.title}** right now. Please try again in a moment.`,
         timestamp: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
       };
       setChatMessages((prev) => [...prev, fallbackMsg]);

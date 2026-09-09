@@ -322,7 +322,17 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                 template = None
                 try:
                     from app.services.classification_service import classify_document
-                    sample_text = pages[0].get("text", "") if pages else ""
+                    # Real bug found live 2026-09-09: page 1 of a multi-page
+                    # gazette is routinely just the shared masthead/notice
+                    # boilerplate, identical across many registered templates
+                    # (different districts/years/forms) — the actual
+                    # form-identifying content (e.g. "Form B (See Rule 5)"
+                    # plus its column headers) only appears starting page 2.
+                    # Page-1-only sampling left the LLM with nothing to
+                    # distinguish templates by, and it silently matched a
+                    # real document (Pune, 2004, Form B) to the wrong
+                    # registered template (Aurangabad, 1973, spread layout).
+                    sample_text = "\n\n".join(p.get("text", "") for p in pages[:3]) if pages else ""
                     async with db.begin_nested():
                         classified_doc = await classify_document(db, tenant_id, document_id, sample_text)
                     if classified_doc.matched_template_id:

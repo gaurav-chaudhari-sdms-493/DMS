@@ -116,14 +116,17 @@ export function SuggestedFilesTable({
       );
     }
 
-    // Default Document / Code / Text
+    // Real bug found live 2026-09-09: every non-image file type -- PDFs,
+    // markdown, spreadsheets, everything -- fell through to this one
+    // hardcoded fake "code.py / import os, sys" mockup graphic, regardless
+    // of the file's actual type. List view's own getFileIcon (above)
+    // already branches correctly by extension; grid view just never
+    // reused it. Type-appropriate icon now, not a generic decorative
+    // placeholder pretending to be a live preview.
     return (
       <div className="relative w-full h-36 bg-[#f8f9fa] rounded-t-2xl border-b border-[#e1e3e1] flex items-center justify-center p-3 overflow-hidden">
-        <div className="w-20 h-28 bg-[#1e1e1e] rounded-md shadow-md border border-[#333333] flex flex-col p-2 overflow-hidden group-hover:scale-105 transition-transform font-mono text-[5.5px] text-emerald-400">
-          <div className="text-gray-400 border-b border-gray-700 pb-1 mb-1 font-sans text-[6px]">code.py</div>
-          <p><span className="text-blue-400">import</span> os, sys</p>
-          <p><span className="text-purple-400">def</span> main():</p>
-          <p className="pl-1 text-gray-300">print(<span className="text-amber-300">&quot;DMS AI&quot;</span>)</p>
+        <div className="w-16 h-16 flex items-center justify-center rounded-2xl bg-white border border-[#e1e3e1] shadow-xs group-hover:scale-105 transition-transform scale-150">
+          {getFileIcon(row.title, row.downloadUrl)}
         </div>
       </div>
     );

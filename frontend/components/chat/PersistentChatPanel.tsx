@@ -27,6 +27,7 @@ import { onKeyActivate } from "@/lib/a11y";
 import type { ChatSession, ChatSessionListItem, ChatMessage, SearchResult, DocumentListItem } from "@/types";
 import { MarkdownViewer } from "./MarkdownViewer";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { CitationModal, CitationModalCitation } from "@/components/search/CitationModal";
 
 
 interface PersistentChatPanelProps {
@@ -67,6 +68,20 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
     onConfirm: () => {},
   });
 
+
+  // T71 — same [N] citation click-through AISummary uses, wired up for
+  // chat replies too: chat_service now asks the model for [N] markers
+  // matching each message's stored `results` ordering.
+  const [activeCitation, setActiveCitation] = useState<CitationModalCitation | null>(null);
+
+  const citationsForMessage = (m: ChatMessage): CitationModalCitation[] =>
+    (m.results || []).map((r, idx) => ({
+      number: idx + 1,
+      document_name: r.document_name,
+      page_number: r.page_number,
+      download_url: r.download_url,
+      fact_id: null,
+    }));
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
@@ -769,7 +784,14 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
                         );
                       })()
                     ) : (
-                      <MarkdownViewer content={m.content} />
+                      <MarkdownViewer
+                        content={m.content}
+                        onCitationClick={
+                          m.results && m.results.length > 0
+                            ? (n) => setActiveCitation(citationsForMessage(m).find((c) => c.number === n) ?? null)
+                            : undefined
+                        }
+                      />
                     )}
                   </div>
                 </div>
@@ -945,6 +967,8 @@ export function PersistentChatPanel({ onPreviewDocument, initialQuery }: Persist
         onConfirm={modalConfig.onConfirm}
         onClose={() => setModalConfig((prev) => ({ ...prev, isOpen: false }))}
       />
+
+      <CitationModal citation={activeCitation} onClose={() => setActiveCitation(null)} />
     </div>
   );
 }

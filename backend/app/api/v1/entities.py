@@ -105,6 +105,28 @@ async def create_entity_edge_api(
     }
 
 
+@router.delete("/edges/{edge_id}", status_code=204)
+async def delete_entity_edge_api(
+    edge_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    await entity_graph_service.delete_edge(db, tenant_id, edge_id, actor_id=user_id)
+
+
+@router.delete("/{node_id}", status_code=204)
+async def delete_entity_node_api(
+    node_id: uuid.UUID,
+    current_user: TokenPayload = Depends(require_role('records_officer', 'operator', 'it_admin')),
+    db: AsyncSession = Depends(get_tenant_db),
+):
+    tenant_id = uuid.UUID(current_user.tenant_id)
+    user_id = uuid.UUID(current_user.sub)
+    await entity_graph_service.delete_node(db, tenant_id, node_id, actor_id=user_id)
+
+
 @router.get("/search")
 async def search_entity_nodes_api(
     q: str,
