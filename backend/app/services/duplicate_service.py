@@ -76,3 +76,76 @@ async def find_fuzzy_duplicates(
     ]
     candidates.sort(key=lambda c: c["similarity"], reverse=True)
     return candidates[:limit]
+
+
+async def resolve_duplicate_representatives(
+    db: AsyncSession, tenant_id: UUID, doc_ids_by_rank: List[UUID], threshold: Optional[float] = None,
+) -> Dict[UUID, UUID]:
+    """Real bug found live (verification report, 2026-09-09): a chat
+    answer's citation pointed at a different document than the one named
+    in the user's own question -- the corpus has near-duplicate scans of
+    the same underlying register (re-uploaded/rescanned copies), and
+    search silently retrieved a chunk from the highest-SCORING duplicate,
+    not necessarily the one the user meant. A same-session prompt-level
+    mitigation (never assert a document identity beyond what the citation
+    marker shows) papered over the symptom but left the actual retrieval
+    behavior unchanged.
+
+    This is the structural fix: given a small set of candidate document
+    ids already in relevance-rank order (best first), groups any that are
+    fuzzy-duplicates of each other (same T79 chunk_index=0 embedding
+    comparison and threshold `find_fuzzy_duplicates` already uses at
+    upload time — 0.92 by default, near-identical content only, never a
+    merely-related document) and returns a mapping from every id to its
+    cluster's REPRESENTATIVE: whichever document in that cluster ranked
+    best. A caller then dedupes its per-document-id keys through this
+    mapping, so a lower-ranked near-duplicate's chunks are silently
+    skipped in favor of the higher-ranked duplicate's — the LLM (and the
+    results list) never sees the confusing second copy at all, instead of
+    seeing it and being told after the fact not to name it.
+
+    Scoped intentionally to just the ids already in play for one query
+    (typically under a dozen), not a background job or a persistent
+    document-merge — matches this module's own "on-demand, never silently
+    discard the underlying data" design (see find_fuzzy_duplicates'
+    docstring): nothing here touches the documents or facts themselves,
+    only which chunks one search response's results/citations draw from.
+    """
+    if len(doc_ids_by_rank) < 2:
+        return {d: d for d in doc_ids_by_rank}
+
+    if threshold is None:
+        threshold = await get_float("duplicate_fuzzy_similarity_threshold", DEFAULT_FUZZY_SIMILARITY_THRESHOLD)
+
+    ids_str = [str(d) for d in doc_ids_by_rank]
+    res = await db.execute(
+        text("""
+            SELECT a.document_id AS doc_a, b.document_id AS doc_b,
+                   1 - (a.embedding <=> b.embedding) AS similarity
+            FROM doc_dg_chunks a
+            JOIN doc_dg_chunks b
+              ON a.chunk_index = 0 AND b.chunk_index = 0
+             AND a.tenant_id = b.tenant_id
+             AND a.document_id < b.document_id
+            WHERE a.tenant_id = :tenant_id
+              AND a.document_id = ANY(:doc_ids) AND b.document_id = ANY(:doc_ids)
+        """),
+        {"tenant_id": str(tenant_id), "doc_ids": ids_str},
+    )
+
+    adjacency: Dict[UUID, set] = {}
+    for doc_a, doc_b, similarity in res.all():
+        if similarity is None or float(similarity) < threshold:
+            continue
+        adjacency.setdefault(doc_a, set()).add(doc_b)
+        adjacency.setdefault(doc_b, set()).add(doc_a)
+
+    representative: Dict[UUID, UUID] = {}
+    for doc_id in doc_ids_by_rank:
+        if doc_id in representative:
+            continue
+        representative[doc_id] = doc_id
+        for neighbor in adjacency.get(doc_id, ()):
+            if neighbor not in representative:
+                representative[neighbor] = doc_id
+    return representative

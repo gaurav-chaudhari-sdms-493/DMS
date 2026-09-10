@@ -15,6 +15,7 @@ from app.ai.base import Message, RankedResult
 from app.models.metadata_item import MetadataItem
 from app.services.config_service import get_int, get_float, get_str
 from app.services.search_glossary_service import expand_query_terms
+from app.services.duplicate_service import resolve_duplicate_representatives
 
 logger = logging.getLogger(__name__)
 
@@ -975,12 +976,39 @@ async def search(
     excerpts = []
     doc_ids_for_metadata = []
     seen_dedup = set()
-    
+
+    # Real bug found live (verification report, 2026-09-09): a chat
+    # answer's citation pointed at a different document than the one
+    # named in the user's own question, because the corpus has
+    # near-duplicate scans of the same underlying register and retrieval
+    # silently pulled a chunk from the highest-scoring duplicate instead.
+    # Resolve every distinct candidate document (already in relevance-rank
+    # order) down to its duplicate-cluster representative BEFORE either
+    # dedup pass below, so a lower-ranked near-duplicate's chunks never
+    # reach final_results/excerpts at all — see
+    # duplicate_service.resolve_duplicate_representatives for the full
+    # reasoning and why this is the structural fix, not a prompt patch.
+    doc_ids_by_rank: List[UUID] = []
+    seen_doc_ids = set()
+    for rank_res in relevant_ranks:
+        doc_id = docs_map[merged[rank_res.index][0]].doc_id
+        if doc_id not in seen_doc_ids:
+            seen_doc_ids.add(doc_id)
+            doc_ids_by_rank.append(doc_id)
+    duplicate_representative = await resolve_duplicate_representatives(db, tenant_id, doc_ids_by_rank)
+
     for rank_res in relevant_ranks:
         idx = rank_res.index
         cid, _ = merged[idx]
         row = docs_map[cid]
-        
+
+        # A document that isn't its own cluster's representative is a
+        # near-duplicate of one already ranked higher — skip its chunks
+        # entirely rather than let a redundant, confusingly-different
+        # document_id show up alongside the one actually worth surfacing.
+        if duplicate_representative.get(row.doc_id, row.doc_id) != row.doc_id:
+            continue
+
         # Deduplicate identical document page matches — except a fact
         # result (T73), which never dedupes against a chunk (or another
         # fact) sharing its page: it's a distinct extracted field, not a
@@ -989,9 +1017,9 @@ async def search(
         if dedup_key in seen_dedup:
             continue
         seen_dedup.add(dedup_key)
-        
+
         doc_ids_for_metadata.append(row.doc_id)
-        
+
         if len(final_results) >= limit:
             break
             
@@ -1016,6 +1044,14 @@ async def search(
         cid, _ = merged[idx]
         row = docs_map[cid]
         is_fact = cid in fact_row_ids
+
+        # Same near-duplicate skip as the metadata pre-pass above — keeps
+        # a lower-ranked duplicate's content out of both final_results
+        # AND the excerpts the grounding LLM (and its citations) actually
+        # see, which is where the reported bug (a citation pointing at a
+        # confusing near-duplicate document) actually happened.
+        if duplicate_representative.get(row.doc_id, row.doc_id) != row.doc_id:
+            continue
 
         # Excerpts feed the grounding LLM (T70) — deduped only by literal
         # chunk/fact identity, never by page, unlike final_results below.
