@@ -363,6 +363,26 @@ async def _ingest_document_task_async(document_id_str: str, version_id_str: str,
                     except Exception as vlm_err:
                         logger.warning(f"T22 VLM extraction skipped for document {document_id}: {vlm_err}")
 
+                    # QA report #5, 2026-09-10 — Entity 360 was always empty
+                    # because nothing ever populated the entity graph outside
+                    # manual API calls (see entity_graph_service.py's
+                    # auto_extract_entities_from_facts docstring). Best-effort
+                    # and non-blocking, same savepoint idiom as VLM extraction
+                    # just above — a bad match here must never abort ingestion.
+                    try:
+                        from app.services.entity_graph_service import auto_extract_entities_from_facts
+                        async with db.begin_nested():
+                            entities_created = await auto_extract_entities_from_facts(
+                                db, tenant_id, document_id, version_id,
+                            )
+                        if entities_created:
+                            logger.info(
+                                f"Entity graph auto-extraction created {entities_created} new node(s) "
+                                f"for document {document_id}"
+                            )
+                    except Exception as entity_err:
+                        logger.warning(f"Entity graph auto-extraction skipped for document {document_id}: {entity_err}")
+
                 # T79 — fuzzy-duplicate check, now at ingest instead of only
                 # on-demand. Needs this document's own chunk-0 embedding,
                 # which is only available once the chunk inserts above have

@@ -68,6 +68,30 @@ export default function DrivePage() {
   const [selectedFolder, setSelectedFolder] = useState<Folder | null>(null);
   const [selectedDoc, setSelectedDoc] = useState<DocumentListItem | null>(null);
 
+  // Real bug found live 2026-09-10 (QA report): the detail side panel
+  // kept showing a renamed file's OLD name until closed and reopened.
+  // selectedDoc/selectedFolder hold their own independent object
+  // reference, captured at selection time -- loadContents() refreshes
+  // the documents/folders LISTS after a rename (or move, star, etc.) but
+  // never touched that separately-held reference, so the panel kept
+  // rendering stale data even though the underlying list was correct.
+  // Re-deriving the selection from the fresh list by id, whenever either
+  // list changes, fixes this for every mutation that goes through
+  // loadContents() -- not just rename -- instead of patching each
+  // individual handler (rename, move, star, ...) to remember to do this.
+  useEffect(() => {
+    if (selectedDoc) {
+      const fresh = documents.find((d) => d.id === selectedDoc.id);
+      if (fresh && fresh !== selectedDoc) setSelectedDoc(fresh);
+    }
+  }, [documents, selectedDoc]);
+  useEffect(() => {
+    if (selectedFolder) {
+      const fresh = folders.find((f) => f.id === selectedFolder.id);
+      if (fresh && fresh !== selectedFolder) setSelectedFolder(fresh);
+    }
+  }, [folders, selectedFolder]);
+
   // Multi-Selection State
   const [selectedFolderIds, setSelectedFolderIds] = useState<Set<string>>(new Set());
   const [selectedDocIds, setSelectedDocIds] = useState<Set<string>>(new Set());
@@ -631,12 +655,24 @@ export default function DrivePage() {
 
   const handlePerformMove = async (targetFolderId: string | null) => {
     const validTargetId = isUUID(targetFolderId) ? targetFolderId : null;
+    // Real bug found live 2026-09-10 (QA report): every failure here —
+    // including the backend's own "move to root silently no-ops" bug,
+    // now fixed at the source — was swallowed with nothing shown to the
+    // user, so the dialog closed looking like success while the item
+    // never actually moved. Collecting failures and alerting (same
+    // pattern already used for "Failed to empty Bin" below) beats a
+    // silent no-op for a destructive-feeling, easy-to-not-notice action.
+    const failures: string[] = [];
     if (itemToMove?.item?.id === "bulk" || selectedFolderIds.size > 0 || selectedDocIds.size > 0) {
       for (const fId of Array.from(selectedFolderIds)) {
-        await api.folders.update(fId, { parent_id: validTargetId }).catch(() => {});
+        await api.folders.update(fId, { parent_id: validTargetId }).catch((err: any) => {
+          failures.push(err?.message || `folder ${fId}`);
+        });
       }
       for (const dId of Array.from(selectedDocIds)) {
-        await api.documents.update(dId, { folder_id: validTargetId }).catch(() => {});
+        await api.documents.update(dId, { folder_id: validTargetId }).catch((err: any) => {
+          failures.push(err?.message || `document ${dId}`);
+        });
       }
       setSelectedFolderIds(new Set());
       setSelectedDocIds(new Set());
@@ -650,11 +686,14 @@ export default function DrivePage() {
           await api.documents.update(itemToMove.item.id, { folder_id: validTargetId });
         }
       } catch (err: any) {
-        console.warn("Move ignored for item:", err);
+        failures.push(err?.message || itemToMove.item.id);
       }
     }
     setItemToMove(null);
     loadContents();
+    if (failures.length > 0) {
+      alert(`Move failed for ${failures.length} item(s):\n\n${failures.join("\n")}`);
+    }
   };
 
   const handleRestoreItem = async (type: "folder" | "doc", id: string) => {

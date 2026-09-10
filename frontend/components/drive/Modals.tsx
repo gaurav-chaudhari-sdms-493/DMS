@@ -24,6 +24,20 @@ const FOLDER_COLORS = [
 export function NewFolderModal({ isOpen, onClose, onCreate }: NewFolderModalProps) {
   const [name, setName] = useState("Untitled folder");
   const [selectedColor, setSelectedColor] = useState("#1a73e8");
+  const nameInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Real bug found live 2026-09-10 (QA report): `autoFocus` alone only
+  // places the cursor in the field, it doesn't select the default text —
+  // so typing a real name appended to "Untitled folder" instead of
+  // replacing it, on every single folder creation. A plain `<input
+  // autoFocus>` can't do this itself; needs the ref + .select() below,
+  // run after the field is actually focused and visible in the DOM.
+  useEffect(() => {
+    if (isOpen) {
+      const id = requestAnimationFrame(() => nameInputRef.current?.select());
+      return () => cancelAnimationFrame(id);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -51,6 +65,7 @@ export function NewFolderModal({ isOpen, onClose, onCreate }: NewFolderModalProp
             <label htmlFor="new-folder-name" className="block text-xs font-semibold text-textMuted mb-2">Folder Name</label>
             <input
               id="new-folder-name"
+              ref={nameInputRef}
               type="text"
               // eslint-disable-next-line jsx-a11y/no-autofocus -- WAI-ARIA APG dialog pattern: move focus into a freshly opened dialog's first field, unlike page-load autofocus
               autoFocus

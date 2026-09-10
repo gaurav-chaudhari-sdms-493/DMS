@@ -1,3 +1,4 @@
+import asyncio
 import time
 import re
 import logging
@@ -408,25 +409,33 @@ async def search(
     if cached:
         return cached
         
-    # 2. Tri-Lingual Query Expansion (English, Hindi, Marathi)
-    expanded = await _expand_trilingual_query(query)
-    detected_lang = expanded.get("detected_lang", "English")
-    response_lang = expanded.get("response_lang") or detected_lang
-    q_en = expanded.get("english", query)
-    q_hi = expanded.get("hindi", query)
-    q_mr = expanded.get("marathi", query)
-    
+    # 2. Tri-Lingual Query Expansion (English, Hindi, Marathi) — an external
+    # LLM round-trip, run concurrently with the glossary lookup below (TS7)
+    # since neither depends on the other's output (real latency fix,
+    # 2026-09-10: QA report #6 measured ~7s on an uncached query; this and
+    # the two rerank/title-match pairs below were the only genuinely
+    # independent steps in an otherwise sequentially-dependent pipeline —
+    # expand must finish before embed, embed before search, search before
+    # rerank, rerank before the grounded answer, so those hops can't be
+    # parallelized away without changing the RAG design itself).
+    expand_task = asyncio.create_task(_expand_trilingual_query(query))
     # TS7 — glossary-first cross-script expansion: free, local, always
     # available (unlike the LLM expansion above, which silently degrades
     # to the raw query on any failure, including air-gapped mode). Only
     # ever adds vector-search variants (see search_glossary_service.py's
     # docstring for why this doesn't touch the keyword-search legs).
     glossary_terms = await expand_query_terms(db, query)
+    expanded = await expand_task
+    detected_lang = expanded.get("detected_lang", "English")
+    response_lang = expanded.get("response_lang") or detected_lang
+    q_en = expanded.get("english", query)
+    q_hi = expanded.get("hindi", query)
+    q_mr = expanded.get("marathi", query)
 
     embed_provider = get_embed_provider()
     tri_queries = list(dict.fromkeys([q_en, q_hi, q_mr, query, *glossary_terms]))
     q_embeddings = await embed_provider.embed(tri_queries)
-    
+
     # Build filter clauses dynamically for hybrid search
     filter_clauses = []
     params = {
@@ -689,10 +698,24 @@ async def search(
             # relevant. top_n=len(doc_texts) scores every candidate under
             # both queries, and the merge now adds a translated-only hit
             # instead of requiring it to already exist.
-            reranked_primary = await reranker.rerank(query, doc_texts, top_n=len(doc_texts))
+            #
+            # Real latency fix, 2026-09-10 (QA report #6): these two Cohere
+            # calls score the exact same candidate set under two different
+            # query strings and are otherwise independent — firing them
+            # concurrently instead of back-to-back was one of the few actual
+            # parallelization opportunities in this pipeline (see the
+            # asyncio.create_task comment at the top of search() for why
+            # most of the rest is genuinely sequential).
             if q_mr and q_mr != query:
+                primary_task = asyncio.create_task(reranker.rerank(query, doc_texts, top_n=len(doc_texts)))
+                trans_task = asyncio.create_task(reranker.rerank(q_mr, doc_texts, top_n=len(doc_texts)))
                 try:
-                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=len(doc_texts))
+                    reranked_primary = await primary_task
+                except Exception:
+                    trans_task.cancel()
+                    raise
+                try:
+                    reranked_trans = await trans_task
                     rank_map = {r.index: r for r in reranked_primary}
                     for r_trans in reranked_trans:
                         if r_trans.index in rank_map:
@@ -702,6 +725,8 @@ async def search(
                     reranked_primary = list(rank_map.values())
                 except Exception as ex:
                     logger.warning("Secondary translation rerank skipped: %s", ex)
+            else:
+                reranked_primary = await reranker.rerank(query, doc_texts, top_n=len(doc_texts))
 
             RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
             fallback_ratio = await get_float("search_relevance_fallback_ratio", 0.5)
@@ -768,10 +793,18 @@ async def search(
                         try:
                             # Same cross-script merge fix as the direct-search
                             # pass above — see that comment for the root cause.
-                            reranked_primary = await reranker.rerank(query, doc_texts, top_n=len(doc_texts))
+                            # Same primary/translated concurrency fix too —
+                            # see the direct-search pass's asyncio comment.
                             if q_mr and q_mr != query:
+                                primary_task = asyncio.create_task(reranker.rerank(query, doc_texts, top_n=len(doc_texts)))
+                                trans_task = asyncio.create_task(reranker.rerank(q_mr, doc_texts, top_n=len(doc_texts)))
                                 try:
-                                    reranked_trans = await reranker.rerank(q_mr, doc_texts, top_n=len(doc_texts))
+                                    reranked_primary = await primary_task
+                                except Exception:
+                                    trans_task.cancel()
+                                    raise
+                                try:
+                                    reranked_trans = await trans_task
                                     rank_map = {r.index: r for r in reranked_primary}
                                     for r_trans in reranked_trans:
                                         if r_trans.index in rank_map:
@@ -781,6 +814,8 @@ async def search(
                                     reranked_primary = list(rank_map.values())
                                 except Exception as ex:
                                     logger.warning("Secondary translation HyDE rerank skipped: %s", ex)
+                            else:
+                                reranked_primary = await reranker.rerank(query, doc_texts, top_n=len(doc_texts))
 
                             RELEVANCE_THRESHOLD = await get_float("search_relevance_threshold", 0.15)
                             fallback_ratio = await get_float("search_relevance_fallback_ratio", 0.5)
@@ -1116,8 +1151,15 @@ async def search(
 
     # T74: also surface any still-processing documents whose title matches —
     # findable by metadata immediately, not just once indexing finishes.
+    #
+    # Real latency fix, 2026-09-10 (QA report #6): this is a plain DB lookup,
+    # independent of the grounded-answer LLM call below (citations only ever
+    # reference documents already in final_results/excerpts before this
+    # extend — a still-processing title match was never eligible to be an
+    # excerpt) — kick it off now and only await it once we actually need the
+    # combined list, so it overlaps the LLM round-trip instead of preceding it.
     already_found = {r.document_id for r in final_results}
-    final_results.extend(await _find_pending_title_matches(db, tenant_id, query, exclude_doc_ids=already_found))
+    pending_title_task = asyncio.create_task(_find_pending_title_matches(db, tenant_id, query, exclude_doc_ids=already_found))
 
     # 7. Generate the AI answer — T70: every claim bound to a source excerpt,
     # refuse outright rather than guess when the excerpts don't answer it.
@@ -1154,6 +1196,8 @@ async def search(
                 "AI summary is temporarily unavailable — the excerpts below are unedited source text."
             )
             grounded = False
+
+    final_results.extend(await pending_title_task)
 
     took_ms = int((time.time() - start_time) * 1000)
 

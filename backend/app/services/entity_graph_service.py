@@ -478,3 +478,131 @@ async def revert_bulk_batch(db: AsyncSession, tenant_id: UUID, batch_id: UUID, a
     )
 
     return {"reverted_count": len(edges), "edge_ids": [e.id for e in edges]}
+
+
+# --- Auto-extraction from document facts (2026-09-10, QA report #5) ---
+#
+# Entity 360 always returned empty for every real document, because
+# nothing ever called create_node/create_edge outside the API router and
+# tests — confirmed live: check_entity_graph.py's own docstring says as
+# much, and the only entity_dg_nodes/entity_dg_edges rows in the real
+# tenant were hand-created demo/healthcheck data, completely disconnected
+# from the corpus's 3,240 real facts. This is the first automated caller,
+# invoked from worker.py right after VLM fact extraction (T22) writes
+# doc_dg_facts for a document.
+#
+# Deliberately narrow, not a general entity-extraction engine: template
+# field_schema carries no semantic role today (T22's field_schema.role is
+# structural — serial/continuation_text/chain_anchor/page_header only), so
+# there is no reliable signal for "this field names a person" beyond the
+# field's own name. Matching is a fixed keyword list built from what this
+# corpus's real registered templates actually use (wakf_gazette_form_a,
+# wardha_form_b) to name a person or the property/institution itself —
+# survey numbers, villages, valuations etc. are attributes of a record, not
+# distinct real-world entities worth a graph node on their own. A template
+# using different field-naming conventions won't be picked up by this pass;
+# treat it as a first pass, not a solved problem.
+AUTO_EXTRACT_POLICY_VERSION = "auto-facts-v1"
+
+_PERSON_FIELD_NAMES = {"mutawalli_name", "owner_name", "applicant_name", "witness_name", "name"}
+_PROPERTY_FIELD_NAMES = {"wakf_name"}
+
+
+def _classify_fact_field(field_name: str) -> Optional[str]:
+    if field_name in _PERSON_FIELD_NAMES:
+        return "person"
+    if field_name in _PROPERTY_FIELD_NAMES:
+        return "property"
+    return None
+
+
+async def auto_extract_entities_from_facts(
+    db: AsyncSession,
+    tenant_id: UUID,
+    document_id: UUID,
+    version_id: UUID,
+) -> int:
+    """Best-effort — called from the ingestion pipeline right after VLM fact
+    extraction, wrapped by the caller in its own savepoint/try-except the
+    same way every other optional ingestion stage is (Section 3.5: search
+    must never wait on this). Never raises on a per-fact failure; skips
+    entirely (returns 0) if this tenant somehow has no user to attribute
+    creation to, rather than inventing one.
+
+    Each matching fact becomes a tier-2 "mentioned_in" edge (auto-commits
+    as 'machine' — a mechanical mention is low-risk, Section 6) from a
+    person/property node to the fact itself, so Entity 360 has something
+    real to show. Nodes are deduped via find_similar_nodes (pg_trgm) before
+    creating a new one — the same "surface for a human, never silently
+    merge or fragment" contract every other entity-graph write already
+    follows — so repeated mentions of the same name across many facts
+    collapse onto one node instead of creating a duplicate per fact.
+
+    Returns the number of new EntityNode rows created this call."""
+    stmt = select(Fact).where(
+        Fact.tenant_id == tenant_id,
+        Fact.document_id == document_id,
+        Fact.version_id == version_id,
+        Fact.field_name.in_(_PERSON_FIELD_NAMES | _PROPERTY_FIELD_NAMES),
+    )
+    res = await db.execute(stmt)
+    facts = list(res.scalars().all())
+    if not facts:
+        return 0
+
+    # T66's exact pattern for a policy-driven action that still needs a
+    # real, FK'able actor to attribute audit events to (audit_dg_logs.
+    # actor_id is NOT NULL at the DB level) — see document_service.py's
+    # _resolve_policy_actor docstring.
+    from app.services.document_service import _resolve_policy_actor
+    actor_id = await _resolve_policy_actor(db, tenant_id, {})
+    if actor_id is None:
+        return 0
+
+    nodes_created = 0
+    edges_created = 0
+    for fact in facts:
+        entity_type = _classify_fact_field(fact.field_name)
+        if entity_type is None:
+            continue
+        raw_value = fact.value.get("v") if isinstance(fact.value, dict) else None
+        label = str(raw_value).strip() if raw_value else ""
+        if not label:
+            continue
+
+        similar = await find_similar_nodes(db, tenant_id, entity_type, label)
+        if similar:
+            node_id = UUID(similar[0]["id"])
+        else:
+            node = await create_node(
+                db, tenant_id, entity_type, label, actor_id=actor_id,
+                attributes={"auto_extracted": True, "extraction_policy_version": AUTO_EXTRACT_POLICY_VERSION},
+            )
+            node_id = node.id
+            nodes_created += 1
+
+        try:
+            await create_edge(
+                db, tenant_id, edge_type="mentioned_in", tier=2,
+                source_node_id=node_id, target_type="fact", target_fact_id=fact.id,
+                confidence=fact.confidence, evidence_fact_id=fact.id,
+                created_by_policy_version=AUTO_EXTRACT_POLICY_VERSION,
+            )
+            edges_created += 1
+        except HTTPException:
+            # Fact or node failed a tenant-ownership check mid-loop —
+            # skip this one mention, keep processing the rest.
+            continue
+
+    if nodes_created or edges_created:
+        await log_action(
+            db, actor_id, tenant_id, "entity_graph.auto_extract",
+            resource_type="document", resource_id=document_id,
+            details={
+                "nodes_created": nodes_created,
+                "edges_created": edges_created,
+                "policy_version": AUTO_EXTRACT_POLICY_VERSION,
+            },
+        )
+
+    return nodes_created

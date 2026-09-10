@@ -112,17 +112,23 @@ async def update_folder(
 ) -> FolderResponse:
     folder = await get_folder(db, folder_id, tenant_id)
 
+    # Real bug found live 2026-09-10 (QA report): same fix as
+    # document_service.update_document -- "move to root" sends parent_id:
+    # null to explicitly clear it, but `is not None` can't tell that apart
+    # from the field being omitted, so it silently did nothing. See that
+    # function's comment for the full explanation.
     changes = {}
-    if folder_in.parent_id is not None:
-        if folder_in.parent_id == folder_id:
-            raise HTTPException(status_code=400, detail="Folder cannot be its own parent")
-        if await _is_descendant(db, folder_in.parent_id, folder_id):
-            raise HTTPException(status_code=400, detail="Cannot move a folder into one of its own subfolders")
-        parent = await db.get(Folder, folder_in.parent_id)
-        if not parent or parent.tenant_id != tenant_id:
-            raise HTTPException(status_code=404, detail="Target parent folder not found")
+    if "parent_id" in folder_in.model_fields_set:
+        if folder_in.parent_id is not None:
+            if folder_in.parent_id == folder_id:
+                raise HTTPException(status_code=400, detail="Folder cannot be its own parent")
+            if await _is_descendant(db, folder_in.parent_id, folder_id):
+                raise HTTPException(status_code=400, detail="Cannot move a folder into one of its own subfolders")
+            parent = await db.get(Folder, folder_in.parent_id)
+            if not parent or parent.tenant_id != tenant_id:
+                raise HTTPException(status_code=404, detail="Target parent folder not found")
         folder.parent_id = folder_in.parent_id
-        changes["parent_id"] = str(folder_in.parent_id)
+        changes["parent_id"] = str(folder_in.parent_id) if folder_in.parent_id else None
 
     if folder_in.name is not None:
         folder.name = folder_in.name

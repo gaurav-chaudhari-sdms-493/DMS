@@ -801,8 +801,44 @@ export function DocumentPreviewModal({
             </div>
           )}
 
-          {/* Code, Markdown & Text Viewer */}
-          {isTextCode && !isDocx && !isExcel && !isCsv && !isPptx && (
+          {/* Markdown Viewer — real bug found live 2026-09-10 (QA report):
+              isMarkdown was computed but never actually used anywhere;
+              .md fell through into the generic isTextCode branch below
+              and rendered as raw source (literal #/| characters), not
+              formatted markdown. MarkdownViewer is already imported and
+              already used elsewhere in this same file for chat messages
+              — reusing it here instead of inventing a second renderer. */}
+          {isMarkdown && (
+            <div
+              style={{
+                transform: `scale(${zoom / 100})`,
+                transformOrigin: "top center",
+                transition: "transform 0.15s ease-out",
+              }}
+              className="w-full max-w-5xl h-full max-h-[80vh] flex flex-col bg-white border border-[#e1e3e1] rounded-2xl shadow-xl overflow-hidden"
+            >
+              <div className="h-10 px-4 bg-[#f8fafd] border-b border-[#e1e3e1] flex items-center justify-between text-xs text-[#444746]">
+                <span className="font-mono font-semibold text-[#1f1f1f]">{doc.title}</span>
+                <button
+                  onClick={handleCopyText}
+                  className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#edf2fc] hover:bg-[#e1e5ea] text-[#0d2e5c] font-semibold transition-colors border border-[#d3d7dc]"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                  <span>{copied ? "Copied" : "Copy content"}</span>
+                </button>
+              </div>
+              <div className="flex-1 p-5 overflow-auto text-sm text-[#1f1f1f] leading-relaxed select-text bg-white">
+                {loadingText ? (
+                  <div className="text-[#747775] text-center py-12">Loading content preview...</div>
+                ) : (
+                  <MarkdownViewer content={textContent || ""} />
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Code & Text Viewer */}
+          {isTextCode && !isMarkdown && !isDocx && !isExcel && !isCsv && !isPptx && (
             <div
               style={{
                 transform: `scale(${zoom / 100})`,

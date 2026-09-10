@@ -345,13 +345,24 @@ async def update_document(
     if not doc:
         raise HTTPException(status_code=404, detail="Document not found")
 
+    # Real bug found live 2026-09-10 (QA report): "move to root" sends
+    # folder_id: null to explicitly clear the field, but `folder_id is not
+    # None` treats an explicit null identically to the field being omitted
+    # entirely from the request -- so a move-to-root silently did nothing:
+    # no error, a 200 response, the document just stayed in its old
+    # folder. `model_fields_set` is Pydantic v2's actual signal for "was
+    # this key present in the client's JSON at all", which a None check
+    # can never recover once parsed. A folder_id genuinely absent from the
+    # request (the common case: renaming a title, not touching location)
+    # still correctly leaves the field untouched either way.
     changes = {}
-    if doc_in.folder_id is not None:
-        folder = await db.get(Folder, doc_in.folder_id)
-        if not folder or folder.tenant_id != tenant_id:
-            raise HTTPException(status_code=404, detail="Target folder not found")
+    if "folder_id" in doc_in.model_fields_set:
+        if doc_in.folder_id is not None:
+            folder = await db.get(Folder, doc_in.folder_id)
+            if not folder or folder.tenant_id != tenant_id:
+                raise HTTPException(status_code=404, detail="Target folder not found")
         doc.folder_id = doc_in.folder_id
-        changes["folder_id"] = str(doc_in.folder_id)
+        changes["folder_id"] = str(doc_in.folder_id) if doc_in.folder_id else None
 
     if doc_in.title is not None:
         doc.title = doc_in.title

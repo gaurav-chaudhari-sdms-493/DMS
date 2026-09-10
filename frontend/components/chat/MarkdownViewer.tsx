@@ -20,6 +20,56 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
     let inCodeBlock = false;
     let codeBuffer: string[] = [];
     let listBuffer: { type: "ul" | "ol"; items: string[] } | null = null;
+    // Real bug found live 2026-09-10 (QA report): this parser had no GFM
+    // table support at all -- a `| col | col |` / `|---|---|` block just
+    // fell through to the generic paragraph branch and rendered as
+    // literal pipe/dash text. tableBuffer follows the exact same
+    // buffer-then-flush pattern already used for lists/code above.
+    let tableBuffer: { header: string[]; rows: string[][] } | null = null;
+
+    const splitTableRow = (line: string): string[] =>
+      line
+        .trim()
+        .replace(/^\|/, "")
+        .replace(/\|$/, "")
+        .split("|")
+        .map((cell) => cell.trim());
+
+    const isTableSeparatorRow = (line: string): boolean =>
+      /^\|?\s*:?-{2,}:?\s*(\|\s*:?-{2,}:?\s*)*\|?$/.test(line.trim());
+
+    const flushTable = () => {
+      if (tableBuffer) {
+        const { header, rows } = tableBuffer;
+        elements.push(
+          <div key={`table-${elements.length}`} className="my-3 overflow-x-auto rounded-xl border border-[#e1e3e1]">
+            <table className="min-w-full text-sm text-left border-collapse">
+              <thead className="bg-[#f0f4f9]">
+                <tr>
+                  {header.map((cell, i) => (
+                    <th key={i} className="px-3 py-2 font-bold text-[#001d35] border-b border-[#e1e3e1] whitespace-nowrap">
+                      {parseInline(cell)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {rows.map((row, ri) => (
+                  <tr key={ri} className="border-b border-[#e1e3e1]/60 last:border-b-0">
+                    {row.map((cell, ci) => (
+                      <td key={ci} className="px-3 py-2 text-[#1f1f1f] align-top">
+                        {parseInline(cell)}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        );
+        tableBuffer = null;
+      }
+    };
 
     const flushList = () => {
       if (listBuffer) {
@@ -57,12 +107,31 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
     };
 
     const parseInline = (text: string): React.ReactNode => {
-      // Bold text **text**, plus [N] citation markers when onCitationClick is set
+      // Bold text **text**, markdown links [text](url), plus [N] citation
+      // markers when onCitationClick is set. The link alternative is listed
+      // first: split() tries alternatives in source order at each position,
+      // so without this a bare `\[\d+\]` citation pattern would grab the
+      // `[1]` out of `[1](url)` and leave `(url)` behind as plain text.
+      const linkPattern = "\\[[^\\]]*\\]\\([^)]*\\)";
       const splitPattern = onCitationClick
-        ? /(\*\*.*?\*\*|\*.*?\*|`.*?`|\[\d+\])/g
-        : /(\*\*.*?\*\*|\*.*?\*|`.*?`)/g;
+        ? new RegExp(`(${linkPattern}|\\*\\*.*?\\*\\*|\\*.*?\\*|\`.*?\`|\\[\\d+\\])`, "g")
+        : new RegExp(`(${linkPattern}|\\*\\*.*?\\*\\*|\\*.*?\\*|\`.*?\`)`, "g");
       const parts = text.split(splitPattern);
       return parts.map((part, i) => {
+        const linkMatch = part.match(/^\[([^\]]*)\]\(([^)]*)\)$/);
+        if (linkMatch) {
+          return (
+            <a
+              key={i}
+              href={linkMatch[2]}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#1a73e8] hover:underline break-all"
+            >
+              {linkMatch[1]}
+            </a>
+          );
+        }
         if (part.startsWith("**") && part.endsWith("**")) {
           return (
             <strong key={i} className="font-bold text-[#001d35]">
@@ -123,6 +192,29 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
       if (inCodeBlock) {
         codeBuffer.push(line);
         return;
+      }
+
+      // GFM tables: a `| col | col |` row immediately followed by a
+      // `|---|---|` separator row starts a table; every following
+      // pipe-row is data until a non-pipe line ends it (flushed there,
+      // then that line falls through to be handled normally below).
+      if (trimmed.startsWith("|") && !tableBuffer) {
+        const nextLine = lines[lineIdx + 1]?.trim() ?? "";
+        if (isTableSeparatorRow(nextLine)) {
+          flushList();
+          tableBuffer = { header: splitTableRow(trimmed), rows: [] };
+          return;
+        }
+      }
+      if (tableBuffer) {
+        if (isTableSeparatorRow(trimmed)) {
+          return; // consume the separator row itself, nothing to render
+        }
+        if (trimmed.startsWith("|")) {
+          tableBuffer.rows.push(splitTableRow(trimmed));
+          return;
+        }
+        flushTable();
       }
 
       // Headers ###, ##, #
@@ -224,6 +316,7 @@ export function MarkdownViewer({ content, className = "", onCitationClick }: Mar
 
     flushList();
     flushCode();
+    flushTable();
 
     return elements;
   };
