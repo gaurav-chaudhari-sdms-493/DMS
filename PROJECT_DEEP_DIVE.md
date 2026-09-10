@@ -5,12 +5,12 @@
 **Internal name:** Document Management System (DMS)
 **Domain:** Government land & property records
 **Languages:** English + Marathi
-**Status:** All engineering complete; remaining items are external sign-offs, not code
+**Status:** All engineering complete; remaining items are external sign-offs, not code. One live provider (AI field-extraction) is paused for a credit top-up — see §7's demo note before you pick which document to show.
 
 **At a glance:**
 - **6** user roles (RBAC)
 - **4** layers in the search engine
-- **76** backend functions live-tested
+- **76+** backend functions live-tested across two independent hardening passes
 - **9** table-reading features (TS1–TS9) built against a real 1973 register
 - **2** scripts read: English & Devanagari
 - **0** unfinished engineering work
@@ -218,7 +218,7 @@ Nothing the AI produces is presented as fact until a person confirms it — this
 **Tamper-evident audit trail.**
 Every mutating action is written to an append-only, hash-chained log — each entry cryptographically includes the previous one, so any attempt to quietly edit history breaks the chain and is detectable on demand.
 
-> **Found & fixed, not just designed:** A real cross-tenant data-isolation gap was found during hardening testing and fixed before this stage — see §8 for exactly what happened and why it matters that it was caught.
+> **Found & fixed, not just designed:** A real cross-tenant data-isolation gap was found during hardening testing and fixed before this stage — see §8 for exactly what happened and why it matters that it was caught. Isolation has since been re-verified a second way: a genuine second tenant was created and used to attempt reading the first tenant's real documents, search results, and entity records directly — every attempt correctly came back empty, not just structurally rejected. That's a positive proof, not only a negative one.
 
 ---
 
@@ -230,18 +230,20 @@ Every substantial piece of engineering scoped for this build is complete. What r
 
 | Area | Status | Notes |
 |---|---|---|
-| Reading & extraction | 🟡 Mostly built | OCR, VLM field extraction, classification, ditto marks, continuation-row merge, and handwriting handling are all confirmed working against real registers. One piece — left/right spread-join across facing pages — is fully coded and correctly refuses to guess on a mismatch, but has not yet produced a confirmed successful join on real data; see §8. |
-| Human verification workbench | ✅ Built | Queues, confidence scores, calibration gate, bulk actions with undo. Click-through to the exact source rectangle works on the backend; the on-screen highlighted viewer panel is the one piece still to wire into the page. |
-| Search & Q&A | ✅ Built | Hybrid search, bilingual, cited/grounded AI answers, near-duplicate detection. |
-| Entity graph & legal records | ✅ Built | Tiered-trust linking, full amendment history, legal status tracking. |
-| Governance & audit | 🟡 Mostly built | Tamper-evident log, exports, completeness dashboard all live. The formal legal certificate is intentionally marked draft, pending legal counsel's sign-off on its wording — not an engineering gap. |
+| Reading & extraction | 🟡 Mostly built | OCR, VLM field extraction, classification, ditto marks, continuation-row merge, and handwriting handling are all confirmed working against real registers. One piece — left/right spread-join across facing pages — is fully coded and correctly refuses to guess on a mismatch, but has not yet produced a confirmed successful join on real data; see §8. A real document-classification bug (a scanned register silently matched to the wrong registered form template, from a different district and year) was found and fixed this pass — see §8. |
+| Human verification workbench | ✅ Built | Queues, confidence scores, calibration gate, bulk actions with undo, click-through to the exact source rectangle. A navigation gap — the workbench page itself was fully built but had no link anywhere in the app to reach it — was found and fixed this pass; it's reachable from the main sidebar now. |
+| Search & Q&A | ✅ Built | Hybrid search, bilingual, cited/grounded AI answers. Near-duplicate detection now runs at search time, not just at upload: when the corpus holds two rescans of the same underlying document, search and chat collapse them to a single citation instead of confusingly citing whichever copy happened to score higher — confirmed live against a real duplicate pair already in the system. |
+| Entity graph & legal records | ✅ Built | Tiered-trust linking, full amendment history, legal status tracking. A real API gap — no way to delete a mistaken entity or link once created — was found and fixed this pass, live-verified end to end (create, link, view, delete). |
+| Governance & audit | 🟡 Mostly built | Tamper-evident log, exports, completeness dashboard all live. The formal legal certificate is intentionally marked draft, pending legal counsel's sign-off on its wording — not an engineering gap. The health-check endpoint now actually verifies tenant isolation is enforceable, not just reporting database/cache status. |
 | Access control & language | ✅ Built | Six-role RBAC, department scoping, full Marathi translation alongside English. |
 | Ingestion connectors | 🟡 Mostly built | Upload, watched folders, SFTP, and email-in all work today. Google Drive / SharePoint / a government e-Office connector are ready to build but are waiting on those third parties to grant API access. |
 | Fully offline ("air-gapped") mode | 🟡 Mostly built | OCR, embeddings, and re-ranking already run 100% locally. The one remaining external call is the AI vision-extraction step — a local replacement model has been evaluated and the hardware requirement is now known; it's a hardware purchase decision, not unsolved engineering. |
 | Formal accuracy benchmark | ⛔ Blocked | Needs a real reference set of documents with independently verified-correct answers to score against — that reference set doesn't exist yet. |
 | Business & legal sign-offs | ⛔ Blocked | Final licensing numbers and one open-source license question are drafted and ready, waiting on a business/legal decision-maker. |
 
-**One line for the room, if asked directly:** there is no unstarted or unblocked engineering work left — everything outstanding is either a third party's access grant, a hardware budget decision, or a human sign-off.
+> **For whoever is running the demo:** the cloud vision-extraction provider (§4, "reading" step) is currently paused pending an API credit top-up — a cost-control choice, not a bug. Every already-processed document (the ones in the demo account today) is completely unaffected: its extracted facts, Workbench queue entries, search, and chat all work exactly as normal. The one thing to avoid live is uploading a **brand-new** document and expecting structured field extraction from it — it will index and become fully text-searchable, just without the field-by-field extraction step, until the provider is re-enabled. Pick an already-processed document (e.g. the Wardha register, with 1,358 extracted facts) for anything that needs to show extraction, the Workbench, or entity linking.
+
+**One line for the room, if asked directly:** there is no unstarted or unblocked engineering work left — everything outstanding is either a third party's access grant, a hardware budget decision, a human sign-off, or (for live extraction specifically, today) a credit top-up.
 
 ---
 
@@ -261,6 +263,20 @@ A second, independent security review specifically targeted cross-tenant data is
 - **Ditto-chain expansion:** 334 real "Do." marks correctly expanded to their real inherited value, across 124 real documents — including a real 68-page gazette register — plus 82 cases correctly flagged as unresolved rather than guessed.
 - **Continuation-row merge:** confirmed on two real 16-page registration files, with one field reconstructed from 17 separate regions spanning a real page boundary.
 - **Spread-join:** every real document that ever matched the spread-layout template has produced a correctly-flagged refusal ("no shared value between the two fragments") — never a confirmed successful join. The safe-refusal behavior is real and proven; the positive case is not yet demonstrated on real data. This is called out honestly in §7 rather than presented as fully proven.
+
+**A second live hardening pass, against real production data (2026-09-09/10).** A separate, independent round of end-to-end testing — real API calls, real documents already in the account, a real second tenant created specifically to test isolation — found and fixed nine more issues:
+
+1. **A document silently matched to the wrong form template.** Classification only ever looked at a document's first page, which is often generic boilerplate shared across many different registered forms. A real 280-page register was silently matched to a template from a different district and decade, corrupting every field it extracted. Fixed by giving classification more of the document to look at, and by teaching it to trust the document's own content over the name of the office that happened to issue it.
+2. **A chat answer that contradicted its own citation.** Asked about a specific field on a specific table row, the assistant said the field wasn't present — while the page it cited plainly showed it. The root cause: the system was only pulling in one field of a multi-field table row for exact-ID-style questions, not for natural-language ones. Fixed so every question style gets the full row.
+3. **Near-duplicate documents producing confusing citations.** Two rescans of the same underlying register could cause a citation to point at a different copy than the one actually discussed. Fixed at the search layer itself — the system now recognizes true rescans (the same near-duplicate-detection logic already used at upload time) and always cites from a single, consistent copy.
+4. **No way to delete a mistaken entity link.** The entity graph could create person/property links but never delete one, even a mistaken test one. Closed, audited the same way every other mutating action is.
+5. **A missing security header on error responses.** A genuine server error wasn't returning the header browsers need to read error details cross-origin — invisible in normal use, but it would have made a real production incident harder to diagnose from the browser console. Fixed.
+6. **The Workbench had no link to it.** The verification queue page itself was fully built and worked correctly, but nothing in the app's navigation pointed at it — it was unreachable except by typing its address directly. Fixed; it's in the main sidebar now.
+7. **The health-check endpoint didn't check the thing it implied it checked.** It reported database/cache status but said nothing about tenant isolation. Now it does — see §6.
+8. **A configuration value that existed in code but not in the settings screen.** A newly added search-relevance threshold was readable in code but had never been registered in the admin Settings screen the way every other threshold is — invisible and uneditable. Fixed.
+9. **Handwriting detection silently always said "no."** One of the two document-reading providers never actually checked whether a value was handwritten — it always reported "no" regardless of the real answer, which matters because handwritten fields are treated differently in the verification workbench (§3). Improved to use the provider's real handwriting-detection signal instead.
+
+Every one of these was found by actually running the system — real logins, real searches, real documents, a real second tenant — not by reading the code and assuming it was correct. Full regression suite (380+ automated tests) stayed green throughout.
 
 > **Why this section exists:** the point of naming these bugs and gaps isn't to advertise flaws — it's that this is the standard of scrutiny this kind of system is held to before it touches a real legal record: find it yourself, report it honestly, and prove it can't silently happen again.
 
@@ -290,6 +306,12 @@ No dedicated GPU yet for local AI extraction, so that one step still depends on 
 
 **"Can you show a table that was split across a left and right page getting stitched together?"**
 Be straight about this one rather than attempt it live: that specific case (a two-page facing-page split) is built and its safety behavior is proven — it correctly refuses to guess rather than produce a wrong answer — but a real successful join hasn't been demonstrated yet. What *can* be shown live and is fully proven: a value split top-to-bottom across a page boundary being correctly reconnected, and "Do." ditto marks being correctly expanded — both confirmed on real registers.
+
+**"Can I upload a new document right now and see it fully processed?"**
+It'll index and become fully text-searchable immediately — but the field-by-field extraction step (Workbench entries, structured facts) is paused right now pending an AI-provider credit top-up, a cost-control choice, not a limitation. Every document already in the account was processed before that pause and is completely unaffected — use one of those (the Wardha register, with 1,358 extracted facts, is the best one to point at) for anything that needs to show extraction or the Workbench.
+
+**"What if the same document was scanned twice and both copies ended up in the system?"**
+Handled two ways: at upload, the system flags likely rescans for a human to resolve. At search/chat time, if two near-identical copies both come up for the same question, the system now automatically cites from just one of them consistently, instead of the answer and its citation pointing at two different copies of the same content — confirmed live against a real duplicate pair already in the account.
 
 ---
 
